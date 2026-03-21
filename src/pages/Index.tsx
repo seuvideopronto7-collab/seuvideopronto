@@ -6,6 +6,8 @@ import RoteiroDisplay from "@/components/RoteiroDisplay";
 import YouTubeDashboard from "@/components/YouTubeDashboard";
 import TikTokDashboard from "@/components/TikTokDashboard";
 import VariacoesDisplay from "@/components/VariacoesDisplay";
+import ImportContent from "@/components/ImportContent";
+import AnalysisResult from "@/components/AnalysisResult";
 import { Loader2 } from "lucide-react";
 
 const Index = () => {
@@ -14,10 +16,18 @@ const Index = () => {
   const [roteiroData, setRoteiroData] = useState<any>(null);
   const [seoData, setSeoData] = useState<any>(null);
   const [variacoesData, setVariacoesData] = useState<any>(null);
+  const [analysisData, setAnalysisData] = useState<any>(null);
+  const [importLoading, setImportLoading] = useState(false);
+
+  // Keep form state at parent level so ImportContent can access it
+  const [formData, setFormData] = useState({
+    produto: "", nicho: "", publico: "", dor: "", beneficio: "", link: "",
+  });
 
   const handleGenerate = async (form: any, tipo: string) => {
     setIsLoading(true);
     setLoadingType(tipo);
+    setFormData(form);
 
     try {
       const { data, error } = await supabase.functions.invoke("generate-viral", {
@@ -93,6 +103,34 @@ const Index = () => {
 
         {/* Input */}
         <ProductForm onGenerate={handleGenerate} isLoading={isLoading} />
+
+        {/* Import Content Module */}
+        <ImportContent
+          produto={formData.produto}
+          nicho={formData.nicho}
+          publico={formData.publico}
+          dor={formData.dor}
+          beneficio={formData.beneficio}
+          link={formData.link}
+          onResult={setAnalysisData}
+          isLoading={importLoading}
+          setIsLoading={setImportLoading}
+        />
+
+        {/* Analysis Results */}
+        {analysisData && (
+          <div className="space-y-2">
+            <h3 className="text-lg font-semibold gradient-text">Resultado da Análise</h3>
+            <AnalysisResult data={analysisData} />
+            {/* Also populate SEO from analysis */}
+            {analysisData.seo && !seoData && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <YouTubeDashboard data={analysisData.seo} />
+                <TikTokDashboard data={analysisData.seo} roteiro={analysisData.novo_roteiro} />
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Results */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
