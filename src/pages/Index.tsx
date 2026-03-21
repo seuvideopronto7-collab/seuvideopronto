@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
+import { useNavigate } from "react-router-dom";
 import ProductForm from "@/components/ProductForm";
 import RoteiroDisplay from "@/components/RoteiroDisplay";
 import YouTubeDashboard from "@/components/YouTubeDashboard";
@@ -8,6 +10,7 @@ import TikTokDashboard from "@/components/TikTokDashboard";
 import VariacoesDisplay from "@/components/VariacoesDisplay";
 import ImportContent from "@/components/ImportContent";
 import AnalysisResult from "@/components/AnalysisResult";
+import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 
 const Index = () => {
