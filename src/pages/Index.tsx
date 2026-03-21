@@ -14,6 +14,8 @@ import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 
 const Index = () => {
+  const { signOut, isAdmin, profile } = useAuth();
+  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [loadingType, setLoadingType] = useState("");
   const [roteiroData, setRoteiroData] = useState<any>(null);
