@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
+import { useNavigate } from "react-router-dom";
 import ProductForm from "@/components/ProductForm";
 import RoteiroDisplay from "@/components/RoteiroDisplay";
 import YouTubeDashboard from "@/components/YouTubeDashboard";
@@ -8,9 +10,12 @@ import TikTokDashboard from "@/components/TikTokDashboard";
 import VariacoesDisplay from "@/components/VariacoesDisplay";
 import ImportContent from "@/components/ImportContent";
 import AnalysisResult from "@/components/AnalysisResult";
+import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 
 const Index = () => {
+  const { signOut, isAdmin, profile } = useAuth();
+  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [loadingType, setLoadingType] = useState("");
   const [roteiroData, setRoteiroData] = useState<any>(null);
@@ -70,9 +75,22 @@ const Index = () => {
               <p className="text-xs text-muted-foreground">Engine de Vídeos Virais</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono">
-            <span className="w-2 h-2 rounded-full bg-neon-cyan animate-pulse-neon" />
-            Sistema Ativo
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground font-mono flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-neon-cyan animate-pulse-neon" />
+              {profile?.full_name || "Usuário"}
+            </span>
+            {isAdmin && (
+              <Button variant="ghost" size="sm" onClick={() => navigate("/admin")}>
+                Admin
+              </Button>
+            )}
+            <Button variant="ghost" size="sm" onClick={() => navigate("/perfil")}>
+              Perfil
+            </Button>
+            <Button variant="ghost" size="sm" onClick={signOut}>
+              Sair
+            </Button>
           </div>
         </div>
       </header>
