@@ -75,9 +75,22 @@ const Index = () => {
               <p className="text-xs text-muted-foreground">Engine de Vídeos Virais</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono">
-            <span className="w-2 h-2 rounded-full bg-neon-cyan animate-pulse-neon" />
-            Sistema Ativo
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground font-mono flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-neon-cyan animate-pulse-neon" />
+              {profile?.full_name || "Usuário"}
+            </span>
+            {isAdmin && (
+              <Button variant="ghost" size="sm" onClick={() => navigate("/admin")}>
+                Admin
+              </Button>
+            )}
+            <Button variant="ghost" size="sm" onClick={() => navigate("/perfil")}>
+              Perfil
+            </Button>
+            <Button variant="ghost" size="sm" onClick={signOut}>
+              Sair
+            </Button>
           </div>
         </div>
       </header>
