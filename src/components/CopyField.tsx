@@ -3,9 +3,9 @@ import { Copy, Check } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
-interface CopyFieldProps {
+export interface CopyFieldProps {
   label: string;
-  emoji: string;
+  emoji?: string;
   value: string;
   multiline?: boolean;
 }
