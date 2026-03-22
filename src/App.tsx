@@ -47,6 +47,14 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/infoproduto"
+              element={
+                <ProtectedRoute>
+                  <Infoproduct />
+                </ProtectedRoute>
+              }
+            />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
