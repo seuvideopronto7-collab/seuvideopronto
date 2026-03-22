@@ -53,6 +53,25 @@ const Index = () => {
           </p>
         </div>
 
+        {/* CTA Infoproduto */}
+        <button
+          onClick={() => navigate("/infoproduto")}
+          className="w-full group relative overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-r from-primary/10 via-purple-500/10 to-accent/10 p-6 text-left transition-all hover:border-primary/60 hover:shadow-[0_0_40px_-8px_hsl(var(--neon-pink)/0.4)]"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center text-2xl shrink-0">
+              🚀
+            </div>
+            <div>
+              <h3 className="text-lg font-bold">CRIAR INFOPRODUTO COMPLETO</h3>
+              <p className="text-sm text-muted-foreground">
+                Curso + Ebook + VSL + Kit de Vendas com IA em minutos
+              </p>
+            </div>
+          </div>
+          <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-accent/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+        </button>
+
         {/* Wizard */}
         <VideoWizard />
       </main>
