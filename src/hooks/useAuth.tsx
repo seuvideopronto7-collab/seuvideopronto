@@ -18,6 +18,7 @@ interface AuthContextType {
   session: Session | null;
   profile: Profile | null;
   isAdmin: boolean;
+  isFounder: boolean;
   isActive: boolean;
   loading: boolean;
   signOut: () => Promise<void>;
@@ -29,6 +30,7 @@ const AuthContext = createContext<AuthContextType>({
   session: null,
   profile: null,
   isAdmin: false,
+  isFounder: false,
   isActive: false,
   loading: true,
   signOut: async () => {},
@@ -42,9 +44,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isFounder, setIsFounder] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = async (userId: string, userEmail?: string | null) => {
     const { data } = await supabase
       .from("profiles")
       .select("*")
@@ -56,7 +59,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       .from("user_roles")
       .select("role")
       .eq("user_id", userId);
-    setIsAdmin(roles?.some((r: any) => r.role === "admin") || false);
+    const admin = roles?.some((r: any) => r.role === "admin") || false;
+    setIsAdmin(admin);
+
+    const founderEmails = (import.meta.env.VITE_FOUNDER_EMAILS || "")
+      .split(",")
+      .map((email: string) => email.trim().toLowerCase())
+      .filter(Boolean);
+    const email = (data?.email || userEmail || "").toLowerCase();
+    const founder = founderEmails.length > 0 ? founderEmails.includes(email) : admin;
+    setIsFounder(founder);
   };
 
   const refreshProfile = async () => {
@@ -69,10 +81,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
-          setTimeout(() => fetchProfile(session.user.id), 0);
+          setTimeout(() => fetchProfile(session.user.id, session.user.email), 0);
         } else {
           setProfile(null);
           setIsAdmin(false);
+          setIsFounder(false);
         }
         setLoading(false);
       }
@@ -82,7 +95,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        fetchProfile(session.user.id);
+        fetchProfile(session.user.id, session.user.email);
       }
       setLoading(false);
     });
@@ -96,6 +109,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setSession(null);
     setProfile(null);
     setIsAdmin(false);
+    setIsFounder(false);
   };
 
   return (
@@ -105,6 +119,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         session,
         profile,
         isAdmin,
+        isFounder,
         isActive: profile?.is_active ?? false,
         loading,
         signOut,

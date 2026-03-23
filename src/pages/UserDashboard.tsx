@@ -10,7 +10,7 @@ import { usePlan } from "@/hooks/usePlan";
 import { formatLimitLabel, getPlanLabel } from "@/lib/plans";
 
 const UserDashboard = () => {
-  const { profile, refreshProfile, signOut, isAdmin } = useAuth();
+  const { profile, refreshProfile, signOut, isAdmin, isFounder } = useAuth();
   const navigate = useNavigate();
   const { planId, limits, usage } = usePlan();
   const [saving, setSaving] = useState(false);
@@ -98,9 +98,14 @@ const UserDashboard = () => {
               <div>
                 <h2 className="text-lg font-semibold">Plano atual</h2>
                 <p className="text-xs text-muted-foreground">{getPlanLabel(planId)}</p>
+                {isFounder && (
+                  <p className="text-xs text-neon-cyan">👑 Founder — Acesso ilimitado</p>
+                )}
               </div>
             </div>
-            <Button variant="neon" size="sm" onClick={() => navigate("/planos")}>Fazer upgrade</Button>
+            {!isFounder && (
+              <Button variant="neon" size="sm" onClick={() => navigate("/planos")}>Fazer upgrade</Button>
+            )}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {Object.entries(limits)
@@ -110,7 +115,7 @@ const UserDashboard = () => {
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-muted-foreground">{formatLimitLabel(key)}</span>
                     <span className="font-mono text-primary">
-                      {(usage as any)[key] || 0}/{value as number}
+                      {(usage as any)[key] || 0}/{Number.isFinite(value as number) ? (value as number) : "∞"}
                     </span>
                   </div>
                 </div>

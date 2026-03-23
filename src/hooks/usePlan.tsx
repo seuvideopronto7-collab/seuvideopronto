@@ -18,7 +18,7 @@ interface LimitCheckResult {
 }
 
 export const usePlan = () => {
-  const { user } = useAuth();
+  const { user, isFounder } = useAuth();
   const [record, setRecord] = useState<PlanRecord | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -95,14 +95,23 @@ export const usePlan = () => {
   }, [record, maybeResetUsage]);
 
   const limits = useMemo(() => {
-    if (!record) return getPlanLimits("start");
-    return record.limite_diario_json || getPlanLimits(record.plano);
-  }, [record]);
+    const baseLimits = isFounder
+      ? getPlanLimits("pro")
+      : record?.limite_diario_json || getPlanLimits(record?.plano || "start");
+    if (!isFounder) return baseLimits;
+    return Object.fromEntries(
+      Object.entries(baseLimits).map(([key, value]) => [
+        key,
+        typeof value === "number" ? Number.POSITIVE_INFINITY : true,
+      ]),
+    ) as PlanLimits;
+  }, [record, isFounder]);
 
   const usage = useMemo(() => record?.uso_hoje_json || {}, [record]);
 
   const checkLimit = useCallback(
     (key: string, amount = 1): LimitCheckResult => {
+      if (isFounder) return { allowed: true };
       const limit = limits?.[key];
       if (typeof limit === "boolean") {
         if (!limit) return { allowed: false, reason: "Seu plano não inclui este recurso." };
@@ -116,12 +125,13 @@ export const usePlan = () => {
       }
       return { allowed: true };
     },
-    [limits, usage],
+    [limits, usage, isFounder],
   );
 
   const consume = useCallback(
     async (key: string, amount = 1): Promise<LimitCheckResult> => {
       if (!user) return { allowed: false, reason: "Usuário não autenticado." };
+      if (isFounder) return { allowed: true };
       if (!record) return { allowed: false, reason: "Plano indisponível." };
 
       const check = checkLimit(key, amount);
@@ -148,7 +158,7 @@ export const usePlan = () => {
       setRecord(data as PlanRecord);
       return { allowed: true };
     },
-    [user, record, checkLimit],
+    [user, record, checkLimit, isFounder],
   );
 
   const updatePlan = useCallback(
@@ -171,7 +181,7 @@ export const usePlan = () => {
 
   return {
     record,
-    planId: record?.plano || "start",
+    planId: isFounder ? "pro" : record?.plano || "start",
     limits,
     usage,
     loading,
