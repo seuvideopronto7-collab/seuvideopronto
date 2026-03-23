@@ -16,21 +16,23 @@ const STEPS = [
 interface StepperProps {
   currentStep: number;
   onStepClick: (step: number) => void;
+  unlockedSteps?: number[];
 }
 
-const Stepper = ({ currentStep, onStepClick }: StepperProps) => {
+const Stepper = ({ currentStep, onStepClick, unlockedSteps = [] }: StepperProps) => {
   return (
     <div className="w-full overflow-x-auto pb-2">
       <div className="flex items-center gap-1 min-w-max px-1">
         {STEPS.map((step, i) => {
           const isCompleted = step.num < currentStep;
           const isCurrent = step.num === currentStep;
-          const isLocked = step.num > currentStep;
+          const isUnlocked = unlockedSteps.includes(step.num);
+          const isLocked = step.num > currentStep && !isUnlocked;
 
           return (
             <div key={step.num} className="flex items-center">
               <button
-                onClick={() => isCompleted && onStepClick(step.num)}
+                onClick={() => (isCompleted || isUnlocked) && onStepClick(step.num)}
                 disabled={isLocked}
                 className={`
                   flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-300
@@ -38,7 +40,9 @@ const Stepper = ({ currentStep, onStepClick }: StepperProps) => {
                     ? "bg-accent/15 text-accent cursor-pointer hover:bg-accent/25"
                     : isCurrent
                       ? "bg-primary/15 text-primary ring-1 ring-primary/40 shadow-[0_0_12px_-3px_hsl(var(--primary)/0.4)]"
-                      : "bg-muted/30 text-muted-foreground/40 cursor-not-allowed"
+                      : isUnlocked
+                        ? "bg-muted/40 text-muted-foreground hover:bg-muted/60"
+                        : "bg-muted/30 text-muted-foreground/40 cursor-not-allowed"
                   }
                 `}
               >
@@ -48,7 +52,9 @@ const Stepper = ({ currentStep, onStepClick }: StepperProps) => {
                     ? "bg-accent text-accent-foreground"
                     : isCurrent
                       ? "bg-primary text-primary-foreground"
-                      : "bg-muted/50 text-muted-foreground/50"
+                      : isUnlocked
+                        ? "bg-muted/60 text-muted-foreground"
+                        : "bg-muted/50 text-muted-foreground/50"
                   }
                 `}>
                   {isCompleted ? <Check className="w-3 h-3" /> : isLocked ? <Lock className="w-2.5 h-2.5" /> : step.num}

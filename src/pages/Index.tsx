@@ -1,11 +1,14 @@
+import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import VideoWizard from "@/components/wizard/VideoWizard";
+import Content30Days from "@/components/Content30Days";
 
 const Index = () => {
   const { signOut, isAdmin, profile } = useAuth();
   const navigate = useNavigate();
+  const [showCalendar, setShowCalendar] = useState(false);
 
   return (
     <div className="min-h-screen bg-background">
@@ -63,7 +66,7 @@ const Index = () => {
               🚀
             </div>
             <div>
-              <h3 className="text-lg font-bold">CRIAR INFOPRODUTO COMPLETO</h3>
+              <h3 className="text-lg font-bold">PUBLICAR MEU INFOPRODUTO</h3>
               <p className="text-sm text-muted-foreground">
                 Curso + Ebook + VSL + Kit de Vendas com IA em minutos
               </p>
@@ -71,6 +74,27 @@ const Index = () => {
           </div>
           <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-accent/5 opacity-0 group-hover:opacity-100 transition-opacity" />
         </button>
+
+        {/* CTA Conteúdo 30 Dias */}
+        <button
+          onClick={() => setShowCalendar((prev) => !prev)}
+          className="w-full group relative overflow-hidden rounded-2xl border border-accent/30 bg-gradient-to-r from-accent/10 via-cyan-500/10 to-primary/10 p-6 text-left transition-all hover:border-accent/60 hover:shadow-[0_0_40px_-8px_hsl(var(--neon-cyan)/0.4)]"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-accent to-primary flex items-center justify-center text-2xl shrink-0">
+              📅
+            </div>
+            <div>
+              <h3 className="text-lg font-bold">CONTEÚDO PARA 30 DIAS</h3>
+              <p className="text-sm text-muted-foreground">
+                Calendário automático + autopost integrado
+              </p>
+            </div>
+          </div>
+          <div className="absolute inset-0 bg-gradient-to-r from-accent/5 to-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+        </button>
+
+        {showCalendar && <Content30Days />}
 
         {/* Wizard */}
         <VideoWizard />

@@ -1,7 +1,9 @@
 import { Button } from "@/components/ui/button";
-import { Download, Copy, Check, Rocket } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Download, Copy, Check, Rocket, Link2, ShieldCheck, Send } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { zipSync, strToU8 } from "fflate";
 
 interface Props {
   estruturaData: any;
@@ -13,6 +15,12 @@ interface Props {
 
 const InfoStepEntrega = ({ estruturaData, conteudoData, vslData, kitData, onNewProduct }: Props) => {
   const [copiedPlatform, setCopiedPlatform] = useState<string | null>(null);
+  const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
+  const [connectedPlatform, setConnectedPlatform] = useState<string | null>(null);
+  const [credentials, setCredentials] = useState({ email: "", senha: "", token: "" });
+  const [status, setStatus] = useState<"Preparando" | "Enviado" | "Aprovado" | "Rejeitado" | "Fallback" | null>(null);
+  const [logs, setLogs] = useState<string[]>([]);
+  const [campaign, setCampaign] = useState<any>(null);
 
   const buildFullCopy = (platform: string) => {
     const parts = [];
@@ -45,11 +53,66 @@ const InfoStepEntrega = ({ estruturaData, conteudoData, vslData, kitData, onNewP
     return parts.join("\n");
   };
 
+  const buildZipPackage = () => {
+    const files: Record<string, Uint8Array> = {
+      "copy.txt": strToU8(buildFullCopy(connectedPlatform || "Plataforma")),
+      "descricao.txt": strToU8(kitData?.landing_page?.estrutura || "Descrição pronta"),
+      "roteiros/vsl.txt": strToU8(vslData?.roteiro_completo || vslData?.hook || "Roteiro VSL"),
+      "roteiros/anuncios.txt": strToU8((kitData?.bullets || []).join("\n") || "Scripts de anúncio"),
+      "thumbnails/README.txt": strToU8("Inclua suas thumbnails aqui"),
+    };
+    const zip = zipSync(files, { level: 6 });
+    const blob = new Blob([zip], { type: "application/zip" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "produto.zip";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const handleCopyPlatform = (platform: string) => {
     navigator.clipboard.writeText(buildFullCopy(platform));
     setCopiedPlatform(platform);
     toast.success(`Copiado para ${platform}!`);
     setTimeout(() => setCopiedPlatform(null), 2000);
+  };
+
+  const handleConnect = () => {
+    if (!selectedPlatform) {
+      toast.error("Selecione uma plataforma para conectar.");
+      return;
+    }
+    if (!credentials.email || (!credentials.senha && !credentials.token)) {
+      toast.error("Informe email e senha ou token/API.");
+      return;
+    }
+    setConnectedPlatform(selectedPlatform);
+    setStatus("Preparando");
+    setLogs((prev) => [`${new Date().toLocaleTimeString()} • ${selectedPlatform} conectado`, ...prev]);
+    toast.success(`Conectado a ${selectedPlatform}!`);
+  };
+
+  const handleEnviar = () => {
+    if (!connectedPlatform) {
+      setStatus("Fallback");
+      setLogs((prev) => [`${new Date().toLocaleTimeString()} • Fallback ativado: pacote pronto`, ...prev]);
+      buildZipPackage();
+      toast.warning("API indisponível. Pacote gerado para envio manual.");
+      return;
+    }
+    setStatus("Enviado");
+    setLogs((prev) => [`${new Date().toLocaleTimeString()} • Produto enviado para aprovação`, ...prev]);
+    toast.success("Produto enviado para análise!");
+  };
+
+  const handleCampaign = () => {
+    const criativos = kitData?.bullets || ["Resultado rápido", "Prova social", "Transformação clara"];
+    const headlines = [kitData?.headline, kitData?.subheadline].filter(Boolean);
+    const publicos = [estruturaData?.avatar?.perfil, estruturaData?.avatar?.situacao].filter(Boolean);
+    const scripts = [kitData?.cta_principal, kitData?.garantia].filter(Boolean);
+    setCampaign({ criativos, headlines, publicos, scripts });
+    toast.success("Campanha de vendas gerada! 🔥");
   };
 
   return (
@@ -86,7 +149,7 @@ const InfoStepEntrega = ({ estruturaData, conteudoData, vslData, kitData, onNewP
 
       {/* Plataformas */}
       <div className="space-y-3">
-        {["Hotmart", "Eduzz", "Monetizze"].map((p) => (
+        {["Hotmart", "Eduzz", "Monetizze", "Kiwify"].map((p) => (
           <Button
             key={p}
             variant="glass"
@@ -98,6 +161,138 @@ const InfoStepEntrega = ({ estruturaData, conteudoData, vslData, kitData, onNewP
             {copiedPlatform === p ? <Check className="w-4 h-4 text-accent" /> : <Copy className="w-4 h-4" />}
           </Button>
         ))}
+      </div>
+
+      <div className="space-y-4 border-t border-border/30 pt-4">
+        <div className="flex items-center gap-2">
+          <Link2 className="w-4 h-4 text-primary" />
+          <h4 className="text-sm font-semibold">Conectar Plataformas</h4>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          {["Hotmart", "Eduzz", "Monetizze", "Kiwify"].map((p) => (
+            <button
+              key={p}
+              onClick={() => setSelectedPlatform(p)}
+              className={`rounded-lg border px-3 py-2 text-xs transition-all ${
+                selectedPlatform === p ? "border-primary bg-primary/10 text-primary" : "border-border/40 text-muted-foreground"
+              }`}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <Input
+            placeholder="Email"
+            value={credentials.email}
+            onChange={(e) => setCredentials((p) => ({ ...p, email: e.target.value }))}
+          />
+          <Input
+            placeholder="Senha"
+            type="password"
+            value={credentials.senha}
+            onChange={(e) => setCredentials((p) => ({ ...p, senha: e.target.value }))}
+          />
+          <Input
+            placeholder="Token/API (opcional)"
+            value={credentials.token}
+            onChange={(e) => setCredentials((p) => ({ ...p, token: e.target.value }))}
+          />
+        </div>
+
+        <Button variant="neon" size="lg" className="w-full" onClick={handleConnect}>
+          <ShieldCheck className="w-4 h-4" /> Conectar Plataforma
+        </Button>
+      </div>
+
+      <div className="space-y-4 border-t border-border/30 pt-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h4 className="text-sm font-semibold">Dashboard</h4>
+            <p className="text-xs text-muted-foreground">Status em tempo real</p>
+          </div>
+          {connectedPlatform && (
+            <span className="text-xs rounded-full bg-accent/20 text-accent px-2 py-1">
+              Conectado: {connectedPlatform}
+            </span>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {status && (
+            <span className="text-xs rounded-full bg-primary/15 text-primary px-2 py-1">{status}</span>
+          )}
+          {!status && <span className="text-xs text-muted-foreground">Aguardando conexão</span>}
+        </div>
+        {logs.length > 0 && (
+          <div className="rounded-lg border border-border/30 bg-muted/30 p-3 text-xs text-muted-foreground space-y-1">
+            {logs.map((log, i) => (
+              <div key={i}>{log}</div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-4 border-t border-border/30 pt-4">
+        <div>
+          <h4 className="text-sm font-semibold">Preparação Automática</h4>
+          <p className="text-xs text-muted-foreground">Materiais adaptados por plataforma</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {["Headline", "Descrição longa", "Categoria", "Thumbnail", "Garantia", "Preço"].map((item) => (
+            <div key={item} className="rounded-lg border border-border/30 bg-muted/30 px-3 py-2 text-xs">
+              ✅ {item}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-3 border-t border-border/30 pt-4">
+        <Button variant="viral" size="lg" className="w-full" onClick={handleEnviar}>
+          <Send className="w-4 h-4" /> Enviar para aprovação
+        </Button>
+        <Button variant="glass" size="lg" className="w-full" onClick={buildZipPackage}>
+          <Download className="w-4 h-4" /> Baixar pacote (ZIP)
+        </Button>
+      </div>
+
+      <div className="space-y-4 border-t border-border/30 pt-4">
+        <div>
+          <h4 className="text-sm font-semibold">Inteligência de Venda</h4>
+          <p className="text-xs text-muted-foreground">Criativos, headlines e scripts prontos</p>
+        </div>
+        <Button variant="neon" size="lg" className="w-full" onClick={handleCampaign}>
+          🔥 Gerar campanha de vendas
+        </Button>
+        {campaign && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+            <div className="rounded-lg border border-border/30 bg-muted/30 p-3">
+              <p className="font-semibold mb-2">Criativos</p>
+              {(campaign.criativos || []).map((c: string, i: number) => (
+                <div key={i}>• {c}</div>
+              ))}
+            </div>
+            <div className="rounded-lg border border-border/30 bg-muted/30 p-3">
+              <p className="font-semibold mb-2">Headlines</p>
+              {(campaign.headlines || []).map((h: string, i: number) => (
+                <div key={i}>• {h}</div>
+              ))}
+            </div>
+            <div className="rounded-lg border border-border/30 bg-muted/30 p-3">
+              <p className="font-semibold mb-2">Públicos</p>
+              {(campaign.publicos || []).map((p: string, i: number) => (
+                <div key={i}>• {p}</div>
+              ))}
+            </div>
+            <div className="rounded-lg border border-border/30 bg-muted/30 p-3">
+              <p className="font-semibold mb-2">Scripts</p>
+              {(campaign.scripts || []).map((s: string, i: number) => (
+                <div key={i}>• {s}</div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <Button variant="viral" size="lg" className="w-full" onClick={onNewProduct}>

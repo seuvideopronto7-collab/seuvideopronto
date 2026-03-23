@@ -11,10 +11,9 @@ interface StepSeoProps {
 }
 
 const StepSeo = ({ data, onRegenerate, onContinue, isLoading }: StepSeoProps) => {
-  if (!data) return null;
-
-  const seo = data.titulos ? data : data.seo;
-  if (!seo) return null;
+  const seo = data?.titulos ? data : data?.seo;
+  const isFallback = Boolean(data?._fallback);
+  const reason = data?._reason;
 
   const copyAll = () => {
     const text = [
@@ -37,24 +36,40 @@ const StepSeo = ({ data, onRegenerate, onContinue, isLoading }: StepSeoProps) =>
           <p className="text-sm text-muted-foreground">Otimizado para máxima viralização</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="glass" size="sm" onClick={copyAll}><Copy className="w-3 h-3" /> Copiar SEO</Button>
+          {seo && (
+            <Button variant="glass" size="sm" onClick={copyAll}><Copy className="w-3 h-3" /> Copiar SEO</Button>
+          )}
           <Button variant="glass" size="sm" onClick={onRegenerate} disabled={isLoading}><RefreshCw className="w-3 h-3" /> Regerar</Button>
         </div>
       </div>
 
       <div className="glass-card p-5 space-y-3">
-        {seo.titulos && <CopyField label="Títulos" emoji="📺" value={seo.titulos.join("\n")} multiline />}
-        {seo.descricao_youtube && <CopyField label="Descrição YouTube" emoji="📄" value={seo.descricao_youtube} multiline />}
-        {seo.hashtags && <CopyField label="Hashtags" emoji="🔥" value={seo.hashtags.join(" ")} />}
-        {(seo.palavras_chave || seo.tags) && (
-          <CopyField label="Tags / Palavras-chave" emoji="🏷️" value={seo.palavras_chave?.join(", ") || seo.tags_youtube || seo.tags || ""} />
+        {isFallback && (
+          <div className="flex items-center justify-between rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-xs text-accent">
+            <span>Fallback aplicado automaticamente</span>
+            {reason && <span className="text-muted-foreground">{reason}</span>}
+          </div>
         )}
-        {seo.thumbnail_prompt && <CopyField label="Ideia de Thumbnail" emoji="🖼️" value={seo.thumbnail_prompt} multiline />}
-        {seo.seo_score && (
-          <div className="flex items-center gap-3 pt-2">
-            <span className="text-sm text-muted-foreground">SEO Score:</span>
-            <span className="text-2xl font-bold text-accent">{seo.seo_score}</span>
-            <span className="text-xs text-muted-foreground">/100</span>
+        {seo ? (
+          <>
+            {seo.titulos && <CopyField label="Títulos" emoji="📺" value={seo.titulos.join("\n")} multiline />}
+            {seo.descricao_youtube && <CopyField label="Descrição YouTube" emoji="📄" value={seo.descricao_youtube} multiline />}
+            {seo.hashtags && <CopyField label="Hashtags" emoji="🔥" value={seo.hashtags.join(" ")} />}
+            {(seo.palavras_chave || seo.tags) && (
+              <CopyField label="Tags / Palavras-chave" emoji="🏷️" value={seo.palavras_chave?.join(", ") || seo.tags_youtube || seo.tags || ""} />
+            )}
+            {seo.thumbnail_prompt && <CopyField label="Ideia de Thumbnail" emoji="🖼️" value={seo.thumbnail_prompt} multiline />}
+            {seo.seo_score && (
+              <div className="flex items-center gap-3 pt-2">
+                <span className="text-sm text-muted-foreground">SEO Score:</span>
+                <span className="text-2xl font-bold text-accent">{seo.seo_score}</span>
+                <span className="text-xs text-muted-foreground">/100</span>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="text-sm text-muted-foreground">
+            SEO indisponível no momento. Você pode continuar sem travar o fluxo.
           </div>
         )}
       </div>

@@ -31,6 +31,38 @@ const VideoWizard = () => {
 
   const goTo = (s: number) => setStep(s);
 
+  const buildSeoFallback = (reason?: string) => {
+    const tituloBase = formData.produto || formData.nicho || "Seu vídeo";
+    const hook = roteiroData?.roteiro?.hook || roteiroData?.roteiro_completo || "Assista até o fim";
+    const descricao = `Descubra como ${formData.beneficio || "transformar seus resultados"} com ${tituloBase}. ${formData.link ? `Link: ${formData.link}` : ""}`.trim();
+    const nichoTag = formData.nicho ? `#${formData.nicho.replace(/\s+/g, "").toLowerCase()}` : "#viral";
+    const hashtags = ["#fyp", "#viral", "#tiktok", "#shorts", "#reels", nichoTag].slice(0, 10);
+    const palavras = [formData.produto, formData.nicho, formData.publico, formData.beneficio]
+      .filter(Boolean)
+      .map((t) => String(t).toLowerCase());
+
+    return {
+      seo: {
+        titulos: [
+          `${tituloBase}: ${hook}`,
+          `${tituloBase} em 3 passos`,
+          `O erro que te impede em ${formData.nicho || "seu nicho"}`,
+          `Como ${formData.publico || "você"} consegue ${formData.beneficio || "resultado"}`,
+          `Antes de ${tituloBase}, veja isso`,
+        ],
+        hashtags,
+        descricao_youtube: descricao,
+        descricao_tiktok: descricao.slice(0, 120),
+        palavras_chave: palavras.length ? palavras.slice(0, 5) : ["viral", "conteúdo", "marketing"],
+        tags_youtube: palavras.join(", ") || "viral, marketing, conteúdo",
+        thumbnail_prompt: `Thumbnail com ${tituloBase}, contraste alto, texto curto e promessa clara.`,
+        seo_score: 72,
+      },
+      _fallback: true,
+      _reason: reason || "Falha na geração automática de SEO",
+    };
+  };
+
   // Step 2 → 3: Analyze content
   const handleAnalyze = async () => {
     setStep(3);
@@ -115,7 +147,9 @@ const VideoWizard = () => {
       toast.success("SEO gerado! 🔥");
     } catch (err: any) {
       console.error(err);
-      toast.error(err.message || "Erro ao gerar SEO");
+      const fallback = buildSeoFallback(err?.message);
+      setSeoData(fallback);
+      toast.warning("SEO falhou. Fallback aplicado automaticamente.");
     } finally {
       setIsLoading(false);
     }
@@ -163,9 +197,9 @@ const VideoWizard = () => {
   };
 
   // Step 6: Transition to SEO step and generate if not already
-  const handleGoToSeo = () => {
+  const handleGoToSeo = async () => {
     setStep(6);
-    if (!seoData) handleGenerateSeo();
+    if (!seoData) await handleGenerateSeo();
   };
 
   // Reset for new version
@@ -181,7 +215,7 @@ const VideoWizard = () => {
 
   return (
     <div className="space-y-6">
-      <Stepper currentStep={step} onStepClick={goTo} />
+      <Stepper currentStep={step} onStepClick={goTo} unlockedSteps={step >= 6 ? [7, 8, 9] : []} />
 
       <div className="step-transition" key={step}>
         {step === 1 && (

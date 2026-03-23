@@ -9,17 +9,18 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { etapa, nome, nicho, publico, problema, promessa, estrutura } = await req.json();
+    const { etapa, nome, nicho, publico, problema, promessa, estrutura, tipo } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
     const context = `
-Nome do produto: ${nome || "a definir"}
-Nicho: ${nicho}
-Público-alvo: ${publico}
-Problema que resolve: ${problema}
-Promessa principal: ${promessa}
-`;
+ Nome do produto: ${nome || "a definir"}
+ Nicho: ${nicho}
+ Público-alvo: ${publico}
+ Problema que resolve: ${problema}
+ Promessa principal: ${promessa}
+ Tipo de infoproduto: ${tipo || "não especificado"}
+ `;
 
     let systemPrompt = "";
     let userPrompt = "";

@@ -14,7 +14,7 @@ const InfoproductWizard = () => {
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [ideiaData, setIdeiaData] = useState<IdeiaData>({
-    nome: "", nicho: "", publico: "", problema: "", promessa: "",
+    nome: "", nicho: "", publico: "", problema: "", promessa: "", tipo: "",
   });
   const [estruturaData, setEstruturaData] = useState<any>(null);
   const [conteudoData, setConteudoData] = useState<any>(null);
@@ -110,7 +110,7 @@ const InfoproductWizard = () => {
     setConteudoData(null);
     setVslData(null);
     setKitData(null);
-    setIdeiaData({ nome: "", nicho: "", publico: "", problema: "", promessa: "" });
+    setIdeiaData({ nome: "", nicho: "", publico: "", problema: "", promessa: "", tipo: "" });
   };
 
   return (

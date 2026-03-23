@@ -9,7 +9,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { produto, nicho, publico, dor, beneficio, link, tipo } = await req.json();
+    const { produto, nicho, publico, dor, beneficio, link, tipo, marca, objetivo, plataforma, modo } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
@@ -23,6 +23,10 @@ Público-alvo: ${publico}
 Dor principal: ${dor}
 Benefício principal: ${beneficio}
 Link: ${link}
+ Marca: ${marca}
+ Objetivo: ${objetivo}
+ Plataforma principal: ${plataforma}
+ Modo: ${modo}
 `;
 
     if (tipo === "roteiro") {
@@ -72,6 +76,26 @@ Retorne EXATAMENTE este formato JSON:
   ]
 }
 Gere exatamente 10 variações.`;
+    } else if (tipo === "calendario_30_dias") {
+      systemPrompt = `Você é um estrategista de conteúdo para redes sociais. Gere um calendário de 30 dias com roteiros curtos, legendas e hashtags. Sempre responda em JSON válido.`;
+      userPrompt = `Crie 30 conteúdos diários para TikTok, Instagram e YouTube Shorts. Distribua plataformas de forma equilibrada.
+${context}
+
+Retorne EXATAMENTE este formato JSON:
+{
+  "conteudos": [
+    {
+      "dia": 1,
+      "plataforma": "TikTok",
+      "objetivo": "Vendas/viral/autoridade",
+      "roteiro": "roteiro curto com gancho e CTA",
+      "legenda": "legenda pronta",
+      "hashtags": ["#hash1", "#hash2"],
+      "texto_falado": "texto falado do vídeo"
+    }
+  ]
+}
+Gere exatamente 30 itens.`;
     }
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {

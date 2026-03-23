@@ -2,6 +2,13 @@ import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Lightbulb } from "lucide-react";
 
 export interface IdeiaData {
@@ -10,6 +17,7 @@ export interface IdeiaData {
   publico: string;
   problema: string;
   promessa: string;
+  tipo: string;
 }
 
 interface Props {
@@ -19,7 +27,7 @@ interface Props {
 }
 
 const InfoStepIdeia = ({ data, onChange, onContinue }: Props) => {
-  const canContinue = data.nicho && data.publico && data.problema && data.promessa;
+  const canContinue = data.nicho && data.publico && data.problema && data.promessa && data.tipo;
 
   return (
     <div className="glass-card p-6 space-y-5 max-w-2xl mx-auto">
@@ -76,6 +84,20 @@ const InfoStepIdeia = ({ data, onChange, onContinue }: Props) => {
             rows={2}
           />
         </div>
+        <div>
+          <label className="text-sm text-muted-foreground mb-1 block">Tipo de infoproduto *</label>
+          <Select value={data.tipo} onValueChange={(value) => onChange({ ...data, tipo: value })}>
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione o formato" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ebook">Ebook</SelectItem>
+              <SelectItem value="curso">Curso</SelectItem>
+              <SelectItem value="vsl">VSL</SelectItem>
+              <SelectItem value="combo">Combo</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <Button
@@ -85,7 +107,7 @@ const InfoStepIdeia = ({ data, onChange, onContinue }: Props) => {
         disabled={!canContinue}
         onClick={onContinue}
       >
-        🧠 GERAR ESTRUTURA
+        🚀 GERAR PRODUTO
       </Button>
     </div>
   );
