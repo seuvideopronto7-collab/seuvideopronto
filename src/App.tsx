@@ -13,6 +13,7 @@ import Infoproduct from "./pages/Infoproduct";
 import ProdutosProntos from "./pages/ProdutosProntos";
 import Planos from "./pages/Planos";
 import NotFound from "./pages/NotFound";
+import Apis from "./pages/Apis";
 
 const queryClient = new QueryClient();
 
@@ -70,6 +71,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Planos />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/apis"
+              element={
+                <ProtectedRoute>
+                  <Apis />
                 </ProtectedRoute>
               }
             />

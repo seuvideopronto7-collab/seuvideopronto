@@ -18,16 +18,11 @@ interface ProdutoGerado {
   created_at: string;
 }
 
-const PAGE_SIZE = 50;
-
 const ProdutosProntos = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [produtos, setProdutos] = useState<ProdutoGerado[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [page, setPage] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
   const [status, setStatus] = useState<"sucesso" | "vazio" | "erro">("sucesso");
 
   const cacheKey = useMemo(() => (user ? `produtos_prontos_${user.id}` : "produtos_prontos"), [user]);
@@ -52,45 +47,51 @@ const ProdutosProntos = () => {
     sessionStorage.setItem(cacheKey, JSON.stringify({ data, ts: Date.now() }));
   };
 
-  const fetchPage = async (nextPage: number) => {
-    if (!user) return;
-    const isFirst = nextPage === 0;
-    if (isFirst) setLoading(true); else setLoadingMore(true);
-    const from = nextPage * PAGE_SIZE;
-    const to = from + PAGE_SIZE - 1;
+  const carregarProdutos = async (userId: string) => {
+    setLoading(true);
     try {
       const { data, error } = await supabase
         .from("produtos_gerados")
         .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .range(from, to);
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
 
       if (error) throw error;
 
-      console.log("Produtos:", data);
-
       const nextData = (data as ProdutoGerado[]) || [];
-      const merged = isFirst ? nextData : [...produtos, ...nextData];
-      setProdutos(merged);
-      setHasMore(nextData.length === PAGE_SIZE);
-      setPage(nextPage);
-      setStatus(merged.length ? "sucesso" : "vazio");
-      saveCache(merged);
+      setProdutos(nextData);
+      setStatus(nextData.length ? "sucesso" : "vazio");
+      saveCache(nextData);
+      return { status: nextData.length ? "sucesso" : "vazio", data: nextData } as const;
     } catch (err) {
       console.error("Erro ao carregar produtos:", err);
       toast.error("Erro ao carregar produtos prontos");
-      if (isFirst) setProdutos([]);
       setStatus("erro");
+      return { status: "erro", data: [] } as const;
     } finally {
       setLoading(false);
-      setLoadingMore(false);
     }
   };
 
   useEffect(() => {
     if (!user) return;
-    if (!loadFromCache()) void fetchPage(0);
+    loadFromCache();
+    void carregarProdutos(user.id);
+
+    const channel = supabase
+      .channel(`produtos_gerados_${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "produtos_gerados", filter: `user_id=eq.${user.id}` },
+        () => {
+          void carregarProdutos(user.id);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
   }, [user]);
 
   const handleUse = (produto: ProdutoGerado) => {
@@ -199,7 +200,7 @@ const ProdutosProntos = () => {
         {!loading && status === "erro" && produtos.length === 0 && (
           <div className="glass-card p-8 text-center text-muted-foreground space-y-4">
             <p>Erro ao carregar produtos</p>
-            <Button variant="outline" onClick={() => fetchPage(0)}>Tentar novamente</Button>
+            <Button variant="outline" onClick={() => user && carregarProdutos(user.id)}>Tentar novamente</Button>
           </div>
         )}
 
@@ -273,13 +274,6 @@ const ProdutosProntos = () => {
           </div>
         )}
 
-        {hasMore && !loading && (
-          <div className="flex justify-center">
-            <Button variant="ghost" onClick={() => fetchPage(page + 1)} disabled={loadingMore}>
-              {loadingMore ? "Carregando..." : "Carregar mais"}
-            </Button>
-          </div>
-        )}
       </main>
     </div>
   );
