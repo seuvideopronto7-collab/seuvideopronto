@@ -86,8 +86,13 @@ serve(async (req) => {
 
     await adminClient
       .from("profiles")
-      .update({ full_name: MASTER_USERNAME, email: MASTER_EMAIL, is_active: true, updated_at: new Date().toISOString() })
-      .eq("id", userId);
+      .upsert({
+        id: userId,
+        full_name: MASTER_USERNAME,
+        email: MASTER_EMAIL,
+        is_active: true,
+        updated_at: new Date().toISOString(),
+      });
 
     return new Response(JSON.stringify({ ok: true, created: true, email: MASTER_EMAIL }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

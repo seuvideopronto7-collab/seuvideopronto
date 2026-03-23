@@ -52,7 +52,11 @@ const Auth = () => {
         "svpa.session",
         JSON.stringify({ user_id: payload.user.id, role: payload.user.role, token: payload.token }),
       );
-      toast.success("Login realizado!");
+      toast.success(
+        payload.user.role === "admin"
+          ? "Acesso liberado. Controle total ativado."
+          : "Login realizado!",
+      );
       navigate("/");
     }
   };

@@ -33,6 +33,11 @@ const Index = () => {
               {profile?.full_name || "Usuário"}
             </span>
             {isAdmin && (
+              <span className="text-xs font-mono flex items-center gap-1 rounded-full border border-accent/40 bg-accent/10 px-2 py-1 text-accent">
+                🟢 Admin ativo · {profile?.full_name || "CEO-Leandro"}
+              </span>
+            )}
+            {isAdmin && (
               <Button variant="ghost" size="sm" onClick={() => navigate("/admin")}>
                 Admin
               </Button>
