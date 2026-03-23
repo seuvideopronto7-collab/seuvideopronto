@@ -74,7 +74,7 @@ const Auth = () => {
             F
           </div>
           <h1 className="text-2xl font-bold gradient-text">Seu Vídeo Pronto</h1>
-          <p className="text-sm text-muted-foreground">Engine de Vídeos Virais</p>
+          <p className="text-sm text-muted-foreground">Vídeo Viral Profissional</p>
         </div>
 
         {/* Form */}
