@@ -11,6 +11,7 @@ import UserDashboard from "./pages/UserDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import Infoproduct from "./pages/Infoproduct";
 import ProdutosProntos from "./pages/ProdutosProntos";
+import Planos from "./pages/Planos";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -61,6 +62,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <ProdutosProntos />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/planos"
+              element={
+                <ProtectedRoute>
+                  <Planos />
                 </ProtectedRoute>
               }
             />

@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
+import { usePlan } from "@/hooks/usePlan";
+import { getVideoDailyKey } from "@/lib/plans";
+import PlanBlockedDialog from "@/components/PlanBlockedDialog";
 import Stepper from "./Stepper";
 import StepEntrada, { type EntryType } from "./StepEntrada";
 import StepConteudo from "./StepConteudo";
@@ -55,9 +58,20 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [produtoId, setProdutoId] = useState<string | null>(null);
   const [produtoStatus, setProdutoStatus] = useState<"rascunho" | "finalizado" | "publicado">("rascunho");
+  const [blocked, setBlocked] = useState<{ title: string; description: string } | null>(null);
   const { user } = useAuth();
+  const { planId, limits, consume } = usePlan();
 
-  const goTo = (s: number) => setStep(s);
+  const goTo = (s: number) => {
+    if (s === 8 && limits?.editor === false) {
+      setBlocked({
+        title: "Recurso bloqueado",
+        description: "O editor está disponível apenas em planos com editor liberado.",
+      });
+      return;
+    }
+    setStep(s);
+  };
 
   const applyManualFallbacks = (data: ManualInputData) => ({
     produto: data.produto || "Produto sem nome",
@@ -266,9 +280,19 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
 
   // Step 4 → 5: Generate roteiro
   const handleGenerateRoteiro = async () => {
-    setStep(5);
     setIsLoading(true);
     try {
+      const videoKey = getVideoDailyKey(planId);
+      const gate = await consume(videoKey, 1);
+      if (!gate.allowed) {
+        setBlocked({
+          title: "Limite do plano",
+          description: gate.reason || "Você atingiu o limite diário do seu plano.",
+        });
+        setIsLoading(false);
+        return;
+      }
+      setStep(5);
       const { data, error } = await supabase.functions.invoke("generate-viral", {
         body: { ...formData, tipo: "roteiro" },
       });
@@ -302,6 +326,17 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
   const handleGenerateSeo = async () => {
     setIsLoading(true);
     try {
+      if (typeof limits?.thumbnails_dia === "number") {
+        const gate = await consume("thumbnails_dia", 1);
+        if (!gate.allowed) {
+          setBlocked({
+            title: "Limite de thumbnails",
+            description: gate.reason || "Você atingiu o limite diário de thumbnails.",
+          });
+          setIsLoading(false);
+          return;
+        }
+      }
       const { data, error } = await supabase.functions.invoke("generate-viral", {
         body: { ...formData, tipo: "seo" },
       });
@@ -544,6 +579,12 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
         )}
         {step === 10 && <StepPublicacao roteiroData={roteiroData} seoData={seoData} />}
       </div>
+      <PlanBlockedDialog
+        open={Boolean(blocked)}
+        onOpenChange={(open) => (!open ? setBlocked(null) : null)}
+        title={blocked?.title}
+        description={blocked?.description}
+      />
     </div>
   );
 };

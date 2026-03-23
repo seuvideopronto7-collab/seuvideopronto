@@ -1,0 +1,183 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { getNextResetAt, getPlanLimits, isResetDue, type PlanId, type PlanLimits } from "@/lib/plans";
+
+interface PlanRecord {
+  id: string;
+  user_id: string;
+  plano: PlanId;
+  limite_diario_json: PlanLimits;
+  uso_hoje_json: Record<string, number>;
+  reset_at: string | null;
+}
+
+interface LimitCheckResult {
+  allowed: boolean;
+  reason?: string;
+}
+
+export const usePlan = () => {
+  const { user } = useAuth();
+  const [record, setRecord] = useState<PlanRecord | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const ensureRecord = useCallback(async () => {
+    if (!user) {
+      setRecord(null);
+      setLoading(false);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("usuarios_planos")
+      .select("*")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (error) {
+      console.error(error);
+    }
+
+    if (!data) {
+      const defaults = getPlanLimits("start");
+      const { data: created, error: createError } = await supabase
+        .from("usuarios_planos")
+        .insert({
+          user_id: user.id,
+          plano: "start",
+          limite_diario_json: defaults,
+          uso_hoje_json: {},
+          reset_at: getNextResetAt(),
+        })
+        .select("*")
+        .single();
+
+      if (createError) {
+        console.error(createError);
+      }
+      setRecord((created as PlanRecord) || null);
+      setLoading(false);
+      return;
+    }
+
+    setRecord(data as PlanRecord);
+    setLoading(false);
+  }, [user]);
+
+  const maybeResetUsage = useCallback(
+    async (current: PlanRecord | null) => {
+      if (!current || !user) return current;
+      if (!isResetDue(current.reset_at)) return current;
+      const nextReset = getNextResetAt();
+      const { data, error } = await supabase
+        .from("usuarios_planos")
+        .update({ uso_hoje_json: {}, reset_at: nextReset })
+        .eq("user_id", user.id)
+        .select("*")
+        .single();
+      if (error) console.error(error);
+      return (data as PlanRecord) || current;
+    },
+    [user],
+  );
+
+  useEffect(() => {
+    void ensureRecord();
+  }, [ensureRecord]);
+
+  useEffect(() => {
+    if (!record) return;
+    void (async () => {
+      const updated = await maybeResetUsage(record);
+      if (updated && updated !== record) setRecord(updated);
+    })();
+  }, [record, maybeResetUsage]);
+
+  const limits = useMemo(() => {
+    if (!record) return getPlanLimits("start");
+    return record.limite_diario_json || getPlanLimits(record.plano);
+  }, [record]);
+
+  const usage = useMemo(() => record?.uso_hoje_json || {}, [record]);
+
+  const checkLimit = useCallback(
+    (key: string, amount = 1): LimitCheckResult => {
+      const limit = limits?.[key];
+      if (typeof limit === "boolean") {
+        if (!limit) return { allowed: false, reason: "Seu plano não inclui este recurso." };
+        return { allowed: true };
+      }
+      if (typeof limit === "number") {
+        const used = usage?.[key] || 0;
+        if (used + amount > limit) {
+          return { allowed: false, reason: `Limite diário atingido (${used}/${limit}).` };
+        }
+      }
+      return { allowed: true };
+    },
+    [limits, usage],
+  );
+
+  const consume = useCallback(
+    async (key: string, amount = 1): Promise<LimitCheckResult> => {
+      if (!user) return { allowed: false, reason: "Usuário não autenticado." };
+      if (!record) return { allowed: false, reason: "Plano indisponível." };
+
+      const check = checkLimit(key, amount);
+      if (!check.allowed) return check;
+
+      const currentUsage = record.uso_hoje_json || {};
+      const nextUsage = {
+        ...currentUsage,
+        [key]: (currentUsage[key] || 0) + amount,
+      };
+
+      const { data, error } = await supabase
+        .from("usuarios_planos")
+        .update({ uso_hoje_json: nextUsage })
+        .eq("user_id", user.id)
+        .select("*")
+        .single();
+
+      if (error) {
+        console.error(error);
+        return { allowed: false, reason: "Falha ao registrar uso." };
+      }
+
+      setRecord(data as PlanRecord);
+      return { allowed: true };
+    },
+    [user, record, checkLimit],
+  );
+
+  const updatePlan = useCallback(
+    async (plan: PlanId) => {
+      if (!user) return;
+      const { data, error } = await supabase
+        .from("usuarios_planos")
+        .update({ plano: plan, limite_diario_json: getPlanLimits(plan) })
+        .eq("user_id", user.id)
+        .select("*")
+        .single();
+      if (error) {
+        console.error(error);
+        return;
+      }
+      setRecord(data as PlanRecord);
+    },
+    [user],
+  );
+
+  return {
+    record,
+    planId: record?.plano || "start",
+    limits,
+    usage,
+    loading,
+    refresh: ensureRecord,
+    checkLimit,
+    consume,
+    updatePlan,
+  };
+};

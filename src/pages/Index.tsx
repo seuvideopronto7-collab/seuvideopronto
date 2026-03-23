@@ -37,6 +37,9 @@ const Index = () => {
                 Admin
               </Button>
             )}
+            <Button variant="ghost" size="sm" onClick={() => navigate("/planos")}>
+              Planos
+            </Button>
             <Button variant="ghost" size="sm" onClick={() => navigate("/perfil")}>
               Perfil
             </Button>

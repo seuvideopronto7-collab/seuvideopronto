@@ -86,6 +86,33 @@ export type Database = {
         }
         Relationships: []
       }
+      usuarios_planos: {
+        Row: {
+          id: string
+          limite_diario_json: Json
+          plano: string
+          reset_at: string | null
+          uso_hoje_json: Json
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          limite_diario_json?: Json
+          plano?: string
+          reset_at?: string | null
+          uso_hoje_json?: Json
+          user_id: string
+        }
+        Update: {
+          id?: string
+          limite_diario_json?: Json
+          plano?: string
+          reset_at?: string | null
+          uso_hoje_json?: Json
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string

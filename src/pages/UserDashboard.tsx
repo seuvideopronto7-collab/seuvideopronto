@@ -4,12 +4,15 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Save, Loader2, Youtube, Instagram, User } from "lucide-react";
+import { Save, Loader2, Youtube, Instagram, User, Crown } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { usePlan } from "@/hooks/usePlan";
+import { formatLimitLabel, getPlanLabel } from "@/lib/plans";
 
 const UserDashboard = () => {
   const { profile, refreshProfile, signOut, isAdmin } = useAuth();
   const navigate = useNavigate();
+  const { planId, limits, usage } = usePlan();
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     full_name: "",
@@ -88,6 +91,32 @@ const UserDashboard = () => {
       </header>
 
       <main className="container max-w-4xl mx-auto px-4 py-8">
+        <div className="glass-card p-6 space-y-4 mb-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Crown className="w-5 h-5 text-neon-cyan" />
+              <div>
+                <h2 className="text-lg font-semibold">Plano atual</h2>
+                <p className="text-xs text-muted-foreground">{getPlanLabel(planId)}</p>
+              </div>
+            </div>
+            <Button variant="neon" size="sm" onClick={() => navigate("/planos")}>Fazer upgrade</Button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {Object.entries(limits)
+              .filter(([, value]) => typeof value === "number")
+              .map(([key, value]) => (
+                <div key={key} className="rounded-lg border border-border/40 bg-muted/30 p-3">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">{formatLimitLabel(key)}</span>
+                    <span className="font-mono text-primary">
+                      {(usage as any)[key] || 0}/{value as number}
+                    </span>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
         <div className="glass-card p-6 space-y-6">
           <div className="flex items-center gap-2">
             <User className="w-5 h-5 text-neon-pink" />
