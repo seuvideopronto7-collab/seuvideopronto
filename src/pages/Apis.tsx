@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
 
 type ConnectionStatus = "connected" | "disconnected" | "testing" | "error";
 type ConnectionMode = "api_key" | "login";
@@ -139,6 +140,10 @@ const Apis = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [eduzzStatus, setEduzzStatus] = useState<ConnectionStatus | "idle">("idle");
+  const [eduzzConnectedAt, setEduzzConnectedAt] = useState<string | null>(null);
+  const [eduzzClientId, setEduzzClientId] = useState("");
+  const [eduzzClientSecret, setEduzzClientSecret] = useState("");
   const [form, setForm] = useState({
     platform: platformList[0].key,
     customName: "",
@@ -175,6 +180,26 @@ const Apis = () => {
     } finally {
       setLoaded(true);
     }
+  }, [profile?.id]);
+
+  useEffect(() => {
+    if (!profile?.id) return;
+    const loadEduzz = async () => {
+      setEduzzStatus("testing");
+      const { data, error } = await supabase
+        .from("integrations")
+        .select("created_at, status")
+        .eq("platform", "eduzz")
+        .maybeSingle();
+      if (error || !data) {
+        setEduzzStatus("disconnected");
+        setEduzzConnectedAt(null);
+        return;
+      }
+      setEduzzStatus(data.status === "connected" ? "connected" : "error");
+      setEduzzConnectedAt(data.created_at || null);
+    };
+    loadEduzz();
   }, [profile?.id]);
 
   useEffect(() => {
@@ -338,6 +363,30 @@ const Apis = () => {
     toast.success(`Postagem automatica iniciada para ${platformName}.`);
   };
 
+  const handleEduzzConnect = async () => {
+    if (!eduzzClientId.trim() || !eduzzClientSecret.trim()) {
+      toast.error("Informe Client ID e Client Secret da Eduzz.");
+      return;
+    }
+    setEduzzStatus("testing");
+    const { data, error } = await supabase.functions.invoke("eduzz-connect", {
+      body: {
+        client_id: eduzzClientId.trim(),
+        client_secret: eduzzClientSecret.trim(),
+      },
+    });
+    if (error || data?.status !== "connected") {
+      setEduzzStatus("error");
+      toast.error("Falha na conexão com a Eduzz.");
+      return;
+    }
+    setEduzzStatus("connected");
+    setEduzzConnectedAt(new Date().toISOString());
+    setEduzzClientId("");
+    setEduzzClientSecret("");
+    toast.success("Eduzz conectada com sucesso.");
+  };
+
   const renderStatus = (status: ConnectionStatus) => {
     if (status === "connected") return { label: "Conectado", color: "bg-emerald-500/15 text-emerald-300" };
     if (status === "testing") return { label: "Testando", color: "bg-amber-500/15 text-amber-300" };
@@ -426,6 +475,46 @@ const Apis = () => {
             </div>
           </div>
         </div>
+
+        <section className="glass-card p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold">Eduzz OAuth</h3>
+              <p className="text-xs text-muted-foreground">Conexão real com validação automática.</p>
+            </div>
+            <Badge className={renderStatus(eduzzStatus === "idle" ? "disconnected" : eduzzStatus).color}>
+              {renderStatus(eduzzStatus === "idle" ? "disconnected" : eduzzStatus).label}
+            </Badge>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>Client ID</Label>
+              <Input
+                value={eduzzClientId}
+                onChange={(event) => setEduzzClientId(event.target.value)}
+                placeholder="Seu Client ID"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Client Secret</Label>
+              <Input
+                type="password"
+                value={eduzzClientSecret}
+                onChange={(event) => setEduzzClientSecret(event.target.value)}
+                placeholder="Seu Client Secret"
+              />
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+            {eduzzConnectedAt ? `Conectado em ${new Date(eduzzConnectedAt).toLocaleString()}` : "Nenhuma conexão ativa"}
+          </div>
+          <div>
+            <Button variant="neon" onClick={handleEduzzConnect} disabled={eduzzStatus === "testing"}>
+              {eduzzStatus === "testing" ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Conectar Eduzz
+            </Button>
+          </div>
+        </section>
 
         <section className="space-y-4">
           <div className="flex items-center justify-between">

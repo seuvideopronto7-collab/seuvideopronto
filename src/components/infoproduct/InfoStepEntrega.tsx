@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Download, Copy, Check, Rocket, Link2, ShieldCheck, Send } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { zipSync, strToU8 } from "fflate";
 import { supabase } from "@/integrations/supabase/client";
@@ -27,6 +27,26 @@ const InfoStepEntrega = ({ estruturaData, conteudoData, vslData, kitData, onNewP
   const [hotmartStatus, setHotmartStatus] = useState<"idle" | "testando" | "conectado" | "erro">("idle");
   const [hotmartToken, setHotmartToken] = useState<string | null>(null);
   const [hotmartBasicAuth, setHotmartBasicAuth] = useState("");
+  const [eduzzConnected, setEduzzConnected] = useState(false);
+  const [eduzzStatusLabel, setEduzzStatusLabel] = useState("Desconectado");
+
+  useEffect(() => {
+    const loadEduzz = async () => {
+      const { data, error } = await supabase
+        .from("integrations")
+        .select("status")
+        .eq("platform", "eduzz")
+        .maybeSingle();
+      if (error || !data || data.status !== "connected") {
+        setEduzzConnected(false);
+        setEduzzStatusLabel("Desconectado");
+        return;
+      }
+      setEduzzConnected(true);
+      setEduzzStatusLabel("Conectado");
+    };
+    loadEduzz();
+  }, []);
 
   const buildFullCopy = (platform: string) => {
     const parts = [];
@@ -150,6 +170,11 @@ const InfoStepEntrega = ({ estruturaData, conteudoData, vslData, kitData, onNewP
   };
 
   const handleEnviar = () => {
+    if (!eduzzConnected) {
+      setLogs((prev) => [`${new Date().toLocaleTimeString()} • Eduzz não conectada`, ...prev]);
+      toast.error("Conecte a Eduzz antes de publicar.");
+      return;
+    }
     if (!connectedPlatform) {
       setStatus("Fallback");
       setLogs((prev) => [`${new Date().toLocaleTimeString()} • Fallback ativado: pacote pronto`, ...prev]);
@@ -313,6 +338,11 @@ const InfoStepEntrega = ({ estruturaData, conteudoData, vslData, kitData, onNewP
           )}
         </div>
         <div className="flex flex-wrap gap-2">
+          <span
+            className={`text-xs rounded-full px-2 py-1 ${eduzzConnected ? "bg-emerald-500/15 text-emerald-300" : "bg-rose-500/15 text-rose-300"}`}
+          >
+            Eduzz: {eduzzStatusLabel}
+          </span>
           {status && (
             <span className="text-xs rounded-full bg-primary/15 text-primary px-2 py-1">{status}</span>
           )}
