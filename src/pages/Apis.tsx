@@ -274,7 +274,6 @@ const Apis = () => {
 
     const platformKey = form.platform === "custom" ? toKey(platformName) : form.platform;
     setSaving(true);
-    updateConnection(platformKey, { status: "testing" });
 
     const payload: CredentialsPayload = {
       apiKey: form.apiKey.trim() || undefined,
@@ -283,9 +282,30 @@ const Apis = () => {
       endpoint: form.endpoint.trim() || undefined,
     };
 
-    const ok = await testConnection(payload, form.mode);
     const encrypted = await encryptPayload(profile.id, payload);
     const now = new Date().toISOString();
+
+    setConnections((prev) => {
+      const next: Record<string, StoredConnection> = {
+        ...prev,
+        [platformKey]: {
+          id: prev[platformKey]?.id || `api_${Date.now()}`,
+          platformKey,
+          platformName,
+          mode: form.mode,
+          status: "testing",
+          encrypted: encrypted.encrypted,
+          iv: encrypted.iv,
+          algo: encrypted.algo,
+          lastChecked: now,
+          createdAt: prev[platformKey]?.createdAt || now,
+        },
+      };
+      persistConnections(next);
+      return next;
+    });
+
+    const ok = await testConnection(payload, form.mode);
 
     setConnections((prev) => {
       const next: Record<string, StoredConnection> = {
