@@ -1,9 +1,11 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { Download, Copy, Check, Rocket, Link2, ShieldCheck, Send } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { zipSync, strToU8 } from "fflate";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Props {
   estruturaData: any;
@@ -21,6 +23,10 @@ const InfoStepEntrega = ({ estruturaData, conteudoData, vslData, kitData, onNewP
   const [status, setStatus] = useState<"Preparando" | "Enviado" | "Aprovado" | "Rejeitado" | "Fallback" | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
   const [campaign, setCampaign] = useState<any>(null);
+  const [hotmartMode, setHotmartMode] = useState<"mock" | "real">("mock");
+  const [hotmartStatus, setHotmartStatus] = useState<"idle" | "testando" | "conectado" | "erro">("idle");
+  const [hotmartToken, setHotmartToken] = useState<string | null>(null);
+  const [hotmartBasicAuth, setHotmartBasicAuth] = useState("");
 
   const buildFullCopy = (platform: string) => {
     const parts = [];
@@ -91,6 +97,56 @@ const InfoStepEntrega = ({ estruturaData, conteudoData, vslData, kitData, onNewP
     setStatus("Preparando");
     setLogs((prev) => [`${new Date().toLocaleTimeString()} • ${selectedPlatform} conectado`, ...prev]);
     toast.success(`Conectado a ${selectedPlatform}!`);
+  };
+
+  const handleTestHotmart = async () => {
+    const platform = selectedPlatform || connectedPlatform;
+    if (platform !== "Hotmart") {
+      toast.error("Selecione Hotmart para testar a conexão real.");
+      return;
+    }
+    setHotmartMode("real");
+    setHotmartStatus("testando");
+    setLogs((prev) => [`${new Date().toLocaleTimeString()} • Validando conexão real com Hotmart`, ...prev]);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("testar-hotmart", {
+        body: {
+          basicAuth: hotmartBasicAuth || undefined,
+        },
+      });
+      if (error) throw error;
+      if (data?.status === "conectado") {
+        setHotmartStatus("conectado");
+        setHotmartToken(data?.token || null);
+        setLogs((prev) => [`${new Date().toLocaleTimeString()} • Conexão real estabelecida`, ...prev]);
+        toast.success("Conexão real estabelecida com Hotmart ✅");
+      } else {
+        setHotmartStatus("erro");
+        setLogs((prev) => [`${new Date().toLocaleTimeString()} • Falha na autenticação`, ...prev]);
+        toast.error("Falha na autenticação com Hotmart");
+      }
+    } catch (err: any) {
+      setHotmartStatus("erro");
+      setLogs((prev) => [`${new Date().toLocaleTimeString()} • Erro na validação Hotmart`, ...prev]);
+      toast.error(err.message || "Erro ao testar conexão real");
+    }
+  };
+
+  const handleEnviarTeste = async () => {
+    if (hotmartMode !== "real") {
+      toast.warning("Ative o modo real para enviar produto teste.");
+      return;
+    }
+    if (hotmartStatus !== "conectado") {
+      toast.warning("Valide a conexão real antes do envio de teste.");
+      return;
+    }
+    setLogs((prev) => [`${new Date().toLocaleTimeString()} • Produto preparado (Hotmart não permite envio direto)`, ...prev]);
+    if (hotmartToken) {
+      console.log("Token válido:", hotmartToken);
+    }
+    toast.success("Produto preparado para envio manual.");
   };
 
   const handleEnviar = () => {
@@ -205,6 +261,43 @@ const InfoStepEntrega = ({ estruturaData, conteudoData, vslData, kitData, onNewP
         <Button variant="neon" size="lg" className="w-full" onClick={handleConnect}>
           <ShieldCheck className="w-4 h-4" /> Conectar Plataforma
         </Button>
+      </div>
+
+      <div className="space-y-4 border-t border-border/30 pt-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h4 className="text-sm font-semibold">Forcar conexao real (test mode)</h4>
+            <p className="text-xs text-muted-foreground">Hotmart: valida token real antes de considerar conectado</p>
+          </div>
+          <div className="flex items-center gap-2 text-xs">
+            <span className={hotmartMode === "real" ? "text-primary" : "text-muted-foreground"}>
+              {hotmartMode === "real" ? "REAL" : "MOCK"}
+            </span>
+            <Switch checked={hotmartMode === "real"} onCheckedChange={(checked) => setHotmartMode(checked ? "real" : "mock")} />
+          </div>
+        </div>
+
+        <Input
+          placeholder="Hotmart Basic Auth (base64 client_id:client_secret)"
+          value={hotmartBasicAuth}
+          onChange={(e) => setHotmartBasicAuth(e.target.value)}
+        />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <Button variant="neon" size="lg" className="w-full" onClick={handleTestHotmart}>
+            Testar conexao real
+          </Button>
+          <Button variant="glass" size="lg" className="w-full" onClick={handleEnviarTeste}>
+            Enviar produto teste
+          </Button>
+        </div>
+
+        <div className="rounded-lg border border-border/30 bg-muted/30 p-3 text-xs text-muted-foreground">
+          {hotmartStatus === "testando" && "Validando conexão com Hotmart..."}
+          {hotmartStatus === "conectado" && "Conexão real estabelecida com Hotmart ✅"}
+          {hotmartStatus === "erro" && "Falha na autenticação"}
+          {hotmartStatus === "idle" && "Status aguardando teste real"}
+        </div>
       </div>
 
       <div className="space-y-4 border-t border-border/30 pt-4">
