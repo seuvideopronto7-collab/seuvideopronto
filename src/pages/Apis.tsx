@@ -43,6 +43,7 @@ const platformList = [
   { key: "instagram", name: "Instagram", description: "Reels e engajamento" },
   { key: "facebook", name: "Facebook", description: "Distribuicao multiplataforma" },
   { key: "tiktok", name: "TikTok", description: "Conteudo viral" },
+  { key: "youtube", name: "YouTube", description: "Shorts e uploads" },
 ];
 
 const textEncoder = new TextEncoder();
@@ -531,7 +532,7 @@ const Apis = () => {
             <div className="rounded-xl border border-border/40 bg-muted/30 p-4 text-xs text-muted-foreground space-y-2">
               <p>Quando voce aciona uma publicacao, o sistema usa a API ja conectada.</p>
               <pre className="bg-background/60 rounded-lg p-3 text-[11px] text-foreground/90 overflow-x-auto">
-{`const api = buscarAPI("instagram");\n\nif (api.status === "conectado") {\n  postarInstagram(api, conteudo);\n}`}
+{`const api = buscarAPI("youtube");\n\nif (api.status === "conectado") {\n  postarYouTube(api, conteudo);\n}`}
               </pre>
             </div>
             <div className="rounded-xl border border-border/40 bg-card/40 p-4 text-xs text-muted-foreground">
@@ -627,6 +628,40 @@ const Apis = () => {
             <Button variant="neon" onClick={handleEduzzConnect} disabled={eduzzStatus === "testing"}>
               {eduzzStatus === "testing" ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               Conectar Eduzz
+            </Button>
+          </div>
+        </section>
+
+        <section className="glass-card p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold">YouTube OAuth</h3>
+              <p className="text-xs text-muted-foreground">Upload de Shorts e videos longos com token seguro.</p>
+            </div>
+            <Badge className={renderStatus(connections.youtube?.status || "disconnected").color}>
+              {renderStatus(connections.youtube?.status || "disconnected").label}
+            </Badge>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-muted-foreground">
+            <div className="rounded-xl border border-border/40 bg-muted/30 p-4 space-y-2">
+              <p className="text-[11px] uppercase tracking-wide text-foreground/70">OAuth</p>
+              <p className="text-xs">https://accounts.google.com/o/oauth2/v2/auth</p>
+            </div>
+            <div className="rounded-xl border border-border/40 bg-muted/30 p-4 space-y-2">
+              <p className="text-[11px] uppercase tracking-wide text-foreground/70">Scopes</p>
+              <p className="text-xs">youtube.upload, youtube</p>
+            </div>
+            <div className="rounded-xl border border-border/40 bg-muted/30 p-4 space-y-2">
+              <p className="text-[11px] uppercase tracking-wide text-foreground/70">Upload</p>
+              <p className="text-xs">https://www.googleapis.com/upload/youtube/v3/videos</p>
+            </div>
+          </div>
+          <div className="rounded-xl border border-border/40 bg-card/40 p-4 text-xs text-muted-foreground">
+            Se a conexao falhar, o sistema libera download do video e assets para publicacao manual.
+          </div>
+          <div>
+            <Button variant="neon" onClick={() => openDialogFor("youtube")}>
+              Conectar YouTube
             </Button>
           </div>
         </section>
