@@ -55,25 +55,38 @@ serve(async (req) => {
       });
     }
 
+    const tokenRequestBody = {
+      grant_type: "client_credentials",
+      client_id: clientId,
+      client_secret: clientSecret,
+    };
+
+    console.log("Eduzz request:", tokenRequestBody);
+
     const tokenResponse = await fetch("https://api.eduzz.com/oauth/token", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        grant_type: "client_credentials",
-        client_id: clientId,
-        client_secret: clientSecret,
-      }),
+      body: JSON.stringify(tokenRequestBody),
     });
+
+    console.log("Eduzz response:", tokenResponse);
 
     const tokenResponseClone = tokenResponse.clone();
     const tokenRaw = await tokenResponseClone.text().catch(() => "");
-    console.log("Eduzz token response:", { status: tokenResponse.status, body: tokenRaw });
+    console.log("Eduzz response:", { status: tokenResponse.status, body: tokenRaw });
 
     if (!tokenResponse.ok) {
-      return new Response(JSON.stringify({ error: "Falha ao autenticar na Eduzz.", details: tokenRaw }), {
+      return new Response(
+        JSON.stringify({
+          error:
+            "Falha na conexão com a Eduzz. Verifique credenciais, escopos e formato da requisição.",
+          details: tokenRaw,
+        }),
+        {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+        },
+      );
     }
 
     const tokenData = (await tokenResponse.json()) as TokenResponse;
@@ -94,15 +107,19 @@ serve(async (req) => {
 
     if (!validateResponse.ok) {
       const validateRaw = await validateResponse.text().catch(() => "");
-      console.log("Eduzz my-account response:", {
+      console.log("Eduzz response:", {
         status: validateResponse.status,
         body: validateRaw,
       });
       return new Response(
-        JSON.stringify({ error: "Falha ao validar credenciais na Eduzz.", details: validateRaw }),
+        JSON.stringify({
+          error:
+            "Falha na conexão com a Eduzz. Verifique credenciais, escopos e formato da requisição.",
+          details: validateRaw,
+        }),
         {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         },
       );
     }
@@ -132,9 +149,16 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({
+        error:
+          "Falha na conexão com a Eduzz. Verifique credenciais, escopos e formato da requisição.",
+        details: error instanceof Error ? error.message : "Unknown error",
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
   }
 });

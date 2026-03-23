@@ -584,7 +584,10 @@ const Apis = () => {
     });
     if (error || data?.status !== "connected") {
       setEduzzStatus("error");
-      toast.error("Falha na conexao com a Eduzz.");
+      toast.error(
+        data?.error ||
+          "Falha na conexão com a Eduzz. Verifique credenciais, escopos e formato da requisição.",
+      );
       return;
     }
     setEduzzStatus("connected");
@@ -809,10 +812,13 @@ const Apis = () => {
           <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
             {eduzzConnectedAt ? `Conectado em ${new Date(eduzzConnectedAt).toLocaleString()}` : "Nenhuma conexao ativa"}
           </div>
-          <div>
+          <div className="flex flex-wrap gap-2">
             <Button variant="neon" onClick={handleEduzzConnect} disabled={eduzzStatus === "testing"}>
               {eduzzStatus === "testing" ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               Conectar Eduzz
+            </Button>
+            <Button variant="glass" onClick={handleEduzzConnect} disabled={eduzzStatus === "testing"}>
+              Revalidar Eduzz
             </Button>
           </div>
         </section>
