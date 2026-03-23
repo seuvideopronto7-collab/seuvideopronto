@@ -1,21 +1,25 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Eye, EyeOff, Loader2, LogIn, UserPlus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
 
   const [form, setForm] = useState({
     fullName: "",
     whatsapp: "",
     email: "",
+    username: "",
+    identifier: "",
     password: "",
   });
 
@@ -24,26 +28,42 @@ const Auth = () => {
 
   const handleLogin = async () => {
     setLoading(true);
+    const response = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ identifier: form.identifier, password: form.password }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || !payload?.user?.email) {
+      setLoading(false);
+      toast.error(payload?.error || "Falha ao autenticar.");
+      return;
+    }
+
     const { error } = await supabase.auth.signInWithPassword({
-      email: form.email,
+      email: payload.user.email,
       password: form.password,
     });
     setLoading(false);
     if (error) {
       toast.error(error.message);
     } else {
+      localStorage.setItem(
+        "svpa.session",
+        JSON.stringify({ user_id: payload.user.id, role: payload.user.role, token: payload.token }),
+      );
       toast.success("Login realizado!");
       navigate("/");
     }
   };
 
   const handleSignup = async () => {
-    if (!form.fullName || !form.whatsapp || !form.email || !form.password) {
+    if (!form.fullName || !form.whatsapp || !form.email || !form.username || !form.password) {
       toast.error("Preencha todos os campos");
       return;
     }
     setLoading(true);
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email: form.email,
       password: form.password,
       options: {
@@ -51,6 +71,19 @@ const Auth = () => {
         emailRedirectTo: window.location.origin,
       },
     });
+    if (!error && data?.user?.id) {
+      const { error: syncError } = await supabase.functions.invoke("auth-sync-user", {
+        body: {
+          userId: data.user.id,
+          email: form.email,
+          username: form.username,
+          password: form.password,
+        },
+      });
+      if (syncError) {
+        toast.error(syncError.message);
+      }
+    }
     setLoading(false);
     if (error) {
       toast.error(error.message);
@@ -64,6 +97,12 @@ const Auth = () => {
     e.preventDefault();
     isLogin ? handleLogin() : handleSignup();
   };
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate("/");
+    }
+  }, [authLoading, user, navigate]);
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
@@ -96,6 +135,16 @@ const Auth = () => {
                 />
               </div>
               <div className="space-y-1.5">
+                <label className="text-sm text-muted-foreground">Usuário</label>
+                <Input
+                  placeholder="Seu usuário"
+                  value={form.username}
+                  onChange={(e) => update("username", e.target.value)}
+                  className="bg-muted/50 border-border/50"
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
                 <label className="text-sm text-muted-foreground">WhatsApp</label>
                 <Input
                   placeholder="(99) 99999-9999"
@@ -109,12 +158,14 @@ const Auth = () => {
           )}
 
           <div className="space-y-1.5">
-            <label className="text-sm text-muted-foreground">E-mail</label>
+            <label className="text-sm text-muted-foreground">
+              {isLogin ? "Email ou usuário" : "E-mail"}
+            </label>
             <Input
-              type="email"
-              placeholder="seu@email.com"
-              value={form.email}
-              onChange={(e) => update("email", e.target.value)}
+              type={isLogin ? "text" : "email"}
+              placeholder={isLogin ? "Email ou usuário" : "seu@email.com"}
+              value={isLogin ? form.identifier : form.email}
+              onChange={(e) => update(isLogin ? "identifier" : "email", e.target.value)}
               className="bg-muted/50 border-border/50"
               required
             />

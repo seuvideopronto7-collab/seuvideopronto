@@ -93,10 +93,18 @@ serve(async (req) => {
     });
 
     if (!validateResponse.ok) {
-      return new Response(JSON.stringify({ error: "Falha ao validar credenciais na Eduzz." }), {
+      const validateRaw = await validateResponse.text().catch(() => "");
+      console.log("Eduzz my-account response:", {
+        status: validateResponse.status,
+        body: validateRaw,
+      });
+      return new Response(
+        JSON.stringify({ error: "Falha ao validar credenciais na Eduzz.", details: validateRaw }),
+        {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+        },
+      );
     }
 
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
