@@ -143,6 +143,12 @@ const ProdutosProntos = () => {
     return <Badge variant={variant}>{label}</Badge>;
   };
 
+  const isPlayableVideoUrl = (url?: string | null) => {
+    if (!url) return false;
+    const clean = url.split("?")[0].toLowerCase();
+    return /\.(mp4|webm|mov|m4v)$/.test(clean);
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border/50 bg-card/30 backdrop-blur-sm sticky top-0 z-50">
@@ -204,6 +210,45 @@ const ProdutosProntos = () => {
                 key={produto.id}
                 className="glass-card p-5 space-y-4 transition-all duration-200 hover:scale-[1.01] hover:shadow-[0_0_26px_-10px_hsl(var(--primary)/0.5)]"
               >
+                {(() => {
+                  const estrutura = produto.estrutura || {};
+                  const seo = estrutura.seoData?.seo || estrutura.seoData;
+                  const roteiro = estrutura.roteiroData?.roteiro || estrutura.roteiroData?.novo_roteiro;
+                  const video = estrutura.videoUrl || estrutura.videoLink;
+                  const canPlay = isPlayableVideoUrl(video);
+                  return (
+                    <>
+                      {video && canPlay ? (
+                        <div className="rounded-xl overflow-hidden border border-border/40 bg-muted/40">
+                          <video
+                            src={video}
+                            className="w-full aspect-video object-cover"
+                            muted
+                            controls
+                            playsInline
+                          />
+                        </div>
+                      ) : (
+                        <div className="rounded-xl border border-border/40 bg-muted/40 p-4 text-xs text-muted-foreground text-center">
+                          {video ? "Preview indisponivel" : "Sem preview de video"}
+                        </div>
+                      )}
+                      <div className="space-y-2">
+                        {seo?.descricao_youtube && (
+                          <p className="text-xs text-muted-foreground max-h-12 overflow-hidden">
+                            {seo.descricao_youtube}
+                          </p>
+                        )}
+                        {seo?.hashtags && (
+                          <p className="text-[10px] text-muted-foreground/70 truncate">{seo.hashtags.join(" ")}</p>
+                        )}
+                        {roteiro?.hook && (
+                          <p className="text-xs font-medium">{roteiro.hook}</p>
+                        )}
+                      </div>
+                    </>
+                  );
+                })()}
                 <div className="flex items-start justify-between">
                   <div>
                     <h3 className="font-semibold text-base">{produto.nome}</h3>
