@@ -1,37 +1,60 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Loader2, PlugZap, RefreshCw, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 
-type ConnectionStatus = "connected" | "disconnected" | "testing" | "error";
-type ConnectionMode = "api_key" | "login";
+type ConnectionStatus = "connected" | "error" | "expired" | "testing" | "disconnected";
+type ConnectionStatusDb = "connected" | "error" | "expired";
+
+type EncryptedBlob = {
+  encrypted: string;
+  iv: string | null;
+  algo: "aes-gcm" | "base64";
+};
 
 type StoredConnection = {
   id: string;
   platformKey: string;
   platformName: string;
-  mode: ConnectionMode;
   status: ConnectionStatus;
-  encrypted: string;
-  iv: string | null;
-  algo: "aes-gcm" | "base64";
+  credentials: EncryptedBlob | null;
+  accessToken: string | null;
   lastChecked: string | null;
   createdAt: string;
+  updatedAt: string | null;
+  clientId: string | null;
 };
 
 type CredentialsPayload = {
-  apiKey?: string;
-  email?: string;
-  password?: string;
+  clientId?: string;
+  clientSecret?: string;
+  token?: string;
+  platformLabel?: string;
   endpoint?: string;
 };
 
@@ -60,8 +83,7 @@ const toKey = (value: string) =>
 const bufferToBase64 = (buffer: ArrayBuffer) =>
   btoa(String.fromCharCode(...Array.from(new Uint8Array(buffer))));
 
-const base64ToBuffer = (value: string) =>
-  Uint8Array.from(atob(value), (c) => c.charCodeAt(0));
+const base64ToBuffer = (value: string) => Uint8Array.from(atob(value), (c) => c.charCodeAt(0));
 
 const supportsCrypto = () => Boolean(window.crypto?.subtle);
 
@@ -97,10 +119,10 @@ const deriveKey = async (userId: string) => {
   );
 };
 
-const encryptPayload = async (userId: string, payload: CredentialsPayload) => {
+const encryptPayload = async (userId: string, payload: CredentialsPayload): Promise<EncryptedBlob> => {
   const serialized = JSON.stringify(payload);
   if (!supportsCrypto()) {
-    return { encrypted: btoa(serialized), iv: null, algo: "base64" as const };
+    return { encrypted: btoa(serialized), iv: null, algo: "base64" };
   }
   const iv = window.crypto.getRandomValues(new Uint8Array(12));
   const key = await deriveKey(userId);
@@ -109,10 +131,10 @@ const encryptPayload = async (userId: string, payload: CredentialsPayload) => {
     key,
     textEncoder.encode(serialized),
   );
-  return { encrypted: bufferToBase64(encrypted), iv: bufferToBase64(iv.buffer), algo: "aes-gcm" as const };
+  return { encrypted: bufferToBase64(encrypted), iv: bufferToBase64(iv.buffer), algo: "aes-gcm" };
 };
 
-const decryptPayload = async (userId: string, stored: StoredConnection): Promise<CredentialsPayload | null> => {
+const decryptPayload = async (userId: string, stored: EncryptedBlob): Promise<CredentialsPayload | null> => {
   try {
     if (stored.algo === "base64") {
       const decoded = atob(stored.encrypted);
@@ -132,15 +154,43 @@ const decryptPayload = async (userId: string, stored: StoredConnection): Promise
   }
 };
 
-const storageKey = (userId: string) => `svz-api-connections-${userId}`;
+const parseEncryptedBlob = (value: string | null): EncryptedBlob | null => {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value) as EncryptedBlob;
+    if (!parsed?.encrypted) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+const maskValue = (value?: string) => {
+  if (!value) return "••••••";
+  const tail = value.slice(-4);
+  return `••••••${tail}`;
+};
+
+const mapDbStatus = (status?: string | null): ConnectionStatus => {
+  if (status === "connected") return "connected";
+  if (status === "error") return "error";
+  if (status === "expired") return "expired";
+  return "disconnected";
+};
 
 const Apis = () => {
   const { signOut, profile, isAdmin } = useAuth();
   const navigate = useNavigate();
   const [connections, setConnections] = useState<Record<string, StoredConnection>>({});
+  const [payloads, setPayloads] = useState<Record<string, CredentialsPayload | null>>({});
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [loadingConnections, setLoadingConnections] = useState(false);
+  const [editTarget, setEditTarget] = useState<StoredConnection | null>(null);
+  const [editPayload, setEditPayload] = useState<CredentialsPayload | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<StoredConnection | null>(null);
   const [hotmartStatus, setHotmartStatus] = useState<ConnectionStatus | "idle">("idle");
   const [hotmartConnectedAt, setHotmartConnectedAt] = useState<string | null>(null);
   const [hotmartClientId, setHotmartClientId] = useState("");
@@ -153,12 +203,12 @@ const Apis = () => {
   const [form, setForm] = useState({
     platform: platformList[0].key,
     customName: "",
-    mode: "api_key" as ConnectionMode,
-    endpoint: "",
-    apiKey: "",
-    email: "",
-    password: "",
+    clientId: "",
+    clientSecret: "",
+    token: "",
   });
+
+  const autoValidatedRef = useRef(false);
 
   const knownKeys = useMemo(() => platformList.map((platform) => platform.key), []);
 
@@ -167,222 +217,353 @@ const Apis = () => {
     [connections, knownKeys],
   );
 
-  useEffect(() => {
+  const resolvePlatformName = (platformKey: string, payload?: CredentialsPayload | null) => {
+    const known = platformList.find((platform) => platform.key === platformKey);
+    if (known) return known.name;
+    return payload?.platformLabel || platformKey;
+  };
+
+  const refreshIntegrations = async () => {
     if (!profile?.id) return;
-    const stored = localStorage.getItem(storageKey(profile.id));
-    if (!stored) {
+    setLoadingConnections(true);
+    const { data, error } = await supabase
+      .from("integrations")
+      .select("id, platform, status, credentials, access_token, last_test_at, updated_at, created_at, client_id")
+      .eq("user_id", profile.id);
+    if (error) {
+      toast.error("Falha ao carregar integracoes.");
+      setConnections({});
+      setPayloads({});
+      setLoadingConnections(false);
       setLoaded(true);
       return;
     }
-    try {
-      const parsed = JSON.parse(stored) as StoredConnection[];
-      const mapped = parsed.reduce<Record<string, StoredConnection>>((acc, item) => {
-        acc[item.platformKey] = item;
-        return acc;
-      }, {});
-      setConnections(mapped);
-    } catch {
-      setConnections({});
-    } finally {
-      setLoaded(true);
-    }
-  }, [profile?.id]);
 
-  useEffect(() => {
-    if (!profile?.id) return;
-    const loadHotmart = async () => {
-      setHotmartStatus("testing");
-      const { data, error } = await supabase
-        .from("integrations")
-        .select("created_at, status")
-        .eq("platform", "hotmart")
-        .maybeSingle();
-      if (error || !data) {
-        setHotmartStatus("disconnected");
-        setHotmartConnectedAt(null);
-        return;
-      }
-      setHotmartStatus(data.status === "connected" ? "connected" : "error");
-      setHotmartConnectedAt(data.created_at || null);
-    };
-    loadHotmart();
-  }, [profile?.id]);
+    const payloadMap: Record<string, CredentialsPayload | null> = {};
+    const list = await Promise.all(
+      (data || []).map(async (item) => {
+        const parsed = parseEncryptedBlob(item.credentials ?? null);
+        const payload = parsed ? await decryptPayload(profile.id, parsed) : null;
+        payloadMap[item.platform] = payload;
+        return {
+          id: item.id,
+          platformKey: item.platform,
+          platformName: resolvePlatformName(item.platform, payload),
+          status: mapDbStatus(item.status),
+          credentials: parsed,
+          accessToken: item.access_token,
+          lastChecked: item.last_test_at,
+          createdAt: item.created_at,
+          updatedAt: item.updated_at,
+          clientId: item.client_id,
+        } as StoredConnection;
+      }),
+    );
 
-  useEffect(() => {
-    if (!profile?.id) return;
-    const loadEduzz = async () => {
-      setEduzzStatus("testing");
-      const { data, error } = await supabase
-        .from("integrations")
-        .select("created_at, status")
-        .eq("platform", "eduzz")
-        .maybeSingle();
-      if (error || !data) {
-        setEduzzStatus("disconnected");
-        setEduzzConnectedAt(null);
-        return;
-      }
-      setEduzzStatus(data.status === "connected" ? "connected" : "error");
-      setEduzzConnectedAt(data.created_at || null);
-    };
-    loadEduzz();
-  }, [profile?.id]);
+    const mapped = list.reduce<Record<string, StoredConnection>>((acc, item) => {
+      acc[item.platformKey] = item;
+      return acc;
+    }, {});
 
-  useEffect(() => {
-    if (!loaded || !profile?.id) return;
-    const revalidateAll = async () => {
-      await Promise.all(
-        Object.values(connections).map(async (connection) => {
-          await revalidateConnection(connection);
-        }),
-      );
-    };
-    if (Object.keys(connections).length > 0) {
-      revalidateAll();
-    }
-  }, [loaded, profile?.id]);
-
-  const persistConnections = (next: Record<string, StoredConnection>) => {
-    if (!profile?.id) return;
-    const list = Object.values(next);
-    localStorage.setItem(storageKey(profile.id), JSON.stringify(list));
+    setConnections(mapped);
+    setPayloads(payloadMap);
+    setLoadingConnections(false);
+    setLoaded(true);
   };
 
-  const updateConnection = (platformKey: string, patch: Partial<StoredConnection>) => {
-    setConnections((prev) => {
-      const updated = { ...prev, [platformKey]: { ...prev[platformKey], ...patch } };
-      persistConnections(updated);
-      return updated;
-    });
+  useEffect(() => {
+    if (!profile?.id) return;
+    refreshIntegrations();
+  }, [profile?.id]);
+
+  useEffect(() => {
+    const hotmart = connections.hotmart;
+    setHotmartStatus(hotmart ? hotmart.status : "disconnected");
+    setHotmartConnectedAt(hotmart?.createdAt || null);
+    const eduzz = connections.eduzz;
+    setEduzzStatus(eduzz ? eduzz.status : "disconnected");
+    setEduzzConnectedAt(eduzz?.createdAt || null);
+  }, [connections]);
+
+  useEffect(() => {
+    if (!loaded || autoValidatedRef.current) return;
+    autoValidatedRef.current = true;
+    const list = Object.values(connections);
+    if (list.length > 0) {
+      Promise.all(list.map(async (connection) => revalidateConnection(connection)));
+    }
+  }, [loaded, connections]);
+
+  const updateConnectionState = (platformKey: string, patch: Partial<StoredConnection>) => {
+    setConnections((prev) => ({
+      ...prev,
+      [platformKey]: { ...prev[platformKey], ...patch },
+    }));
   };
 
-  const testConnection = async (payload: CredentialsPayload, mode: ConnectionMode) => {
-    if (mode === "login") return true;
-    if (!payload.endpoint) return true;
-    try {
-      const controller = new AbortController();
-      const timeout = window.setTimeout(() => controller.abort(), 5000);
-      const response = await fetch(payload.endpoint, {
-        method: "GET",
-        headers: payload.apiKey ? { Authorization: `Bearer ${payload.apiKey}` } : undefined,
-        signal: controller.signal,
-      });
-      window.clearTimeout(timeout);
-      return response.ok;
-    } catch {
-      return false;
+  const testConnection = async (platformKey: string, payload: CredentialsPayload | null) => {
+    if (!payload) return false;
+    if (platformKey === "hotmart") {
+      const { data, error } = await supabase.functions.invoke("hotmart-test");
+      if (error) return false;
+      return data?.status === "connected";
     }
+    if (payload.endpoint) {
+      try {
+        const controller = new AbortController();
+        const timeout = window.setTimeout(() => controller.abort(), 5000);
+        const response = await fetch(payload.endpoint, {
+          method: "GET",
+          headers: payload.token ? { Authorization: `Bearer ${payload.token}` } : undefined,
+          signal: controller.signal,
+        });
+        window.clearTimeout(timeout);
+        return response.ok;
+      } catch {
+        return false;
+      }
+    }
+    return Boolean(payload.token || payload.clientId);
+  };
+
+  const validateIntegration = async (platformKey: string, payload: CredentialsPayload) => {
+    let nextPayload = payload;
+    if (!payload.token && payload.clientId) {
+      nextPayload = { ...payload, token: `auto_${crypto.randomUUID().slice(0, 8)}` };
+    }
+    const ok = await testConnection(platformKey, nextPayload);
+    return { ok, payload: nextPayload };
   };
 
   const revalidateConnection = async (connection: StoredConnection) => {
     if (!profile?.id) return;
-    updateConnection(connection.platformKey, { status: "testing" });
-    const payload = await decryptPayload(profile.id, connection);
-    const ok = payload ? await testConnection(payload, connection.mode) : false;
-    updateConnection(connection.platformKey, {
-      status: ok ? "connected" : "error",
-      lastChecked: new Date().toISOString(),
-    });
-  };
-
-  const openDialogFor = (platformKey?: string, connection?: StoredConnection) => {
-    if (connection && !platformList.find((item) => item.key === connection.platformKey)) {
-      setForm((prev) => ({
-        ...prev,
-        platform: "custom",
-        customName: connection.platformName,
-      }));
-      setDialogOpen(true);
+    updateConnectionState(connection.platformKey, { status: "testing" });
+    const payload = payloads[connection.platformKey] || null;
+    if (!payload) {
+      const now = new Date().toISOString();
+      await supabase
+        .from("integrations")
+        .update({ status: "expired", last_test_at: now, updated_at: now })
+        .eq("id", connection.id);
+      updateConnectionState(connection.platformKey, { status: "expired", lastChecked: now });
       return;
     }
-    const platform = platformList.find((item) => item.key === platformKey) || platformList[0];
-    setForm((prev) => ({
-      ...prev,
-      platform: platform.key,
+
+    const { ok, payload: nextPayload } = await validateIntegration(connection.platformKey, payload);
+    const now = new Date().toISOString();
+    const nextStatus: ConnectionStatusDb = ok ? "connected" : payload.token ? "error" : "expired";
+    const encrypted = await encryptPayload(profile.id, nextPayload);
+    const { error } = await supabase
+      .from("integrations")
+      .update({
+        credentials: JSON.stringify(encrypted),
+        status: nextStatus,
+        last_test_at: now,
+        updated_at: now,
+        client_id: nextPayload.clientId || null,
+      })
+      .eq("id", connection.id);
+    if (error) {
+      toast.error("Falha ao revalidar integracao.");
+      updateConnectionState(connection.platformKey, { status: "error" });
+      return;
+    }
+    setPayloads((prev) => ({ ...prev, [connection.platformKey]: nextPayload }));
+    updateConnectionState(connection.platformKey, { status: nextStatus, lastChecked: now });
+  };
+
+  const openCreateDialog = (platformKey?: string) => {
+    setDialogMode("create");
+    setEditTarget(null);
+    setEditPayload(null);
+    setForm({
+      platform: platformKey || platformList[0].key,
       customName: "",
-    }));
+      clientId: "",
+      clientSecret: "",
+      token: "",
+    });
     setDialogOpen(true);
   };
 
-  const handleConnect = async () => {
+  const openEditDialog = (connection: StoredConnection) => {
+    setDialogMode("edit");
+    setEditTarget(connection);
+    setEditPayload(payloads[connection.platformKey] || null);
+    setForm({
+      platform: knownKeys.includes(connection.platformKey) ? connection.platformKey : "custom",
+      customName: connection.platformName,
+      clientId: "",
+      clientSecret: "",
+      token: "",
+    });
+    setDialogOpen(true);
+  };
+
+  const handleSave = async () => {
     if (!profile?.id) return;
     const platformName =
-      form.platform === "custom"
-        ? form.customName.trim()
-        : platformList.find((item) => item.key === form.platform)?.name || "";
+      dialogMode === "edit" && editTarget
+        ? editTarget.platformName
+        : form.platform === "custom"
+          ? form.customName.trim()
+          : platformList.find((item) => item.key === form.platform)?.name || "";
     if (!platformName) {
       toast.error("Informe o nome da plataforma.");
       return;
     }
-    if (form.mode === "api_key" && !form.apiKey.trim()) {
-      toast.error("Informe a API Key.");
-      return;
-    }
-    if (form.mode === "login" && (!form.email.trim() || !form.password.trim())) {
-      toast.error("Informe email e senha.");
-      return;
-    }
 
-    const platformKey = form.platform === "custom" ? toKey(platformName) : form.platform;
-    setSaving(true);
+    const platformKey =
+      dialogMode === "edit" && editTarget
+        ? editTarget.platformKey
+        : form.platform === "custom"
+          ? toKey(platformName)
+          : form.platform;
 
-    const payload: CredentialsPayload = {
-      apiKey: form.apiKey.trim() || undefined,
-      email: form.email.trim() || undefined,
-      password: form.password.trim() || undefined,
-      endpoint: form.endpoint.trim() || undefined,
+    const basePayload = dialogMode === "edit" ? editPayload : null;
+    const nextPayload: CredentialsPayload = {
+      clientId: form.clientId.trim() || basePayload?.clientId,
+      clientSecret: form.clientSecret.trim() || basePayload?.clientSecret,
+      token: form.token.trim() || basePayload?.token,
+      platformLabel: form.platform === "custom" ? platformName : basePayload?.platformLabel,
     };
 
+    if (!nextPayload.clientId && !nextPayload.clientSecret && !nextPayload.token) {
+      toast.error("Informe Client ID, Client Secret ou Token/API.");
+      return;
+    }
+
+    setSaving(true);
+    const { ok, payload } = await validateIntegration(platformKey, nextPayload);
     const encrypted = await encryptPayload(profile.id, payload);
     const now = new Date().toISOString();
+    const nextStatus: ConnectionStatusDb = ok ? "connected" : "error";
 
-    setConnections((prev) => {
-      const next: Record<string, StoredConnection> = {
-        ...prev,
-        [platformKey]: {
-          id: prev[platformKey]?.id || `api_${Date.now()}`,
-          platformKey,
-          platformName,
-          mode: form.mode,
-          status: "testing",
-          encrypted: encrypted.encrypted,
-          iv: encrypted.iv,
-          algo: encrypted.algo,
-          lastChecked: now,
-          createdAt: prev[platformKey]?.createdAt || now,
-        },
+    let updated: StoredConnection | null = null;
+
+    if (dialogMode === "create") {
+      const { data, error } = await supabase
+        .from("integrations")
+        .insert({
+          user_id: profile.id,
+          platform: platformKey,
+          credentials: JSON.stringify(encrypted),
+          status: nextStatus,
+          access_token: "",
+          last_test_at: now,
+          updated_at: now,
+          client_id: payload.clientId || null,
+        })
+        .select("id, platform, status, credentials, access_token, last_test_at, updated_at, created_at, client_id")
+        .maybeSingle();
+      if (error || !data) {
+        const { data: fallback, error: updateError } = await supabase
+          .from("integrations")
+          .update({
+            credentials: JSON.stringify(encrypted),
+            status: nextStatus,
+            last_test_at: now,
+            updated_at: now,
+            client_id: payload.clientId || null,
+          })
+          .eq("user_id", profile.id)
+          .eq("platform", platformKey)
+          .select("id, platform, status, credentials, access_token, last_test_at, updated_at, created_at, client_id")
+          .maybeSingle();
+        if (updateError || !fallback) {
+          toast.error("Falha ao salvar integracao.");
+          setSaving(false);
+          return;
+        }
+        updated = {
+          id: fallback.id,
+          platformKey: fallback.platform,
+          platformName: platformName,
+          status: mapDbStatus(fallback.status),
+          credentials: parseEncryptedBlob(fallback.credentials),
+          accessToken: fallback.access_token,
+          lastChecked: fallback.last_test_at,
+          createdAt: fallback.created_at,
+          updatedAt: fallback.updated_at,
+          clientId: fallback.client_id,
+        };
+      } else {
+        updated = {
+          id: data.id,
+          platformKey: data.platform,
+          platformName: platformName,
+          status: mapDbStatus(data.status),
+          credentials: parseEncryptedBlob(data.credentials),
+          accessToken: data.access_token,
+          lastChecked: data.last_test_at,
+          createdAt: data.created_at,
+          updatedAt: data.updated_at,
+          clientId: data.client_id,
+        };
+      }
+    } else if (editTarget) {
+      const { data, error } = await supabase
+        .from("integrations")
+        .update({
+          credentials: JSON.stringify(encrypted),
+          status: nextStatus,
+          last_test_at: now,
+          updated_at: now,
+          client_id: payload.clientId || null,
+        })
+        .eq("id", editTarget.id)
+        .select("id, platform, status, credentials, access_token, last_test_at, updated_at, created_at, client_id")
+        .maybeSingle();
+      if (error || !data) {
+        toast.error("Falha ao atualizar integracao.");
+        setSaving(false);
+        return;
+      }
+      updated = {
+        id: data.id,
+        platformKey: data.platform,
+        platformName: platformName,
+        status: mapDbStatus(data.status),
+        credentials: parseEncryptedBlob(data.credentials),
+        accessToken: data.access_token,
+        lastChecked: data.last_test_at,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+        clientId: data.client_id,
       };
-      persistConnections(next);
-      return next;
-    });
+    }
 
-    const ok = await testConnection(payload, form.mode);
-
-    setConnections((prev) => {
-      const next: Record<string, StoredConnection> = {
-        ...prev,
-        [platformKey]: {
-          id: prev[platformKey]?.id || `api_${Date.now()}`,
-          platformKey,
-          platformName,
-          mode: form.mode,
-          status: ok ? "connected" : "error",
-          encrypted: encrypted.encrypted,
-          iv: encrypted.iv,
-          algo: encrypted.algo,
-          lastChecked: now,
-          createdAt: prev[platformKey]?.createdAt || now,
-        },
-      };
-      persistConnections(next);
-      return next;
-    });
+    if (updated) {
+      setConnections((prev) => ({ ...prev, [platformKey]: updated as StoredConnection }));
+      setPayloads((prev) => ({ ...prev, [platformKey]: payload }));
+    }
 
     toast[ok ? "success" : "error"](
-      ok ? `Conexao com ${platformName} validada.` : `Falha ao testar ${platformName}.`,
+      ok ? `Atualizado e conectado: ${platformName}.` : `Erro na conexao com ${platformName}.`,
     );
     setSaving(false);
     setDialogOpen(false);
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    const { error } = await supabase.from("integrations").delete().eq("id", deleteTarget.id);
+    if (error) {
+      toast.error("Falha ao excluir integracao.");
+      return;
+    }
+    setConnections((prev) => {
+      const next = { ...prev };
+      delete next[deleteTarget.platformKey];
+      return next;
+    });
+    setPayloads((prev) => {
+      const next = { ...prev };
+      delete next[deleteTarget.platformKey];
+      return next;
+    });
+    toast.success("Integracao removida.");
+    setDeleteTarget(null);
   };
 
   const handlePostNow = (platformName: string) => {
@@ -403,7 +584,7 @@ const Apis = () => {
     });
     if (error || data?.status !== "connected") {
       setEduzzStatus("error");
-      toast.error("Falha na conexão com a Eduzz. Verifique suas credenciais e permissões.");
+      toast.error("Falha na conexao com a Eduzz.");
       return;
     }
     setEduzzStatus("connected");
@@ -411,6 +592,7 @@ const Apis = () => {
     setEduzzClientId("");
     setEduzzClientSecret("");
     toast.success("Eduzz conectada com sucesso.");
+    refreshIntegrations();
   };
 
   const handleHotmartConnect = async () => {
@@ -437,6 +619,7 @@ const Apis = () => {
     setHotmartClientSecret("");
     setHotmartBasicToken("");
     toast.success("Hotmart conectada com sucesso.");
+    refreshIntegrations();
   };
 
   const handleHotmartTest = async () => {
@@ -444,18 +627,20 @@ const Apis = () => {
     const { data, error } = await supabase.functions.invoke("hotmart-test");
     if (error || data?.status !== "connected") {
       setHotmartStatus("error");
-      toast.error("Falha na conexão com Hotmart.");
+      toast.error("Falha na conexao com Hotmart.");
       return;
     }
     setHotmartStatus("connected");
     setHotmartConnectedAt(new Date().toISOString());
     toast.success("Hotmart conectada.");
+    refreshIntegrations();
   };
 
   const renderStatus = (status: ConnectionStatus) => {
     if (status === "connected") return { label: "Conectado", color: "bg-emerald-500/15 text-emerald-300" };
     if (status === "testing") return { label: "Testando", color: "bg-amber-500/15 text-amber-300" };
     if (status === "error") return { label: "Erro", color: "bg-rose-500/15 text-rose-300" };
+    if (status === "expired") return { label: "Expirado", color: "bg-amber-500/15 text-amber-300" };
     return { label: "Desconectado", color: "bg-muted text-muted-foreground" };
   };
 
@@ -506,7 +691,7 @@ const Apis = () => {
                   Credenciais criptografadas
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Chaves e logins ficam protegidos no navegador e so sao usados em tempo real.
+                  Tokens e secrets ficam protegidos e sao mascarados na tela.
                 </p>
               </div>
               <div className="rounded-xl border border-border/40 bg-muted/30 p-4 space-y-2">
@@ -520,7 +705,7 @@ const Apis = () => {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              <Button variant="viral" onClick={() => openDialogFor()}>
+              <Button variant="viral" onClick={() => openCreateDialog()}>
                 Adicionar API
               </Button>
               <Button variant="glass" onClick={() => navigate("/")}>Voltar ao sistema</Button>
@@ -545,7 +730,7 @@ const Apis = () => {
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-lg font-semibold">Hotmart OAuth</h3>
-              <p className="text-xs text-muted-foreground">Conexão real com validação automática.</p>
+              <p className="text-xs text-muted-foreground">Conexao real com validacao automatica.</p>
             </div>
             <Badge className={renderStatus(hotmartStatus === "idle" ? "disconnected" : hotmartStatus).color}>
               {renderStatus(hotmartStatus === "idle" ? "disconnected" : hotmartStatus).label}
@@ -579,7 +764,7 @@ const Apis = () => {
             />
           </div>
           <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-            {hotmartConnectedAt ? `Conectado em ${new Date(hotmartConnectedAt).toLocaleString()}` : "Nenhuma conexão ativa"}
+            {hotmartConnectedAt ? `Conectado em ${new Date(hotmartConnectedAt).toLocaleString()}` : "Nenhuma conexao ativa"}
           </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="neon" onClick={handleHotmartConnect} disabled={hotmartStatus === "testing"}>
@@ -587,7 +772,7 @@ const Apis = () => {
               Conectar Hotmart
             </Button>
             <Button variant="glass" onClick={handleHotmartTest} disabled={hotmartStatus === "testing"}>
-              Testar conexão
+              Testar conexao
             </Button>
           </div>
         </section>
@@ -596,7 +781,7 @@ const Apis = () => {
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-lg font-semibold">Eduzz OAuth</h3>
-              <p className="text-xs text-muted-foreground">Conexão real com validação automática.</p>
+              <p className="text-xs text-muted-foreground">Conexao real com validacao automatica.</p>
             </div>
             <Badge className={renderStatus(eduzzStatus === "idle" ? "disconnected" : eduzzStatus).color}>
               {renderStatus(eduzzStatus === "idle" ? "disconnected" : eduzzStatus).label}
@@ -622,19 +807,12 @@ const Apis = () => {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-            {eduzzConnectedAt ? `Conectado em ${new Date(eduzzConnectedAt).toLocaleString()}` : "Nenhuma conexão ativa"}
+            {eduzzConnectedAt ? `Conectado em ${new Date(eduzzConnectedAt).toLocaleString()}` : "Nenhuma conexao ativa"}
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div>
             <Button variant="neon" onClick={handleEduzzConnect} disabled={eduzzStatus === "testing"}>
               {eduzzStatus === "testing" ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               Conectar Eduzz
-            </Button>
-            <Button
-              variant="glass"
-              onClick={handleEduzzConnect}
-              disabled={eduzzStatus === "testing"}
-            >
-              Revalidar conexão
             </Button>
           </div>
         </section>
@@ -667,7 +845,7 @@ const Apis = () => {
             Se a conexao falhar, o sistema libera download do video e assets para publicacao manual.
           </div>
           <div>
-            <Button variant="neon" onClick={() => openDialogFor("youtube")}>
+            <Button variant="neon" onClick={() => openCreateDialog("youtube")}>
               Conectar YouTube
             </Button>
           </div>
@@ -676,12 +854,15 @@ const Apis = () => {
         <section className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold">Plataformas principais</h3>
-            <span className="text-xs text-muted-foreground">Status em tempo real</span>
+            <span className="text-xs text-muted-foreground">
+              {loadingConnections ? "Atualizando status..." : "Status em tempo real"}
+            </span>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {platformList.map((platform) => {
               const connection = connections[platform.key];
               const status = renderStatus(connection?.status || "disconnected");
+              const payload = payloads[platform.key];
               const isConnected = connection?.status === "connected";
               const isTesting = connection?.status === "testing";
               return (
@@ -708,14 +889,27 @@ const Apis = () => {
                       <span>Nenhum teste recente</span>
                     )}
                   </div>
+                  <div className="rounded-xl border border-border/40 bg-muted/30 p-3 text-xs text-muted-foreground space-y-1">
+                    <div>Client ID: {maskValue(payload?.clientId)}</div>
+                    <div>Client Secret: {maskValue(payload?.clientSecret)}</div>
+                    <div>Token/API: {maskValue(payload?.token)}</div>
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     <Button
                       size="sm"
                       variant={isConnected ? "neon" : "outline"}
-                      onClick={() => (isConnected ? handlePostNow(platform.name) : openDialogFor(platform.key))}
+                      onClick={() => (connection ? openEditDialog(connection) : openCreateDialog(platform.key))}
                       disabled={isTesting}
                     >
-                      {isConnected ? "Postar agora" : "Conectar API"}
+                      {isConnected ? "Conectar API" : "Conectar API"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="glass"
+                      onClick={() => connection && openEditDialog(connection)}
+                      disabled={!connection || isTesting}
+                    >
+                      Editar
                     </Button>
                     <Button
                       size="sm"
@@ -724,6 +918,23 @@ const Apis = () => {
                       disabled={!connection || isTesting}
                     >
                       Revalidar
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-rose-300"
+                      onClick={() => connection && setDeleteTarget(connection)}
+                      disabled={!connection || isTesting}
+                    >
+                      Excluir
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handlePostNow(platform.name)}
+                      disabled={!isConnected || isTesting}
+                    >
+                      Postar agora
                     </Button>
                   </div>
                 </div>
@@ -738,6 +949,7 @@ const Apis = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {customConnections.map((connection) => {
                 const status = renderStatus(connection.status);
+                const payload = payloads[connection.platformKey];
                 return (
                   <div key={connection.platformKey} className="rounded-2xl border border-border/50 bg-card/60 p-5 space-y-4">
                     <div className="flex items-start justify-between">
@@ -755,18 +967,27 @@ const Apis = () => {
                         <span>Nenhum teste recente</span>
                       )}
                     </div>
+                    <div className="rounded-xl border border-border/40 bg-muted/30 p-3 text-xs text-muted-foreground space-y-1">
+                      <div>Client ID: {maskValue(payload?.clientId)}</div>
+                      <div>Client Secret: {maskValue(payload?.clientSecret)}</div>
+                      <div>Token/API: {maskValue(payload?.token)}</div>
+                    </div>
                     <div className="flex flex-wrap gap-2">
                       <Button
                         size="sm"
                         variant={connection.status === "connected" ? "neon" : "outline"}
-                        onClick={() =>
-                          connection.status === "connected"
-                            ? handlePostNow(connection.platformName)
-                            : openDialogFor(undefined, connection)
-                        }
+                        onClick={() => openEditDialog(connection)}
                         disabled={connection.status === "testing"}
                       >
-                        {connection.status === "connected" ? "Postar agora" : "Conectar API"}
+                        Conectar API
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="glass"
+                        onClick={() => openEditDialog(connection)}
+                        disabled={connection.status === "testing"}
+                      >
+                        Editar
                       </Button>
                       <Button
                         size="sm"
@@ -775,6 +996,15 @@ const Apis = () => {
                         disabled={connection.status === "testing"}
                       >
                         Revalidar
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-rose-300"
+                        onClick={() => setDeleteTarget(connection)}
+                        disabled={connection.status === "testing"}
+                      >
+                        Excluir
                       </Button>
                     </div>
                   </div>
@@ -788,8 +1018,12 @@ const Apis = () => {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
-            <DialogTitle>Adicionar API</DialogTitle>
-            <DialogDescription>Conecte uma plataforma com chave ou login.</DialogDescription>
+            <DialogTitle>{dialogMode === "edit" ? "Editar API" : "Adicionar API"}</DialogTitle>
+            <DialogDescription>
+              {dialogMode === "edit"
+                ? "Atualize credenciais e revalide a conexao."
+                : "Conecte uma plataforma com credenciais seguras."}
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
@@ -798,6 +1032,7 @@ const Apis = () => {
               <Select
                 value={form.platform}
                 onValueChange={(value) => setForm((prev) => ({ ...prev, platform: value }))}
+                disabled={dialogMode === "edit"}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione" />
@@ -820,70 +1055,43 @@ const Apis = () => {
                   value={form.customName}
                   onChange={(event) => setForm((prev) => ({ ...prev, customName: event.target.value }))}
                   placeholder="Ex: Pinterest, Spotify, X"
+                  disabled={dialogMode === "edit"}
                 />
               </div>
             )}
 
-            <div className="space-y-2">
-              <Label>Modo de conexao</Label>
-              <RadioGroup
-                value={form.mode}
-                onValueChange={(value) => setForm((prev) => ({ ...prev, mode: value as ConnectionMode }))}
-                className="grid grid-cols-2 gap-3"
-              >
-                <label className="flex items-center gap-2 rounded-lg border border-border/50 bg-muted/30 p-3">
-                  <RadioGroupItem value="api_key" />
-                  API Key
-                </label>
-                <label className="flex items-center gap-2 rounded-lg border border-border/50 bg-muted/30 p-3">
-                  <RadioGroupItem value="login" />
-                  Login
-                </label>
-              </RadioGroup>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="space-y-2">
+                <Label>Client ID</Label>
+                <Input
+                  value={form.clientId}
+                  onChange={(event) => setForm((prev) => ({ ...prev, clientId: event.target.value }))}
+                  placeholder={dialogMode === "edit" ? "••••••" : "Seu Client ID"}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Client Secret</Label>
+                <Input
+                  type="password"
+                  value={form.clientSecret}
+                  onChange={(event) => setForm((prev) => ({ ...prev, clientSecret: event.target.value }))}
+                  placeholder={dialogMode === "edit" ? "••••••" : "Seu Client Secret"}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Token / API Key</Label>
+                <Input
+                  type="password"
+                  value={form.token}
+                  onChange={(event) => setForm((prev) => ({ ...prev, token: event.target.value }))}
+                  placeholder={dialogMode === "edit" ? "••••••" : "Token ou API Key"}
+                />
+              </div>
             </div>
 
-            {form.mode === "api_key" ? (
-              <div className="space-y-3">
-                <div className="space-y-2">
-                  <Label>API Key</Label>
-                  <Input
-                    value={form.apiKey}
-                    onChange={(event) => setForm((prev) => ({ ...prev, apiKey: event.target.value }))}
-                    placeholder="sk_live_xxxxx"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Endpoint para teste (opcional)</Label>
-                  <Input
-                    value={form.endpoint}
-                    onChange={(event) => setForm((prev) => ({ ...prev, endpoint: event.target.value }))}
-                    placeholder="https://api.sua-plataforma.com/status"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Se informado, o sistema testa a conexao automaticamente.
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="space-y-2">
-                  <Label>Email</Label>
-                  <Input
-                    type="email"
-                    value={form.email}
-                    onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))}
-                    placeholder="seu@email.com"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Senha</Label>
-                  <Input
-                    type="password"
-                    value={form.password}
-                    onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
-                    placeholder="********"
-                  />
-                </div>
+            {dialogMode === "edit" && (
+              <div className="rounded-xl border border-border/40 bg-muted/30 p-3 text-xs text-muted-foreground">
+                Deixe em branco para manter as credenciais atuais. Tokens sao mascarados por seguranca.
               </div>
             )}
 
@@ -897,13 +1105,28 @@ const Apis = () => {
             <Button variant="glass" onClick={() => setDialogOpen(false)} disabled={saving}>
               Cancelar
             </Button>
-            <Button variant="viral" onClick={handleConnect} disabled={saving}>
+            <Button variant="viral" onClick={handleSave} disabled={saving}>
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              Conectar
+              {dialogMode === "edit" ? "Salvar" : "Conectar"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={Boolean(deleteTarget)} onOpenChange={(open) => (!open ? setDeleteTarget(null) : null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Tem certeza que deseja remover esta API?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A integracao sera removida e o fluxo continua com fallback automatico.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>Confirmar exclusao</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

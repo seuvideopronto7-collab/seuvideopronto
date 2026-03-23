@@ -1,0 +1,7 @@
+ALTER TABLE public.integrations
+ADD COLUMN IF NOT EXISTS credentials TEXT,
+ADD COLUMN IF NOT EXISTS last_test_at TIMESTAMPTZ,
+ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
+
+ALTER TABLE public.integrations
+ALTER COLUMN access_token DROP NOT NULL;
