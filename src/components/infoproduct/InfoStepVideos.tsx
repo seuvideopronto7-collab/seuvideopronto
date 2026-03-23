@@ -15,12 +15,53 @@ const estilos = [
   { id: "influenciador", label: "Influenciador", icon: "🔥", desc: "Tom dinâmico e envolvente", avatar: "😎" },
 ];
 
-const aulasSimuladas = [
-  { titulo: "Aula 01 — Introdução e Boas-vindas", duracao: "03:45" },
-  { titulo: "Aula 02 — Fundamentos Essenciais", duracao: "07:12" },
-  { titulo: "Aula 03 — Estratégia Prática", duracao: "05:30" },
-  { titulo: "Aula 04 — Estudo de Caso Real", duracao: "06:18" },
-  { titulo: "Aula 05 — Plano de Ação Final", duracao: "04:55" },
+type Aula = {
+  titulo: string;
+  descricao: string;
+  videoUrl?: string;
+  duracao: string;
+  legenda?: string;
+};
+
+const aulasBase: Aula[] = [
+  {
+    titulo: "Aula 01 — Introdução e Boas-vindas",
+    descricao: "Visao geral do curso e objetivos da jornada.",
+    duracao: "03:45",
+    videoUrl: "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+    legenda: "PT-BR",
+  },
+  {
+    titulo: "Aula 02 — Fundamentos Essenciais",
+    descricao: "Bases e conceitos-chave para destravar resultados.",
+    duracao: "07:12",
+    videoUrl: "https://storage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+    legenda: "PT-BR",
+  },
+  {
+    titulo: "Aula 03 — Estratégia Prática",
+    descricao: "Aplicacao pratica passo a passo.",
+    duracao: "05:30",
+    legenda: "PT-BR",
+  },
+  {
+    titulo: "Aula 04 — Estudo de Caso Real",
+    descricao: "Analise real com resultados e aprendizados.",
+    duracao: "06:18",
+    legenda: "PT-BR",
+  },
+  {
+    titulo: "Aula 05 — Plano de Ação Final",
+    descricao: "Checklist final para colocar tudo em pratica.",
+    duracao: "04:55",
+    legenda: "PT-BR",
+  },
+];
+
+const demoVideoUrls = [
+  "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+  "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
+  "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4",
 ];
 
 const etapasProcessamento = [
@@ -39,6 +80,7 @@ const InfoStepVideos = ({ onContinue }: Props) => {
   const [concluido, setConcluido] = useState(false);
   const [playerAberto, setPlayerAberto] = useState(false);
   const [aulaAtiva, setAulaAtiva] = useState<number | null>(null);
+  const [aulas, setAulas] = useState<Aula[]>(aulasBase);
 
   const estiloSelecionado = estilos.find((e) => e.id === estilo);
 
@@ -70,6 +112,17 @@ const InfoStepVideos = ({ onContinue }: Props) => {
     setAulaAtiva(index);
     setPlayerAberto(true);
   };
+
+  const gerarAulaAgora = (index: number) => {
+    setAulas((prev) =>
+      prev.map((aula, i) => {
+        if (i !== index || aula.videoUrl) return aula;
+        return { ...aula, videoUrl: demoVideoUrls[index % demoVideoUrls.length] };
+      })
+    );
+  };
+
+  const aulasGeradas = aulas.filter((aula) => aula.videoUrl).length;
 
   return (
     <div className="glass-card p-6 space-y-5 max-w-2xl mx-auto">
@@ -142,7 +195,7 @@ const InfoStepVideos = ({ onContinue }: Props) => {
           </div>
           <Progress value={progresso} className="h-2" />
           <div className="flex justify-between text-xs text-muted-foreground">
-            <span>Processando {aulasSimuladas.length} aulas</span>
+            <span>Processando {aulas.length} aulas</span>
             <span>{Math.round(progresso)}%</span>
           </div>
         </div>
@@ -154,12 +207,12 @@ const InfoStepVideos = ({ onContinue }: Props) => {
           <div className="flex items-center gap-2 mb-1">
             <CheckCircle2 className="w-5 h-5 text-accent" />
             <p className="text-sm font-bold text-accent">
-              {aulasSimuladas.length} videoaulas geradas com sucesso!
-            </p>
-          </div>
+               {aulasGeradas} videoaulas prontas para assistir
+             </p>
+           </div>
 
-          <div className="space-y-2">
-            {aulasSimuladas.map((aula, i) => (
+           <div className="space-y-2">
+            {aulas.map((aula, i) => (
               <button
                 key={i}
                 onClick={() => abrirPlayer(i)}
@@ -177,7 +230,11 @@ const InfoStepVideos = ({ onContinue }: Props) => {
                     <span>{estiloSelecionado?.label || "Apresentador IA"}</span>
                   </div>
                 </div>
-                <CheckCircle2 className="w-4 h-4 text-accent flex-shrink-0" />
+                {aula.videoUrl ? (
+                  <CheckCircle2 className="w-4 h-4 text-accent flex-shrink-0" />
+                ) : (
+                  <Sparkles className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                )}
               </button>
             ))}
           </div>
@@ -219,30 +276,40 @@ const InfoStepVideos = ({ onContinue }: Props) => {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-base">
-              {aulaAtiva !== null ? aulasSimuladas[aulaAtiva].titulo : ""}
+              {aulaAtiva !== null ? aulas[aulaAtiva].titulo : ""}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            {/* Fake player */}
-            <div className="aspect-video rounded-xl bg-gradient-to-br from-background via-muted to-background border border-border/50 flex flex-col items-center justify-center relative overflow-hidden">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,hsl(var(--primary)/0.08)_0%,transparent_70%)]" />
-              <span className="text-6xl mb-3">{estiloSelecionado?.avatar || "👨‍🏫"}</span>
-              <p className="text-sm font-semibold">{estiloSelecionado?.label || "Apresentador IA"}</p>
-              <div className="absolute bottom-0 left-0 right-0 bg-background/80 backdrop-blur-sm p-3 border-t border-border/30">
-                <p className="text-xs text-center text-muted-foreground italic">
-                  "Bem-vindo à aula! Hoje vamos explorar os fundamentos que vão transformar seus resultados..."
+            {aulaAtiva !== null && aulas[aulaAtiva].videoUrl ? (
+              <video
+                src={aulas[aulaAtiva].videoUrl}
+                controls
+                autoPlay
+                playsInline
+                className="w-full aspect-video object-cover rounded-xl"
+              />
+            ) : (
+              <div className="aspect-video rounded-xl bg-muted/30 border border-border/50 flex flex-col items-center justify-center gap-3 p-6">
+                <p className="text-sm font-semibold">Essa aula ainda esta sendo gerada.</p>
+                <p className="text-xs text-muted-foreground text-center">
+                  Assim que o video estiver pronto, ele aparece aqui automaticamente.
                 </p>
+                {aulaAtiva !== null && (
+                  <Button variant="outline" size="sm" onClick={() => gerarAulaAgora(aulaAtiva)}>
+                    🔄 Gerar agora
+                  </Button>
+                )}
               </div>
-            </div>
+            )}
             {/* Info */}
             <div className="flex items-center justify-between text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4" />
-                <span>{aulaAtiva !== null ? aulasSimuladas[aulaAtiva].duracao : ""}</span>
+                <span>{aulaAtiva !== null ? aulas[aulaAtiva].duracao : ""}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Subtitles className="w-4 h-4" />
-                <span>Legendas PT-BR</span>
+                <span>{aulaAtiva !== null ? aulas[aulaAtiva].legenda || "PT-BR" : "PT-BR"}</span>
               </div>
             </div>
           </div>
