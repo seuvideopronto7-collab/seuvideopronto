@@ -45,6 +45,7 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
   });
   const [file, setFile] = useState<File | null>(null);
   const [videoLink, setVideoLink] = useState("");
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [analysisData, setAnalysisData] = useState<any>(null);
   const [generationMode, setGenerationMode] = useState<string | null>(null);
   const [roteiroData, setRoteiroData] = useState<any>(null);
@@ -75,8 +76,15 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
     seoData,
     variacoesData,
     videoLink,
+    videoUrl,
     variacoesCount,
   });
+
+  const isPlayableVideoUrl = (url?: string | null) => {
+    if (!url) return false;
+    const clean = url.split("?")[0].toLowerCase();
+    return /\.(mp4|webm|mov|m4v)$/.test(clean);
+  };
 
   const persistProduto = async (override?: { status?: "rascunho" | "finalizado" | "publicado"; formData?: Partial<typeof formData> }) => {
     if (!user) return;
@@ -220,6 +228,7 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
           if (uploadError) throw uploadError;
           const { data: urlData } = supabase.storage.from("media-uploads").getPublicUrl(path);
           fileUrl = urlData.publicUrl;
+          setVideoUrl(fileUrl);
         }
 
         const { data, error } = await supabase.functions.invoke("analyze-content", {
@@ -396,6 +405,7 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
     setEntryType(null);
     setFile(null);
     setVideoLink("");
+    setVideoUrl(null);
     setFormData({
       produto: "",
       nicho: "",
@@ -419,6 +429,12 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
   }, [step, produtoStatus]);
 
   useEffect(() => {
+    if (isPlayableVideoUrl(videoLink)) {
+      setVideoUrl(videoLink);
+    }
+  }, [videoLink]);
+
+  useEffect(() => {
     if (!initialProduto) return;
     const estrutura = initialProduto.estrutura || {};
     const nextEntryType = (estrutura.entryType || "manual") as EntryType;
@@ -426,6 +442,7 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
     setEntryType(nextEntryType);
     setFormData(nextForm);
     setVideoLink(estrutura.videoLink || "");
+    setVideoUrl(estrutura.videoUrl || null);
     setAnalysisData(estrutura.analysisData || null);
     setRoteiroData(estrutura.roteiroData || null);
     setSeoData(estrutura.seoData || null);
@@ -519,7 +536,9 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
           <StepFinal
             roteiroData={roteiroData}
             seoData={seoData}
+            videoUrl={videoUrl}
             onNewVersion={handleNewVersion}
+            onEdit={() => goTo(8)}
             onContinue={() => goTo(10)}
           />
         )}

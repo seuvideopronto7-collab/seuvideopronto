@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import CopyField from "@/components/CopyField";
 import { toast } from "sonner";
@@ -6,13 +7,32 @@ import { Copy, Download, RefreshCw } from "lucide-react";
 interface StepFinalProps {
   roteiroData: any;
   seoData: any;
+  videoUrl?: string | null;
   onNewVersion: () => void;
   onContinue: () => void;
 }
 
-const StepFinal = ({ roteiroData, seoData, onNewVersion, onContinue }: StepFinalProps) => {
+const StepFinal = ({ roteiroData, seoData, videoUrl, onNewVersion, onContinue }: StepFinalProps) => {
   const roteiro = roteiroData?.roteiro || roteiroData?.novo_roteiro;
   const seo = seoData?.titulos ? seoData : seoData?.seo;
+  const [status, setStatus] = useState<"idle" | "sem_video" | "erro_video">("idle");
+
+  const normalizedVideoUrl = useMemo(() => (videoUrl || "").trim(), [videoUrl]);
+  const hasVideo = Boolean(normalizedVideoUrl);
+  const isPlayableVideoUrl = useMemo(() => {
+    if (!normalizedVideoUrl) return false;
+    const clean = normalizedVideoUrl.split("?")[0].toLowerCase();
+    return /\.(mp4|webm|mov|m4v)$/.test(clean);
+  }, [normalizedVideoUrl]);
+
+  useEffect(() => {
+    console.log("VIDEO URL:", normalizedVideoUrl);
+    if (!normalizedVideoUrl || !isPlayableVideoUrl) {
+      setStatus("sem_video");
+      return;
+    }
+    setStatus("idle");
+  }, [normalizedVideoUrl, isPlayableVideoUrl]);
 
   const copyAll = () => {
     const parts = [];
@@ -32,15 +52,48 @@ const StepFinal = ({ roteiroData, seoData, onNewVersion, onContinue }: StepFinal
         <p className="text-sm text-muted-foreground">Seu vídeo está pronto! Confira o material completo</p>
       </div>
 
-      {/* Video placeholder */}
       <div className="glass-card p-1 rounded-xl overflow-hidden max-w-2xl mx-auto">
         <div className="bg-gradient-to-br from-primary/20 via-muted to-accent/20 rounded-lg aspect-video flex items-center justify-center">
-          <div className="text-center space-y-2">
-            <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto">
-              <span className="text-3xl">▶️</span>
+          {status === "erro_video" && (
+            <div className="text-center space-y-3 px-6">
+              <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto">
+                <span className="text-3xl">⚠️</span>
+              </div>
+              <p className="text-sm text-muted-foreground">Erro ao carregar vídeo</p>
+              <div className="flex flex-wrap gap-2 justify-center">
+                <Button variant="neon" size="sm" onClick={() => setStatus("idle")}>Tentar novamente</Button>
+                <Button
+                  variant="glass"
+                  size="sm"
+                  onClick={() => (normalizedVideoUrl ? window.open(normalizedVideoUrl, "_blank") : null)}
+                >
+                  <Download className="w-4 h-4" /> Baixar vídeo
+                </Button>
+                <Button variant="glass" size="sm" onClick={onNewVersion}>Gerar novamente</Button>
+              </div>
             </div>
-            <p className="text-sm text-muted-foreground">Preview do vídeo</p>
-          </div>
+          )}
+
+          {status === "sem_video" && (
+            <div className="text-center space-y-2">
+              <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto">
+                <span className="text-3xl">🎬</span>
+              </div>
+              <p className="text-sm text-muted-foreground">Finalizando seu vídeo…</p>
+            </div>
+          )}
+
+          {status === "idle" && hasVideo && (
+            <video
+              src={normalizedVideoUrl}
+              controls
+              autoPlay
+              muted
+              playsInline
+              style={{ width: "100%", borderRadius: "16px" }}
+              onError={() => setStatus("erro_video")}
+            />
+          )}
         </div>
       </div>
 
