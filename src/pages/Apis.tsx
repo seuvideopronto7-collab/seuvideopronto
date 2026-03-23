@@ -140,6 +140,11 @@ const Apis = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [hotmartStatus, setHotmartStatus] = useState<ConnectionStatus | "idle">("idle");
+  const [hotmartConnectedAt, setHotmartConnectedAt] = useState<string | null>(null);
+  const [hotmartClientId, setHotmartClientId] = useState("");
+  const [hotmartClientSecret, setHotmartClientSecret] = useState("");
+  const [hotmartBasicToken, setHotmartBasicToken] = useState("");
   const [eduzzStatus, setEduzzStatus] = useState<ConnectionStatus | "idle">("idle");
   const [eduzzConnectedAt, setEduzzConnectedAt] = useState<string | null>(null);
   const [eduzzClientId, setEduzzClientId] = useState("");
@@ -180,6 +185,26 @@ const Apis = () => {
     } finally {
       setLoaded(true);
     }
+  }, [profile?.id]);
+
+  useEffect(() => {
+    if (!profile?.id) return;
+    const loadHotmart = async () => {
+      setHotmartStatus("testing");
+      const { data, error } = await supabase
+        .from("integrations")
+        .select("created_at, status")
+        .eq("platform", "hotmart")
+        .maybeSingle();
+      if (error || !data) {
+        setHotmartStatus("disconnected");
+        setHotmartConnectedAt(null);
+        return;
+      }
+      setHotmartStatus(data.status === "connected" ? "connected" : "error");
+      setHotmartConnectedAt(data.created_at || null);
+    };
+    loadHotmart();
   }, [profile?.id]);
 
   useEffect(() => {
@@ -387,6 +412,45 @@ const Apis = () => {
     toast.success("Eduzz conectada com sucesso.");
   };
 
+  const handleHotmartConnect = async () => {
+    if (!hotmartClientId.trim() || !hotmartClientSecret.trim() || !hotmartBasicToken.trim()) {
+      toast.error("Informe Client ID, Client Secret e Basic Token da Hotmart.");
+      return;
+    }
+    setHotmartStatus("testing");
+    const { data, error } = await supabase.functions.invoke("hotmart-connect", {
+      body: {
+        client_id: hotmartClientId.trim(),
+        client_secret: hotmartClientSecret.trim(),
+        basic_token: hotmartBasicToken.trim(),
+      },
+    });
+    if (error || data?.status !== "connected") {
+      setHotmartStatus("error");
+      toast.error("Falha ao conectar com Hotmart. Verifique suas credenciais.");
+      return;
+    }
+    setHotmartStatus("connected");
+    setHotmartConnectedAt(new Date().toISOString());
+    setHotmartClientId("");
+    setHotmartClientSecret("");
+    setHotmartBasicToken("");
+    toast.success("Hotmart conectada com sucesso.");
+  };
+
+  const handleHotmartTest = async () => {
+    setHotmartStatus("testing");
+    const { data, error } = await supabase.functions.invoke("hotmart-test");
+    if (error || data?.status !== "connected") {
+      setHotmartStatus("error");
+      toast.error("Falha na conexão com Hotmart.");
+      return;
+    }
+    setHotmartStatus("connected");
+    setHotmartConnectedAt(new Date().toISOString());
+    toast.success("Hotmart conectada.");
+  };
+
   const renderStatus = (status: ConnectionStatus) => {
     if (status === "connected") return { label: "Conectado", color: "bg-emerald-500/15 text-emerald-300" };
     if (status === "testing") return { label: "Testando", color: "bg-amber-500/15 text-amber-300" };
@@ -475,6 +539,57 @@ const Apis = () => {
             </div>
           </div>
         </div>
+
+        <section className="glass-card p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold">Hotmart OAuth</h3>
+              <p className="text-xs text-muted-foreground">Conexão real com validação automática.</p>
+            </div>
+            <Badge className={renderStatus(hotmartStatus === "idle" ? "disconnected" : hotmartStatus).color}>
+              {renderStatus(hotmartStatus === "idle" ? "disconnected" : hotmartStatus).label}
+            </Badge>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>Client ID</Label>
+              <Input
+                value={hotmartClientId}
+                onChange={(event) => setHotmartClientId(event.target.value)}
+                placeholder="Seu Client ID"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Client Secret</Label>
+              <Input
+                type="password"
+                value={hotmartClientSecret}
+                onChange={(event) => setHotmartClientSecret(event.target.value)}
+                placeholder="Seu Client Secret"
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Basic Token (base64)</Label>
+            <Input
+              value={hotmartBasicToken}
+              onChange={(event) => setHotmartBasicToken(event.target.value)}
+              placeholder="base64(client_id:client_secret)"
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+            {hotmartConnectedAt ? `Conectado em ${new Date(hotmartConnectedAt).toLocaleString()}` : "Nenhuma conexão ativa"}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="neon" onClick={handleHotmartConnect} disabled={hotmartStatus === "testing"}>
+              {hotmartStatus === "testing" ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Conectar Hotmart
+            </Button>
+            <Button variant="glass" onClick={handleHotmartTest} disabled={hotmartStatus === "testing"}>
+              Testar conexão
+            </Button>
+          </div>
+        </section>
 
         <section className="glass-card p-6 space-y-4">
           <div className="flex items-center justify-between">

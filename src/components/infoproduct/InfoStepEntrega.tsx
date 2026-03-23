@@ -27,25 +27,43 @@ const InfoStepEntrega = ({ estruturaData, conteudoData, vslData, kitData, onNewP
   const [hotmartStatus, setHotmartStatus] = useState<"idle" | "testando" | "conectado" | "erro">("idle");
   const [hotmartToken, setHotmartToken] = useState<string | null>(null);
   const [hotmartBasicAuth, setHotmartBasicAuth] = useState("");
+  const [hotmartConnected, setHotmartConnected] = useState(false);
+  const [hotmartStatusLabel, setHotmartStatusLabel] = useState("Desconectado");
   const [eduzzConnected, setEduzzConnected] = useState(false);
   const [eduzzStatusLabel, setEduzzStatusLabel] = useState("Desconectado");
+  const [kiwifyConnected, setKiwifyConnected] = useState(false);
+  const [kiwifyStatusLabel, setKiwifyStatusLabel] = useState("Desconectado");
 
   useEffect(() => {
-    const loadEduzz = async () => {
+    const loadIntegrations = async () => {
       const { data, error } = await supabase
         .from("integrations")
-        .select("status")
-        .eq("platform", "eduzz")
-        .maybeSingle();
-      if (error || !data || data.status !== "connected") {
+        .select("platform, status")
+        .in("platform", ["eduzz", "hotmart", "kiwify"]);
+      if (error || !data) {
         setEduzzConnected(false);
         setEduzzStatusLabel("Desconectado");
+        setHotmartConnected(false);
+        setHotmartStatusLabel("Desconectado");
+        setKiwifyConnected(false);
+        setKiwifyStatusLabel("Desconectado");
         return;
       }
-      setEduzzConnected(true);
-      setEduzzStatusLabel("Conectado");
+      const statusByPlatform = data.reduce<Record<string, string>>((acc, item) => {
+        acc[item.platform] = item.status;
+        return acc;
+      }, {});
+      const eduzzOk = statusByPlatform.eduzz === "connected";
+      const hotmartOk = statusByPlatform.hotmart === "connected";
+      const kiwifyOk = statusByPlatform.kiwify === "connected";
+      setEduzzConnected(eduzzOk);
+      setEduzzStatusLabel(eduzzOk ? "Conectado" : "Desconectado");
+      setHotmartConnected(hotmartOk);
+      setHotmartStatusLabel(hotmartOk ? "Conectado" : "Desconectado");
+      setKiwifyConnected(kiwifyOk);
+      setKiwifyStatusLabel(kiwifyOk ? "Conectado" : "Desconectado");
     };
-    loadEduzz();
+    loadIntegrations();
   }, []);
 
   const buildFullCopy = (platform: string) => {
@@ -170,6 +188,18 @@ const InfoStepEntrega = ({ estruturaData, conteudoData, vslData, kitData, onNewP
   };
 
   const handleEnviar = () => {
+    if (hotmartConnected) {
+      const payload = {
+        name: estruturaData?.nome_otimizado || "Produto",
+        description: kitData?.landing_page?.estrutura || kitData?.headline || "",
+        price: kitData?.preco || null,
+        thumbnail: kitData?.thumbnail || null,
+        video_url: vslData?.video_url || null,
+        checkout_link: kitData?.checkout_link || null,
+      };
+      setLogs((prev) => [`${new Date().toLocaleTimeString()} • Payload Hotmart preparado`, ...prev]);
+      console.log("Hotmart payload preparado", payload);
+    }
     if (!eduzzConnected) {
       setLogs((prev) => [`${new Date().toLocaleTimeString()} • Eduzz não conectada`, ...prev]);
       toast.error("Conecte a Eduzz antes de publicar.");
@@ -339,9 +369,19 @@ const InfoStepEntrega = ({ estruturaData, conteudoData, vslData, kitData, onNewP
         </div>
         <div className="flex flex-wrap gap-2">
           <span
+            className={`text-xs rounded-full px-2 py-1 ${hotmartConnected ? "bg-emerald-500/15 text-emerald-300" : "bg-rose-500/15 text-rose-300"}`}
+          >
+            Hotmart: {hotmartStatusLabel}
+          </span>
+          <span
             className={`text-xs rounded-full px-2 py-1 ${eduzzConnected ? "bg-emerald-500/15 text-emerald-300" : "bg-rose-500/15 text-rose-300"}`}
           >
             Eduzz: {eduzzStatusLabel}
+          </span>
+          <span
+            className={`text-xs rounded-full px-2 py-1 ${kiwifyConnected ? "bg-emerald-500/15 text-emerald-300" : "bg-rose-500/15 text-rose-300"}`}
+          >
+            Kiwify: {kiwifyStatusLabel}
           </span>
           {status && (
             <span className="text-xs rounded-full bg-primary/15 text-primary px-2 py-1">{status}</span>

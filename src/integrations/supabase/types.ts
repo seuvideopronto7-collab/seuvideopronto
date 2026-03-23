@@ -17,6 +17,7 @@ export type Database = {
       integrations: {
         Row: {
           access_token: string
+          client_id: string | null
           created_at: string
           id: string
           platform: string
@@ -25,6 +26,7 @@ export type Database = {
         }
         Insert: {
           access_token: string
+          client_id?: string | null
           created_at?: string
           id?: string
           platform: string
@@ -33,6 +35,7 @@ export type Database = {
         }
         Update: {
           access_token?: string
+          client_id?: string | null
           created_at?: string
           id?: string
           platform?: string
