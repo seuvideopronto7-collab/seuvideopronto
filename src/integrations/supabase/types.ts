@@ -53,6 +53,39 @@ export type Database = {
         }
         Relationships: []
       }
+      produtos_gerados: {
+        Row: {
+          id: string
+          user_id: string
+          nome: string
+          tipo: string
+          nicho: string
+          estrutura: Json
+          status: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          nome?: string
+          tipo?: string
+          nicho?: string
+          estrutura?: Json
+          status?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          nome?: string
+          tipo?: string
+          nicho?: string
+          estrutura?: Json
+          status?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import VideoWizard from "@/components/wizard/VideoWizard";
 import Content30Days from "@/components/Content30Days";
@@ -8,7 +8,10 @@ import Content30Days from "@/components/Content30Days";
 const Index = () => {
   const { signOut, isAdmin, profile } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [showCalendar, setShowCalendar] = useState(false);
+  const initialProduto = (location.state as any)?.produto || null;
+  const autoStart = Boolean((location.state as any)?.autoStart);
 
   return (
     <div className="min-h-screen bg-background">
@@ -36,6 +39,9 @@ const Index = () => {
             )}
             <Button variant="ghost" size="sm" onClick={() => navigate("/perfil")}>
               Perfil
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => navigate("/produtos-prontos")}>
+              Produtos Prontos
             </Button>
             <Button variant="ghost" size="sm" onClick={signOut}>
               Sair
@@ -97,7 +103,7 @@ const Index = () => {
         {showCalendar && <Content30Days />}
 
         {/* Wizard */}
-        <VideoWizard />
+        <VideoWizard initialProduto={initialProduto} autoStart={autoStart} />
       </main>
     </div>
   );

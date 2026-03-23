@@ -10,6 +10,7 @@ import Auth from "./pages/Auth";
 import UserDashboard from "./pages/UserDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import Infoproduct from "./pages/Infoproduct";
+import ProdutosProntos from "./pages/ProdutosProntos";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -52,6 +53,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Infoproduct />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/produtos-prontos"
+              element={
+                <ProtectedRoute>
+                  <ProdutosProntos />
                 </ProtectedRoute>
               }
             />
