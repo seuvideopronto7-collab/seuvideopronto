@@ -65,9 +65,12 @@ serve(async (req) => {
       }),
     });
 
+    const tokenResponseClone = tokenResponse.clone();
+    const tokenRaw = await tokenResponseClone.text().catch(() => "");
+    console.log("Eduzz token response:", { status: tokenResponse.status, body: tokenRaw });
+
     if (!tokenResponse.ok) {
-      const errorText = await tokenResponse.text();
-      return new Response(JSON.stringify({ error: "Falha ao autenticar na Eduzz.", details: errorText }), {
+      return new Response(JSON.stringify({ error: "Falha ao autenticar na Eduzz.", details: tokenRaw }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
