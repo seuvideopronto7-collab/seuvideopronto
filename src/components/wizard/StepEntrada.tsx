@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { FileText, ImageIcon, FileVideo, FileAudio, Link2 } from "lucide-react";
 
@@ -7,7 +8,14 @@ interface StepEntradaProps {
   selected: EntryType | null;
   onSelect: (type: EntryType) => void;
   onContinue: () => void;
+  onFileSelected?: (file: File) => void;
 }
+
+const acceptMap: Record<string, string> = {
+  image: "image/*",
+  video: "video/*",
+  audio: "audio/*",
+};
 
 const options: { type: EntryType; icon: any; label: string; desc: string }[] = [
   { type: "manual", icon: FileText, label: "Inserir Dados Manualmente", desc: "Preencha informações do produto" },
@@ -17,7 +25,32 @@ const options: { type: EntryType; icon: any; label: string; desc: string }[] = [
   { type: "link", icon: Link2, label: "Colar Link de Vídeo", desc: "YouTube, TikTok ou Instagram" },
 ];
 
-const StepEntrada = ({ selected, onSelect, onContinue }: StepEntradaProps) => {
+const StepEntrada = ({ selected, onSelect, onContinue, onFileSelected }: StepEntradaProps) => {
+  const imageRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLInputElement>(null);
+  const audioRef = useRef<HTMLInputElement>(null);
+
+  const refMap: Record<string, React.RefObject<HTMLInputElement>> = {
+    image: imageRef,
+    video: videoRef,
+    audio: audioRef,
+  };
+
+  const handleClick = (type: EntryType) => {
+    onSelect(type);
+    if (type === "image" || type === "video" || type === "audio") {
+      refMap[type]?.current?.click();
+    }
+  };
+
+  const handleFileChange = (type: EntryType) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    onSelect(type);
+    onFileSelected?.(f);
+    onContinue();
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -25,11 +58,16 @@ const StepEntrada = ({ selected, onSelect, onContinue }: StepEntradaProps) => {
         <p className="text-sm text-muted-foreground">Como você quer começar?</p>
       </div>
 
+      {/* Hidden file inputs */}
+      <input ref={imageRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange("image")} />
+      <input ref={videoRef} type="file" accept="video/*" className="hidden" onChange={handleFileChange("video")} />
+      <input ref={audioRef} type="file" accept="audio/*" className="hidden" onChange={handleFileChange("audio")} />
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {options.map((opt) => (
           <button
             key={opt.type}
-            onClick={() => onSelect(opt.type)}
+            onClick={() => handleClick(opt.type)}
             className={`
               glass-card p-5 text-left transition-all duration-200 hover:scale-[1.02]
               ${selected === opt.type

@@ -185,7 +185,12 @@ const VideoWizard = () => {
 
       <div className="step-transition" key={step}>
         {step === 1 && (
-          <StepEntrada selected={entryType} onSelect={setEntryType} onContinue={() => goTo(2)} />
+          <StepEntrada
+            selected={entryType}
+            onSelect={setEntryType}
+            onContinue={() => goTo(2)}
+            onFileSelected={(f) => setFile(f)}
+          />
         )}
         {step === 2 && (
           <StepConteudo
