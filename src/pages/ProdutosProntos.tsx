@@ -18,7 +18,7 @@ interface ProdutoGerado {
   created_at: string;
 }
 
-const PAGE_SIZE = 6;
+const PAGE_SIZE = 50;
 
 const ProdutosProntos = () => {
   const { user } = useAuth();
@@ -28,6 +28,7 @@ const ProdutosProntos = () => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
+  const [status, setStatus] = useState<"sucesso" | "vazio" | "erro">("sucesso");
 
   const cacheKey = useMemo(() => (user ? `produtos_prontos_${user.id}` : "produtos_prontos"), [user]);
 
@@ -37,7 +38,9 @@ const ProdutosProntos = () => {
     try {
       const parsed = JSON.parse(cached) as { data: ProdutoGerado[]; ts: number };
       if (Date.now() - parsed.ts > 5 * 60 * 1000) return false;
-      setProdutos(parsed.data || []);
+      const cachedData = parsed.data || [];
+      setProdutos(cachedData);
+      setStatus(cachedData.length ? "sucesso" : "vazio");
       setLoading(false);
       return true;
     } catch {
@@ -55,28 +58,34 @@ const ProdutosProntos = () => {
     if (isFirst) setLoading(true); else setLoadingMore(true);
     const from = nextPage * PAGE_SIZE;
     const to = from + PAGE_SIZE - 1;
-    const { data, error } = await supabase
-      .from("produtos_gerados")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .range(from, to);
+    try {
+      const { data, error } = await supabase
+        .from("produtos_gerados")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .range(from, to);
 
-    if (error) {
+      if (error) throw error;
+
+      console.log("Produtos:", data);
+
+      const nextData = (data as ProdutoGerado[]) || [];
+      const merged = isFirst ? nextData : [...produtos, ...nextData];
+      setProdutos(merged);
+      setHasMore(nextData.length === PAGE_SIZE);
+      setPage(nextPage);
+      setStatus(merged.length ? "sucesso" : "vazio");
+      saveCache(merged);
+    } catch (err) {
+      console.error("Erro ao carregar produtos:", err);
       toast.error("Erro ao carregar produtos prontos");
+      if (isFirst) setProdutos([]);
+      setStatus("erro");
+    } finally {
       setLoading(false);
       setLoadingMore(false);
-      return;
     }
-
-    const nextData = (data as ProdutoGerado[]) || [];
-    const merged = isFirst ? nextData : [...produtos, ...nextData];
-    setProdutos(merged);
-    setHasMore(nextData.length === PAGE_SIZE);
-    setPage(nextPage);
-    setLoading(false);
-    setLoadingMore(false);
-    saveCache(merged);
   };
 
   useEffect(() => {
@@ -174,9 +183,17 @@ const ProdutosProntos = () => {
           </div>
         )}
 
-        {!loading && produtos.length === 0 && (
-          <div className="glass-card p-8 text-center text-muted-foreground">
-            Nenhum produto salvo ainda.
+        {!loading && status === "vazio" && produtos.length === 0 && (
+          <div className="glass-card p-8 text-center text-muted-foreground space-y-4">
+            <p>Voce ainda nao criou produtos. Comece agora.</p>
+            <Button variant="neon" onClick={() => navigate("/")}>Criar produto</Button>
+          </div>
+        )}
+
+        {!loading && status === "erro" && produtos.length === 0 && (
+          <div className="glass-card p-8 text-center text-muted-foreground space-y-4">
+            <p>Erro ao carregar produtos</p>
+            <Button variant="outline" onClick={() => fetchPage(0)}>Tentar novamente</Button>
           </div>
         )}
 
