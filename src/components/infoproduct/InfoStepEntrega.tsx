@@ -1,7 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Download, Copy, Check, Rocket, Link2, ShieldCheck, Send } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Check, Copy, Download, ExternalLink, Link2, Loader2, Rocket, Send, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { zipSync, strToU8 } from "fflate";
@@ -33,6 +34,16 @@ const InfoStepEntrega = ({ estruturaData, conteudoData, vslData, kitData, onNewP
   const [eduzzStatusLabel, setEduzzStatusLabel] = useState("Desconectado");
   const [kiwifyConnected, setKiwifyConnected] = useState(false);
   const [kiwifyStatusLabel, setKiwifyStatusLabel] = useState("Desconectado");
+  const [eduzzPosting, setEduzzPosting] = useState(false);
+  const [eduzzError, setEduzzError] = useState<string | null>(null);
+  const [eduzzResult, setEduzzResult] = useState<{ id?: string; url?: string } | null>(null);
+  const [eduzzPayload, setEduzzPayload] = useState({
+    nome: "",
+    descricao: "",
+    preco: "",
+    url_capa: "",
+    conteudo_url: "",
+  });
 
   useEffect(() => {
     const loadIntegrations = async () => {
@@ -65,6 +76,16 @@ const InfoStepEntrega = ({ estruturaData, conteudoData, vslData, kitData, onNewP
     };
     loadIntegrations();
   }, []);
+
+  useEffect(() => {
+    setEduzzPayload((prev) => ({
+      nome: prev.nome || estruturaData?.nome_otimizado || "",
+      descricao: prev.descricao || kitData?.landing_page?.estrutura || kitData?.headline || "",
+      preco: prev.preco || kitData?.preco?.toString?.() || "",
+      url_capa: prev.url_capa || kitData?.thumbnail || "",
+      conteudo_url: prev.conteudo_url || vslData?.video_url || "",
+    }));
+  }, [estruturaData, kitData, vslData]);
 
   const buildFullCopy = (platform: string) => {
     const parts = [];
@@ -224,6 +245,50 @@ const InfoStepEntrega = ({ estruturaData, conteudoData, vslData, kitData, onNewP
     const scripts = [kitData?.cta_principal, kitData?.garantia].filter(Boolean);
     setCampaign({ criativos, headlines, publicos, scripts });
     toast.success("Campanha de vendas gerada! 🔥");
+  };
+
+  const handleEduzzPost = async () => {
+    if (!eduzzConnected) {
+      setLogs((prev) => [`${new Date().toLocaleTimeString()} • Eduzz não conectada`, ...prev]);
+      toast.error("Conecte a Eduzz antes de publicar.");
+      return;
+    }
+
+    const produto = {
+      nome: eduzzPayload.nome || estruturaData?.nome_otimizado || "Produto",
+      descricao: eduzzPayload.descricao || kitData?.landing_page?.estrutura || kitData?.headline || "",
+      preco: Number(eduzzPayload.preco),
+      tipo: "digital",
+      url_capa: eduzzPayload.url_capa,
+      conteudo_url: eduzzPayload.conteudo_url,
+    };
+
+    if (!produto.nome || !produto.descricao || !produto.preco) {
+      toast.error("Informe nome, descrição e preço antes de publicar.");
+      return;
+    }
+
+    setEduzzPosting(true);
+    setEduzzError(null);
+    setEduzzResult(null);
+    console.log("Enviando produto:", produto);
+
+    const { data, error } = await supabase.functions.invoke("eduzz-post-product", {
+      body: { produto },
+    });
+
+    console.log("Resposta Eduzz:", data || error);
+
+    if (error || data?.error) {
+      setEduzzError("Erro ao publicar. Baixe o material e publique manualmente.");
+      toast.error("Erro ao publicar. Baixe o material e publique manualmente.");
+      setEduzzPosting(false);
+      return;
+    }
+
+    setEduzzResult({ id: data?.id, url: data?.url });
+    toast.success("Produto publicado na Eduzz com sucesso 🚀");
+    setEduzzPosting(false);
   };
 
   return (
@@ -411,12 +476,67 @@ const InfoStepEntrega = ({ estruturaData, conteudoData, vslData, kitData, onNewP
         </div>
       </div>
 
+      <div className="space-y-4 border-t border-border/30 pt-4">
+        <div>
+          <h4 className="text-sm font-semibold">Publicar na Eduzz</h4>
+          <p className="text-xs text-muted-foreground">Publicação automática com link de checkout</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <Input
+            placeholder="Nome do produto"
+            value={eduzzPayload.nome}
+            onChange={(e) => setEduzzPayload((prev) => ({ ...prev, nome: e.target.value }))}
+          />
+          <Input
+            placeholder="Preço (ex: 97)"
+            value={eduzzPayload.preco}
+            onChange={(e) => setEduzzPayload((prev) => ({ ...prev, preco: e.target.value }))}
+          />
+          <Input
+            placeholder="URL da capa (opcional)"
+            value={eduzzPayload.url_capa}
+            onChange={(e) => setEduzzPayload((prev) => ({ ...prev, url_capa: e.target.value }))}
+          />
+          <Input
+            placeholder="URL do conteúdo (opcional)"
+            value={eduzzPayload.conteudo_url}
+            onChange={(e) => setEduzzPayload((prev) => ({ ...prev, conteudo_url: e.target.value }))}
+          />
+        </div>
+        <Textarea
+          placeholder="Descrição"
+          value={eduzzPayload.descricao}
+          onChange={(e) => setEduzzPayload((prev) => ({ ...prev, descricao: e.target.value }))}
+          rows={4}
+        />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <Button variant="viral" size="lg" className="w-full" onClick={handleEduzzPost} disabled={eduzzPosting}>
+            {eduzzPosting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Postar agora
+          </Button>
+          <Button variant="glass" size="lg" className="w-full" onClick={buildZipPackage}>
+            <Download className="w-4 h-4" /> Baixar pacote (ZIP)
+          </Button>
+        </div>
+        {eduzzResult?.url && (
+          <Button
+            variant="neon"
+            size="lg"
+            className="w-full"
+            onClick={() => window.open(eduzzResult.url, "_blank")}
+          >
+            <ExternalLink className="w-4 h-4" /> Abrir produto
+          </Button>
+        )}
+        {eduzzError && (
+          <div className="rounded-lg border border-border/40 bg-muted/30 p-3 text-xs text-muted-foreground">
+            {eduzzError}
+          </div>
+        )}
+      </div>
+
       <div className="space-y-3 border-t border-border/30 pt-4">
         <Button variant="viral" size="lg" className="w-full" onClick={handleEnviar}>
           <Send className="w-4 h-4" /> Enviar para aprovação
-        </Button>
-        <Button variant="glass" size="lg" className="w-full" onClick={buildZipPackage}>
-          <Download className="w-4 h-4" /> Baixar pacote (ZIP)
         </Button>
       </div>
 
