@@ -73,7 +73,7 @@ const Auth = () => {
           <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center text-2xl font-bold mx-auto">
             F
           </div>
-          <h1 className="text-2xl font-bold gradient-text">Fature</h1>
+          <h1 className="text-2xl font-bold gradient-text">Seu Vídeo Pronto</h1>
           <p className="text-sm text-muted-foreground">Engine de Vídeos Virais</p>
         </div>
 
