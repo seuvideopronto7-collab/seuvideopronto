@@ -145,6 +145,15 @@ const Index = () => {
             🧭 Video Wizard
           </Button>
 
+          <Button
+            onClick={criarVideoTeste}
+            disabled={testLoading}
+            variant="outline"
+            className="border-primary text-primary"
+          >
+            {testLoading ? "⏳ Gerando..." : "🚀 Gerar Vídeo Teste"}
+          </Button>
+
         </div>
 
         {/* 🔥 MOTOR PRINCIPAL (SEMPRE ATIVO) */}
