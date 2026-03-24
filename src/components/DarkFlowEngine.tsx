@@ -161,23 +161,67 @@ const DarkFlowEngine = () => {
 
   const update = (key: string, value: string) => setForm((p) => ({ ...p, [key]: value }));
 
+  const withTimeout = async <T,>(fn: () => Promise<T>, ms: number) => {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error("Timeout ao gerar conteudo")), ms);
+    });
+    try {
+      return await Promise.race([fn(), timeoutPromise]);
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+    }
+  };
+
+  const buildFallbackNiches = () => {
+    const base = form.nicho || form.produto || "Negocios digitais";
+    return {
+      nichos_quentes: [
+        `${base} para iniciantes`,
+        `${base} rapido`,
+        `${base} sem aparecer`,
+        `${base} com baixo investimento`,
+        `${base} com prova social`,
+      ],
+      temas_sugeridos: [
+        "Erro comum que trava resultados",
+        "Metodo simples em 3 passos",
+        "Checklist de execucao diaria",
+        "Antes e depois real",
+        "Porque voce ainda nao conseguiu",
+      ],
+    };
+  };
+
+  const runDarkFlowPipeline = (payload: DarkFlowResult, sourceLabel: string) => {
+    setResult(payload);
+    toast.success(`Conteudo Dark gerado (${sourceLabel})`);
+  };
+
   const handleDetectNiches = async () => {
     setIsDetecting(true);
     try {
-      const { data, error } = await supabase.functions.invoke("generate-viral", {
-        body: {
-          ...form,
-          tipo: "dark_flow_niches",
-        },
-      });
+      const { data, error } = await withTimeout(
+        () =>
+          supabase.functions.invoke("generate-viral", {
+            body: {
+              ...form,
+              tipo: "dark_flow_niches",
+            },
+          }),
+        10000
+      );
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       setNiches(data?.nichos_quentes || []);
       setThemes(data?.temas_sugeridos || []);
       toast.success("Nichos quentes detectados");
     } catch (err: any) {
-      console.error(err);
-      toast.error(err.message || "Erro ao detectar nichos");
+      console.warn("API falhou, usando modo local");
+      const local = buildFallbackNiches();
+      setNiches(local.nichos_quentes || []);
+      setThemes(local.temas_sugeridos || []);
+      toast.message("Nichos detectados no modo local");
     } finally {
       setIsDetecting(false);
     }
@@ -198,20 +242,21 @@ const DarkFlowEngine = () => {
           tom: "especialista",
         },
       };
-      console.log("Payload gerar dark:", payload);
-
-      const { data, error } = await supabase.functions.invoke("generate-viral", {
-        body: payload,
-      });
+      const { data, error } = await withTimeout(
+        () =>
+          supabase.functions.invoke("generate-viral", {
+            body: payload,
+          }),
+        10000
+      );
       if (error) throw error;
       if (data?.error || data?.success === false) throw new Error(data?.error || "Erro ao gerar conteudo dark");
       if (!data) throw new Error("Resposta vazia ao gerar conteudo dark");
-      setResult(data || null);
-      toast.success("Conteudo Dark gerado");
+      runDarkFlowPipeline(data || buildFallbackDarkFlow(form), "API");
     } catch (err: any) {
-      console.error(err);
+      console.warn("API falhou, usando modo local");
       const fallback = buildFallbackDarkFlow(form);
-      setResult(fallback);
+      runDarkFlowPipeline(fallback, "Local");
       toast.warning("Falha ao gerar conteudo dark. Usando fallback local.");
     } finally {
       setIsLoading(false);
