@@ -54,6 +54,12 @@ const canalYouTube = document.getElementById("canalYouTube");
 const btnConectarRedes = document.getElementById("btnConectarRedes");
 const btnAtivarAutopost = document.getElementById("btnAtivarAutopost");
 const autopostStatus = document.getElementById("autopostStatus");
+const routeSelect = document.getElementById("routeSelect");
+const viewRoute = document.getElementById("viewRoute");
+const routeTitle = document.getElementById("routeTitle");
+const routeDesc = document.getElementById("routeDesc");
+const routeStatus = document.getElementById("routeStatus");
+const routePath = document.getElementById("routePath");
 
 const STORAGE_KEY = "material_salvo";
 const QUEUE_KEY = "fila_publicacao";
@@ -255,6 +261,78 @@ const executarFluxoCompleto = (input) => {
   return state;
 };
 
+const executarAcaoReal = async (nome, payload) => {
+  console.log("Executando acao real:", nome);
+
+  try {
+    if (!nome) {
+      return null;
+    }
+
+    if (nome.startsWith("/")) {
+      return navegarReal(nome);
+    }
+
+    if (nome === "navegar") {
+      return navegarReal(payload);
+    }
+
+    if (["salvar", "salvar-distribuir", "salvar-material"].includes(nome)) {
+      return salvarReal(payload || getMaterial());
+    }
+
+    if (["gerar", "ativar-maquina", "publicar-infoproduto"].includes(nome)) {
+      return gerarReal(payload || getDarkflowInput());
+    }
+
+    if (nome === "postar-agora") {
+      return publicarReal(payload || getMaterial());
+    }
+
+    console.warn("Acao nao mapeada:", nome);
+    return null;
+  } catch (err) {
+    console.error("Erro na acao:", nome, err);
+    return null;
+  }
+};
+
+const navegarReal = (rota) => {
+  if (!rota) return;
+  if (rota.startsWith("/")) {
+    navigateTo(rota);
+    return;
+  }
+  window.location.href = rota;
+};
+
+const salvarReal = (dados) => {
+  if (!dados) return;
+  persistMaterial(dados);
+  console.log("Salvo localmente");
+};
+
+const gerarReal = (input) => {
+  if (!input) return null;
+  return executarFluxoCompleto(input);
+};
+
+const publicarReal = async (dados) => {
+  if (!dados) return;
+  console.log("Preparando publicacao...");
+  addToQueue(dados);
+  const fila = JSON.parse(localStorage.getItem("fila_post") || "[]");
+  fila.push({
+    titulo: dados.titulo,
+    descricao: dados.descricao,
+    video: dados.video,
+    hashtags: dados.hashtags,
+    links: dados.links
+  });
+  localStorage.setItem("fila_post", JSON.stringify(fila));
+  console.log("Conteudo salvo para publicacao futura");
+};
+
 const applyMaterialToFields = (data) => {
   if (!data) return;
   fields.titulo.value = data.titulo || "";
@@ -426,11 +504,8 @@ const renderProdutos = (produtos) => {
     reuse.type = "button";
     reuse.className = "btn-inline";
     reuse.textContent = "Usar novamente";
-    reuse.addEventListener("click", () => {
-      produtoNome.value = produto.nome || "";
-      produtoTipo.value = produto.tipo || "ebook";
-      setProdutosStatus("Produto selecionado para reutilizar.", "success");
-    });
+    reuse.dataset.action = "abrir-projeto";
+    reuse.dataset.projetoId = produto.id;
 
     meta.appendChild(nome);
     meta.appendChild(sub);
@@ -462,6 +537,18 @@ const criarProduto = () => {
   produtoNome.value = "";
   produtoTipo.value = "ebook";
   setProdutosStatus("Produto criado e salvo localmente.", "success");
+};
+
+const abrirProjeto = (id) => {
+  const lista = carregarProdutosLocal();
+  const produto = lista.find((item) => String(item.id) === String(id));
+  if (!produto) {
+    setProdutosStatus("Produto nao encontrado para reutilizar.", "warning");
+    return;
+  }
+  produtoNome.value = produto.nome || "";
+  produtoTipo.value = produto.tipo || "ebook";
+  setProdutosStatus("Produto selecionado para reutilizar.", "success");
 };
 
 const gerarCalendario30Dias = (input) => {
@@ -663,6 +750,15 @@ btnSalvarDistribuir.addEventListener("click", () => {
   navigateTo("/distribuidor", material);
 });
 
+document.addEventListener("click", (event) => {
+  const target = event.target?.closest?.("[data-action]");
+  if (!target) return;
+  const acao = target.dataset?.action;
+  if (!acao) return;
+  const payload = target.dataset?.route || undefined;
+  executarAcaoReal(acao, payload);
+});
+
 window.addEventListener("popstate", (event) => {
   const nextPath = event.state?.path || window.location.pathname;
   setRoute(nextPath);
@@ -680,3 +776,4 @@ if (window.location.pathname !== initialPath) {
   window.history.replaceState({ path: initialPath }, "", initialPath);
 }
 setRoute(initialPath);
+console.log("Runtime ativo ✔");

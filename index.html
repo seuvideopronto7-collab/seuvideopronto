@@ -16,8 +16,23 @@
           <div class="brand-sub">Fluxo principal + distribuicao extra</div>
         </div>
         <div class="route-actions">
-          <button id="btnGoFlow" class="ghost" type="button">Fluxo principal</button>
-          <button id="btnGoDistribuidor" class="ghost" type="button">Central de Distribuicao</button>
+          <button id="btnGoFlow" class="ghost" type="button" data-action="/infoproduto">
+            Fluxo principal
+          </button>
+          <button id="btnGoDistribuidor" class="ghost" type="button" data-action="/distribuidor">
+            Central de Distribuicao
+          </button>
+          <select id="routeSelect" class="route-select">
+            <option value="/auth">Auth</option>
+            <option value="/">Home</option>
+            <option value="/perfil">Perfil</option>
+            <option value="/admin">Admin</option>
+            <option value="/infoproduto">Infoproduto</option>
+            <option value="/produtos-prontos">Produtos</option>
+            <option value="/planos">Planos</option>
+            <option value="/apis">APIs</option>
+            <option value="/distribuidor">Distribuidor</option>
+          </select>
         </div>
       </header>
 
@@ -58,8 +73,10 @@
                 Finalize o material e publique normalmente. O modulo de distribuicao e opcional.
               </p>
               <div class="actions">
-                <button class="primary" type="button">Postar agora</button>
-                <button id="btnSalvarDistribuir" class="ghost" type="button">
+                <button id="btnPostarAgora" class="primary" type="button" data-action="postar-agora">
+                  Postar agora
+                </button>
+                <button id="btnSalvarDistribuir" class="ghost" type="button" data-action="salvar-distribuir">
                   Salvar / Distribuir Material
                 </button>
               </div>
@@ -72,8 +89,10 @@
                 Modo automatico que executa roteiro, variacoes, produto, SEO e publicacao sem travar.
               </p>
               <div class="actions">
-                <button id="btnAtivarMaquina" class="primary" type="button">Ativar Modo Maquina</button>
-                <button id="btnPublicarInfoproduto" class="ghost" type="button">
+                <button id="btnAtivarMaquina" class="primary" type="button" data-action="ativar-maquina">
+                  Ativar Modo Maquina
+                </button>
+                <button id="btnPublicarInfoproduto" class="ghost" type="button" data-action="publicar-infoproduto">
                   Publicar meu infoproduto
                 </button>
               </div>
@@ -112,7 +131,9 @@
                     <option value="youtube">YouTube Shorts</option>
                   </select>
                 </div>
-                <button id="btnConteudo30" class="primary" type="button">Gerar 30 dias</button>
+                <button id="btnConteudo30" class="primary" type="button" data-action="gerar-30-dias">
+                  Gerar 30 dias
+                </button>
                 <div id="conteudo30Status" class="note"></div>
               </div>
               <div class="calendar" id="conteudo30Calendario"></div>
@@ -164,7 +185,9 @@
             <section class="card products">
               <div class="products-header">
                 <h2>Produtos Prontos</h2>
-                <button id="btnProdutosAtualizar" class="ghost" type="button">Atualizar</button>
+                <button id="btnProdutosAtualizar" class="ghost" type="button" data-action="produtos-atualizar">
+                  Atualizar
+                </button>
               </div>
               <p id="produtosVazio" class="note">Nenhum produto ainda. Crie o primeiro.</p>
               <ul id="produtosLista" class="products-list"></ul>
@@ -183,7 +206,9 @@
                     <option value="combo">Combo</option>
                   </select>
                 </div>
-                <button id="btnProdutoCriar" class="primary" type="button">Criar novo</button>
+                <button id="btnProdutoCriar" class="primary" type="button" data-action="produto-criar">
+                  Criar novo
+                </button>
                 <div id="produtosStatus" class="note"></div>
               </div>
             </section>
@@ -238,8 +263,8 @@
                   <input id="videoUrl" type="url" placeholder="https://.../video.mp4" />
                 </div>
                 <div class="actions">
-                  <button id="btnSalvar" class="primary">Salvar para depois</button>
-                  <button id="btnBaixarVideo" class="ghost">Baixar video</button>
+                  <button id="btnSalvar" class="primary" data-action="salvar-material">Salvar para depois</button>
+                  <button id="btnBaixarVideo" class="ghost" data-action="baixar-video">Baixar video</button>
                 </div>
                 <div class="note" id="saveStatus">Material nao salvo.</div>
               </div>
@@ -248,10 +273,16 @@
             <section class="card">
               <h2>Acoes rapidas</h2>
               <div class="actions stack">
-                <button id="btnBaixarPacote" class="primary">Baixar pacote completo</button>
-                <button id="btnCopiarCopy" class="ghost">Copiar copy</button>
-                <button id="btnReenviar" class="ghost">Reenviar (fila futura)</button>
-                <button id="btnRegerar" class="danger">Regerar conteudo</button>
+                <button id="btnBaixarPacote" class="primary" data-action="baixar-pacote">
+                  Baixar pacote completo
+                </button>
+                <button id="btnCopiarCopy" class="ghost" data-action="copiar-copy">Copiar copy</button>
+                <button id="btnReenviar" class="ghost" data-action="reenviar-fila">
+                  Reenviar (fila futura)
+                </button>
+                <button id="btnRegerar" class="danger" data-action="regerar-conteudo">
+                  Regerar conteudo
+                </button>
               </div>
               <div class="info" id="infoAviso"></div>
             </section>
@@ -269,8 +300,12 @@
                   </div>
                 </div>
                 <div class="actions">
-                  <button id="btnConectarRedes" class="ghost" type="button">Conectar redes</button>
-                  <button id="btnAtivarAutopost" class="primary" type="button">Ativar autopost</button>
+                  <button id="btnConectarRedes" class="ghost" type="button" data-action="conectar-redes">
+                    Conectar redes
+                  </button>
+                  <button id="btnAtivarAutopost" class="primary" type="button" data-action="ativar-autopost">
+                    Ativar autopost
+                  </button>
                 </div>
                 <div id="autopostStatus" class="note"></div>
               </div>
@@ -285,6 +320,37 @@
   hashtags.txt
   links.txt</pre>
               <div class="small">Estrutura simulada do pacote gerado.</div>
+            </section>
+          </div>
+        </section>
+
+        <section id="viewRoute" class="view">
+          <header class="hero">
+            <div class="hero-text">
+              <p class="kicker">Navegacao rapida</p>
+              <h1 id="routeTitle">Rota ativa</h1>
+              <p id="routeDesc" class="subtitle">Essa rota esta operacional e pronta para acao.</p>
+            </div>
+            <div class="status-chip">
+              <div class="status-title">Status da rota</div>
+              <div id="routeStatus" class="status-note">Ativa</div>
+            </div>
+          </header>
+          <div class="grid">
+            <section class="card">
+              <h2>Atalhos</h2>
+              <p class="subtitle">Volte para o fluxo principal ou para a central a qualquer momento.</p>
+              <div class="actions">
+                <button class="primary" type="button" data-action="/infoproduto">Voltar ao fluxo</button>
+                <button class="ghost" type="button" data-action="/distribuidor">
+                  Central de Distribuicao
+                </button>
+              </div>
+            </section>
+            <section class="card">
+              <h2>Debug de rotas</h2>
+              <div class="note">Rota atual: <span id="routePath">-</span></div>
+              <div class="note">Nenhum clique fica sem resposta aqui.</div>
             </section>
           </div>
         </section>
