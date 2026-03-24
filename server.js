@@ -2,40 +2,64 @@ import express from "express";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
+import { createClient } from "@supabase/supabase-js";
 
 const app = express();
 app.use(express.json());
 
-const jobs = new Map();
-let nextId = 1;
+const supabaseUrl = process.env.SUPABASE_URL || "";
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+const supabase = supabaseUrl && supabaseServiceRoleKey
+  ? createClient(supabaseUrl, supabaseServiceRoleKey, { auth: { persistSession: false } })
+  : null;
 
-const createJob = ({ imageUrl, productType, style, useDarkflow, useViral }) => {
-  const id = String(nextId++);
-  const job = {
-    id,
-    imageUrl: imageUrl || null,
-    productType: productType || null,
-    style: style || null,
-    useDarkflow: Boolean(useDarkflow),
-    useViral: Boolean(useViral),
-    status: "queued",
-    progress: 0,
-    error_message: null,
-    created_at: new Date().toISOString()
-  };
-  jobs.set(id, job);
-  return job;
+const ensureSupabase = () => {
+  if (!supabase) {
+    throw new Error("Supabase env nao configurado");
+  }
+};
+
+const createJob = async ({ imageUrl, prompt, userId }) => {
+  ensureSupabase();
+  const { data, error } = await supabase
+    .from("video_jobs")
+    .insert({
+      user_id: userId,
+      status: "queued",
+      progress: 0,
+      image_url: imageUrl || null,
+      prompt: prompt || null,
+      video_url: null,
+      error: null,
+    })
+    .select("id")
+    .single();
+  if (error) throw error;
+  return data;
 };
 
 const updateJob = async (id, updates) => {
-  const job = jobs.get(String(id));
-  if (!job) return null;
-  const updated = { ...job, ...updates, updated_at: new Date().toISOString() };
-  jobs.set(String(id), updated);
-  return updated;
+  ensureSupabase();
+  const { data, error } = await supabase
+    .from("video_jobs")
+    .update({ ...updates })
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data;
 };
 
-const getJob = async (id) => jobs.get(String(id)) || null;
+const getJob = async (id) => {
+  ensureSupabase();
+  const { data, error } = await supabase
+    .from("video_jobs")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  return data || null;
+};
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -194,100 +218,78 @@ const uploadFinalVideo = async (jobId, finalPath) => {
 };
 
 const processVideoJob = async (jobId) => {
-  await updateJob(jobId, { status: "generating_script", progress: 10 });
-
   const job = await getJob(jobId);
   if (!job) throw new Error("Job nao encontrado");
 
-  const productType = job.product_type ?? job.productType ?? "outro";
-  const style = job.style ?? "luxo";
-  const useDarkflow = job.use_darkflow ?? job.useDarkflow ?? false;
-  const useViral = job.use_viral ?? job.useViral ?? false;
-  const sourceImageUrl = job.source_image_url ?? job.imageUrl ?? job.image_url;
+  const sourceImageUrl = job.image_url;
+  if (!sourceImageUrl) throw new Error("imageUrl obrigatorio");
 
-  const promptText = buildCinematicPrompt(productType, style, useDarkflow, useViral);
-  const script = buildScript(productType, style);
-
-  await updateJob(jobId, { script_text: script, progress: 20 });
-
-  await updateJob(jobId, { status: "generating_video", progress: 30 });
-
-  const runwayTask = await createRunwayImageToVideoTask({
-    imageUrl: sourceImageUrl,
-    promptText,
-    duration: 5,
-    ratio: "1080:1920",
-  });
-
-  await updateJob(jobId, { runway_task_id: runwayTask.id, provider: "runway" });
-
-  let outputUrl;
-  for (let i = 0; i < 120; i++) {
-    const task = await getRunwayTask(runwayTask.id);
-
-    if (task.status === "SUCCEEDED" || task.status === "succeeded") {
-      outputUrl = task.output?.[0] ?? task.artifacts?.[0]?.url;
-      break;
-    }
-
-    if (task.status === "FAILED" || task.status === "failed") {
-      throw new Error(task.failure || task.failureCode || "Runway task failed");
-    }
-
-    await delay(5000);
-  }
-
-  if (!outputUrl) throw new Error("Runway task timeout sem output");
-
-  await updateJob(jobId, { video_url: outputUrl, status: "generating_voice", progress: 65 });
-
-  const voiceMp3 = await generateVoiceover(script);
-  const voicePath = await saveTempFile(`${jobId}-voice.mp3`, voiceMp3);
-
-  await updateJob(jobId, { progress: 78 });
-
-  const videoPath = await downloadToTemp(outputUrl, `${jobId}-video.mp4`);
-  const soundtrackPath = await resolveDefaultSoundtrack(style);
-
-  await updateJob(jobId, { status: "composing", progress: 88 });
-
-  const finalPath = await composeFinalVideo({
-    videoPath,
-    voicePath,
-    soundtrackPath,
-    outputPath: path.join(os.tmpdir(), `${jobId}-final.mp4`),
-  });
-
-  const finalUrl = await uploadFinalVideo(jobId, finalPath);
+  const promptText = job.prompt || buildCinematicPrompt("outro", "luxo", false, false);
 
   await updateJob(jobId, {
-    status: "completed",
-    progress: 100,
-    video_url: finalUrl,
-    caption_text: buildCaption(script, style),
+    status: "processing",
+    progress: 10,
+    prompt: promptText,
+    image_url: sourceImageUrl,
+    error: null,
   });
+
+  const response = await fetch(`${supabaseUrl}/functions/v1/generate-video`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${supabaseServiceRoleKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      imageUrl: sourceImageUrl,
+      estilo: "cinematografico",
+      movimento: "zoom cinematografico",
+      duracao: 6,
+      prompt: promptText,
+      conteudoRelacionado: true,
+    }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    await updateJob(jobId, { status: "error", progress: 100, error: text || "Falha ao gerar video" });
+    return;
+  }
+
+  const data = await response.json();
+  const videoUrl = data?.videoUrl || data?.video_url;
+
+  if (!videoUrl) {
+    await updateJob(jobId, { status: "error", progress: 100, error: "Video vazio" });
+    return;
+  }
+
+  await updateJob(jobId, { status: "completed", progress: 100, video_url: videoUrl, error: null });
 };
 
 app.post("/api/video-jobs", async (req, res) => {
-  const { imageUrl, productType, style, useDarkflow, useViral } = req.body || {};
-  const job = createJob({
-    imageUrl,
-    productType,
-    style,
-    useDarkflow,
-    useViral
-  });
+  try {
+    const { imageUrl, prompt, user_id, userId } = req.body || {};
+    const resolvedUserId = user_id || userId;
+    if (!resolvedUserId) {
+      res.status(400).json({ error: "user_id obrigatorio" });
+      return;
+    }
+    const job = await createJob({ imageUrl, prompt, userId: resolvedUserId });
 
-  queueMicrotask(() => {
-    processVideoJob(job.id).catch(async (err) => {
-      await updateJob(job.id, {
-        status: "failed",
-        error_message: err.message
+    queueMicrotask(() => {
+      processVideoJob(job.id).catch(async (err) => {
+        await updateJob(job.id, {
+          status: "error",
+          error: err.message
+        });
       });
     });
-  });
 
-  res.json({ id: job.id });
+    res.json({ id: job.id });
+  } catch (error) {
+    res.status(500).json({ error: error?.message || "Falha ao criar job" });
+  }
 });
 
 app.get("/api/webhook/health", async (_req, res) => {
@@ -295,12 +297,16 @@ app.get("/api/webhook/health", async (_req, res) => {
 });
 
 app.get("/api/video-jobs/:id", async (req, res) => {
-  const job = await getJob(req.params.id);
-  if (!job) {
-    res.status(404).json({ error: "Job nao encontrado" });
-    return;
+  try {
+    const job = await getJob(req.params.id);
+    if (!job) {
+      res.status(404).json({ error: "Job nao encontrado" });
+      return;
+    }
+    res.json(job);
+  } catch (error) {
+    res.status(500).json({ error: error?.message || "Falha ao buscar job" });
   }
-  res.json(job);
 });
 
 const port = Number(process.env.PORT) || 3001;

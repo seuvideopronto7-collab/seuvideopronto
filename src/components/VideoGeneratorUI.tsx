@@ -961,6 +961,11 @@ const VideoGeneratorUI = () => {
             <Badge variant="secondary">{progressLabel}</Badge>
           </div>
           <div className="text-xs text-muted-foreground">{statusMessage}</div>
+          {(jobStatus === "error" || jobStatus === "failed" || jobStatus === "fallback") && (
+            <Button variant="glass" onClick={startJob} disabled={isProcessing}>
+              Tentar novamente
+            </Button>
+          )}
         </div>
 
         <div className="cinema-panel p-6 space-y-4">

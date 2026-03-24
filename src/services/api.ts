@@ -22,23 +22,13 @@ export type VideoJob = {
 };
 
 export const createVideoJob = async (payload: CreateVideoJobInput) => {
-  const { data, error } = await supabase.functions.invoke("create-video-job", {
-    body: payload,
+  const { data, error } = await supabase.functions.invoke("generate-video", {
+    body: { ...payload, createJob: true },
   });
 
   if (error) throw error;
   if (data?.error) throw new Error(data.error);
-  return data as { id: string };
-};
-
-export const processVideoJob = async (payload: CreateVideoJobInput & { jobId: string }) => {
-  const { data, error } = await supabase.functions.invoke("process-video-job", {
-    body: payload,
-  });
-
-  if (error) throw error;
-  if (data?.error) throw new Error(data.error);
-  return data as VideoJob;
+  return data as { jobId: string; status?: string; videoUrl?: string | null; error?: string | null };
 };
 
 export const fetchVideoJob = async (jobId: string) => {
