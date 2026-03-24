@@ -55,16 +55,18 @@ const AdminVideoGenerator = () => {
   }, [previewUrl]);
 
   const resetStages = () => {
-    setStages(Array(8).fill("idle"));
+    setStages(stageBlueprint.map((stage) => ({ ...stage, status: "idle", note: "" })));
   };
 
-  const updateStage = (index: number, status: StageStatus) => {
-    setStages((prev) => prev.map((item, idx) => (idx === index ? status : item)));
+  const updateStage = (index: number, status: StageStatus, note?: string) => {
+    setStages((prev) =>
+      prev.map((item, idx) => (idx === index ? { ...item, status, note: note ?? item.note } : item)),
+    );
   };
 
   const progressValue = useMemo(() => {
-    const completed = stages.filter((stage) => stage === "done").length;
-    return (completed / 8) * 100;
+    const completed = stages.filter((stage) => stage.status === "done" || stage.status === "fallback").length;
+    return (completed / stages.length) * 100;
   }, [stages]);
 
   const handleFile = (next?: File | null) => {
@@ -85,6 +87,16 @@ const AdminVideoGenerator = () => {
     event.preventDefault();
     const dropped = event.dataTransfer.files?.[0];
     handleFile(dropped);
+  };
+
+  const withTimeout = async <T,>(promise: Promise<T>, ms: number, message: string) => {
+    const timeout = new Promise<never>((_, reject) => {
+      const id = setTimeout(() => {
+        clearTimeout(id);
+        reject(new Error(message));
+      }, ms);
+    });
+    return Promise.race([promise, timeout]);
   };
 
   const handleGenerate = async (mode: "cinema" | "darkflow" | "viral") => {
