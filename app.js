@@ -398,15 +398,76 @@ const hydrateFromRouteState = () => {
   }
 };
 
+const routeMeta = {
+  "/auth": {
+    title: "Autenticacao",
+    description: "Controle de acesso e login centralizado."
+  },
+  "/perfil": {
+    title: "Perfil",
+    description: "Gestao de dados do usuario e preferencias."
+  },
+  "/admin": {
+    title: "Admin",
+    description: "Configuracoes e visao administrativa do sistema."
+  },
+  "/infoproduto": {
+    title: "Infoproduto",
+    description: "Fluxo principal de criacao e publicacao."
+  },
+  "/produtos-prontos": {
+    title: "Produtos Prontos",
+    description: "Biblioteca de produtos finalizados para reutilizar."
+  },
+  "/planos": {
+    title: "Planos",
+    description: "Gestao de planos e cobrancas."
+  },
+  "/apis": {
+    title: "APIs",
+    description: "Integracoes disponiveis e status de conexao."
+  },
+  "/distribuidor": {
+    title: "Distribuidor",
+    description: "Central de distribuicao e reaproveitamento."
+  }
+};
+
 const setRoute = (path) => {
-  const isDistribuidor = path === "/distribuidor";
-  viewFlow.classList.toggle("active", !isDistribuidor);
+  const normalizedPath = path === "/" ? "/infoproduto" : path;
+  const isDistribuidor = normalizedPath === "/distribuidor";
+  const isFlow = normalizedPath === "/infoproduto";
+  const isRouteView = !isDistribuidor && !isFlow;
+
+  viewFlow.classList.toggle("active", isFlow);
   viewDistribuidor.classList.toggle("active", isDistribuidor);
-  document.title = isDistribuidor ? "Central de Distribuicao" : "Seu Video Pronto";
+  viewRoute.classList.toggle("active", isRouteView);
+
   if (isDistribuidor) {
+    document.title = "Central de Distribuicao";
     hydrateFromRouteState();
-  } else {
+  } else if (isFlow) {
+    document.title = "Seu Video Pronto";
     updateResumo(getMaterialGerado());
+  } else {
+    const meta = routeMeta[normalizedPath] || {
+      title: "Rota personalizada",
+      description: "Essa rota esta ativa e pronta para acao."
+    };
+    document.title = `Rota ${normalizedPath}`;
+    routeTitle.textContent = meta.title;
+    routeDesc.textContent = meta.description;
+    routeStatus.textContent = "Ativa";
+    routePath.textContent = normalizedPath;
+  }
+
+  if (routeSelect) {
+    const values = Array.from(routeSelect.options).map((opt) => opt.value);
+    if (values.includes(normalizedPath)) {
+      routeSelect.value = normalizedPath;
+    } else if (values.includes("/")) {
+      routeSelect.value = "/";
+    }
   }
 };
 
@@ -612,6 +673,23 @@ const ativarAutopost = () => {
   setAutopostStatus("Autopost ativado com agendamento inteligente.", "success");
 };
 
+const navegar = (rota) => {
+  navigateTo(rota);
+};
+
+const executarPublicacao = () => {
+  const material = getMaterial();
+  persistMaterial(material);
+  setInfo("Publicando conteudo...", "success");
+};
+
+const salvarDistribuir = () => {
+  const material = getMaterialGerado();
+  persistMaterial(material);
+  flowInfo.textContent = "Enviando material para a Central de Distribuicao.";
+  navigateTo("/distribuidor", material);
+};
+
 const baixarVideo = async (material) => {
   if (material.video) {
     saveAs(material.video, "video.mp4");
@@ -681,6 +759,101 @@ const resetarConteudo = () => {
   updateResumo(getFallbackMaterial());
 };
 
+const setButtonLoading = (button, isLoading) => {
+  if (!button) return;
+  if (isLoading) {
+    if (!button.dataset.originalLabel) {
+      button.dataset.originalLabel = button.textContent;
+    }
+    button.textContent = "Processando...";
+    button.disabled = true;
+    button.classList.add("is-loading");
+    return;
+  }
+  button.textContent = button.dataset.originalLabel || button.textContent;
+  button.disabled = false;
+  button.classList.remove("is-loading");
+};
+
+const actionRegistry = {
+  "/": () => navegar("/infoproduto"),
+  "/auth": () => navegar("/auth"),
+  "/perfil": () => navegar("/perfil"),
+  "/admin": () => navegar("/admin"),
+  "/infoproduto": () => navegar("/infoproduto"),
+  "/produtos-prontos": () => navegar("/produtos-prontos"),
+  "/planos": () => navegar("/planos"),
+  "/apis": () => navegar("/apis"),
+  "/distribuidor": () => navegar("/distribuidor"),
+  "postar-agora": () => executarPublicacao(),
+  "salvar-distribuir": () => salvarDistribuir(),
+  "ativar-maquina": () => executarFluxoCompleto(getDarkflowInput()),
+  "publicar-infoproduto": () => {
+    const state = executarFluxoCompleto(getDarkflowInput());
+    flowInfo.textContent = `Infoproduto pronto: ${state.dados.produto?.nome || "Produto"}.`;
+  },
+  "gerar-30-dias": () => {
+    const input = getDarkflowInput();
+    const itens = gerarCalendario30Dias(input);
+    renderCalendario30Dias(itens);
+    conteudo30Status.textContent = "Calendario de 30 dias gerado e integrado ao fluxo.";
+  },
+  "produtos-atualizar": () => carregarProdutos().then(renderProdutos),
+  "produto-criar": () => criarProduto(),
+  "salvar-material": () => {
+    const material = getMaterial();
+    persistMaterial(material);
+    if (!ytConnected.checked) {
+      setInfo("Material salvo. Publique manualmente.", "warning");
+    }
+  },
+  "baixar-video": () => baixarVideo(getMaterial()),
+  "baixar-pacote": () => {
+    const material = getMaterial();
+    persistMaterial(material);
+    return baixarPacote(material);
+  },
+  "copiar-copy": () => copiarCopy(),
+  "reenviar-fila": () => {
+    const material = getMaterial();
+    addToQueue(material);
+    setInfo("Material enviado para fila futura.", "success");
+  },
+  "regerar-conteudo": () => resetarConteudo(),
+  "conectar-redes": () => conectarRedes(),
+  "ativar-autopost": () => ativarAutopost(),
+  "abrir-projeto": (payload) => abrirProjeto(payload.projetoId)
+};
+
+const executarAcao = (nome, payload = {}, target) => {
+  const action = actionRegistry[nome];
+  if (!action) {
+    console.warn("Acao nao encontrada:", nome);
+    alert("Essa funcao ainda nao esta ativa.");
+    return;
+  }
+
+  const button = target?.closest("button");
+  setButtonLoading(button, true);
+
+  try {
+    const result = action(payload, target);
+    if (result && typeof result.then === "function") {
+      return result
+        .catch((error) => {
+          console.warn("Falha na acao:", error);
+          setInfo("Falha ao executar a acao solicitada.", "warning");
+        })
+        .finally(() => setButtonLoading(button, false));
+    }
+  } catch (error) {
+    console.warn("Falha na acao:", error);
+    setInfo("Falha ao executar a acao solicitada.", "warning");
+  }
+
+  setButtonLoading(button, false);
+};
+
 const atualizarYoutubeStatus = () => {
   if (ytConnected.checked) {
     ytStatus.textContent = "Conectado";
@@ -691,64 +864,20 @@ const atualizarYoutubeStatus = () => {
   }
 };
 
-btnSalvar.addEventListener("click", () => {
-  const material = getMaterial();
-  persistMaterial(material);
-  if (!ytConnected.checked) {
-    setInfo("Material salvo. Publique manualmente.", "warning");
+document.addEventListener("click", (event) => {
+  console.log("Clique detectado:", event.target);
+  const target = event.target.closest("[data-action]");
+  if (!target) return;
+  executarAcao(target.dataset.action, target.dataset, target);
+});
+
+document.addEventListener("change", (event) => {
+  if (event.target === routeSelect) {
+    executarAcao(routeSelect.value, { value: routeSelect.value }, routeSelect);
   }
 });
 
-btnBaixarPacote.addEventListener("click", async () => {
-  const material = getMaterial();
-  persistMaterial(material);
-  await baixarPacote(material);
-});
-
-btnBaixarVideo.addEventListener("click", async () => {
-  const material = getMaterial();
-  await baixarVideo(material);
-});
-
-btnCopiarCopy.addEventListener("click", copiarCopy);
-
-btnReenviar.addEventListener("click", () => {
-  const material = getMaterial();
-  addToQueue(material);
-  setInfo("Material enviado para fila futura.", "success");
-});
-
-btnRegerar.addEventListener("click", resetarConteudo);
 ytConnected.addEventListener("change", atualizarYoutubeStatus);
-btnProdutosAtualizar.addEventListener("click", () => {
-  carregarProdutos().then(renderProdutos);
-});
-btnProdutoCriar.addEventListener("click", criarProduto);
-btnAtivarMaquina.addEventListener("click", () => {
-  const input = getDarkflowInput();
-  executarFluxoCompleto(input);
-});
-btnPublicarInfoproduto.addEventListener("click", () => {
-  const input = getDarkflowInput();
-  const state = executarFluxoCompleto(input);
-  flowInfo.textContent = `Infoproduto pronto: ${state.dados.produto?.nome || "Produto"}.`;
-});
-btnConteudo30.addEventListener("click", () => {
-  const input = getDarkflowInput();
-  const itens = gerarCalendario30Dias(input);
-  renderCalendario30Dias(itens);
-  conteudo30Status.textContent = "Calendario de 30 dias gerado e integrado ao fluxo.";
-});
-btnConectarRedes.addEventListener("click", conectarRedes);
-btnAtivarAutopost.addEventListener("click", ativarAutopost);
-
-btnGoFlow.addEventListener("click", () => navigateTo("/infoproduto"));
-btnGoDistribuidor.addEventListener("click", () => navigateTo("/distribuidor"));
-btnSalvarDistribuir.addEventListener("click", () => {
-  const material = getMaterialGerado();
-  flowInfo.textContent = "Enviando material para a Central de Distribuicao.";
-  navigateTo("/distribuidor", material);
-});
 
 document.addEventListener("click", (event) => {
   const target = event.target?.closest?.("[data-action]");
@@ -771,7 +900,20 @@ renderCalendario30Dias(
   JSON.parse(localStorage.getItem(DARKFLOW_CALENDAR_KEY) || "[]")
 );
 
-const initialPath = window.location.pathname === "/distribuidor" ? "/distribuidor" : "/infoproduto";
+const allowedRoutes = new Set([
+  "/",
+  "/infoproduto",
+  "/distribuidor",
+  "/auth",
+  "/perfil",
+  "/admin",
+  "/produtos-prontos",
+  "/planos",
+  "/apis"
+]);
+const initialPath = allowedRoutes.has(window.location.pathname)
+  ? window.location.pathname
+  : "/infoproduto";
 if (window.location.pathname !== initialPath) {
   window.history.replaceState({ path: initialPath }, "", initialPath);
 }
