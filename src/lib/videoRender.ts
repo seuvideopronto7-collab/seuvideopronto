@@ -178,6 +178,6 @@ export const renderVideoFromImage = async (imageUrl: string, options?: RenderOpt
     ffmpeg.off("progress", progressHandler as any);
   }
 
-  const blob = new Blob([data.buffer], { type: "video/mp4" });
+  const blob = new Blob([(data as any).buffer || data], { type: "video/mp4" });
   return URL.createObjectURL(blob);
 };

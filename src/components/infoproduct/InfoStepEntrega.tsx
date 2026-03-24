@@ -191,7 +191,7 @@ const InfoStepEntrega = ({ estruturaData, conteudoData, vslData, kitData, onNewP
       "thumbnails/README.txt": strToU8("Inclua suas thumbnails aqui"),
     };
     const zip = zipSync(files, { level: 6 });
-    const blob = new Blob([zip], { type: "application/zip" });
+    const blob = new Blob([zip as unknown as BlobPart], { type: "application/zip" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;

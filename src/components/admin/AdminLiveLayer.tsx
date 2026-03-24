@@ -26,9 +26,9 @@ export default function AdminLiveLayer() {
   async function loadData() {
     try {
       const [usersResult, videosResult, jobsResult] = await Promise.all([
-        supabase.from("users").select("*", { count: "exact", head: true }),
-        supabase.from("videos").select("*", { count: "exact", head: true }),
-        supabase.from("video_jobs").select("*", { count: "exact", head: true }),
+        supabase.from("profiles").select("*", { count: "exact", head: true }),
+        supabase.from("assets" as any).select("*", { count: "exact", head: true }),
+        supabase.from("video_jobs" as any).select("*", { count: "exact", head: true }),
       ]);
 
       setData({

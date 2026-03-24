@@ -40,27 +40,42 @@ export type Database = {
       }
       integrations: {
         Row: {
+          access_token: string | null
           api_key: string | null
+          client_id: string | null
           created_at: string
+          credentials: string | null
           id: string
+          last_test_at: string | null
           platform: string
           status: string
+          updated_at: string | null
           user_id: string
         }
         Insert: {
+          access_token?: string | null
           api_key?: string | null
+          client_id?: string | null
           created_at?: string
+          credentials?: string | null
           id?: string
+          last_test_at?: string | null
           platform: string
           status?: string
+          updated_at?: string | null
           user_id: string
         }
         Update: {
+          access_token?: string | null
           api_key?: string | null
+          client_id?: string | null
           created_at?: string
+          credentials?: string | null
           id?: string
+          last_test_at?: string | null
           platform?: string
           status?: string
+          updated_at?: string | null
           user_id?: string
         }
         Relationships: []

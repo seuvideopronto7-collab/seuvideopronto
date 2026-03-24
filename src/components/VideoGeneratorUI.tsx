@@ -364,10 +364,10 @@ const VideoGeneratorUI = () => {
         hook: "Pare tudo e veja isso agora",
         benefits: ["Benefício 1", "Benefício 2", "Benefício 3"],
         cta: "Clique para saber mais",
-        roteiroCompleto: "Hook forte, benefícios diretos e CTA agressivo.",
+        fullScript: "Hook forte, benefícios diretos e CTA agressivo.",
+        onScreenText: ["HOOK FORTE", "3 BENEFÍCIOS", "CTA DIRETO"],
       });
       setNarrationText("Se você busca resultados, precisa ver isso agora.");
-      setOnScreenText(["HOOK FORTE", "3 BENEFÍCIOS", "CTA DIRETO"]);
       toast.warning("Falha ao gerar roteiro. Fallback aplicado.");
     } finally {
       setIsGeneratingScript(false);
