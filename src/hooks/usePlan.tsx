@@ -42,17 +42,17 @@ export const usePlan = () => {
 
       if (!data) {
         const defaults = getPlanLimits("start");
-        const { data: created, error: createError } = await supabase
-          .from("usuarios_planos")
+        const { data: created, error: createError } = await (supabase
+          .from("usuarios_planos" as any)
           .insert({
             user_id: user.id,
             plano: "start",
             limite_diario_json: defaults,
             uso_hoje_json: {},
             reset_at: getNextResetAt(),
-          })
+          } as any)
           .select("*")
-          .single();
+          .single() as any);
 
         if (createError) {
           console.error("PDG PLAN ERROR: create", createError);
