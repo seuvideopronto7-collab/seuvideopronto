@@ -25,6 +25,7 @@ const StepFinal = ({ roteiroData, seoData, videoUrl, onNewVersion, onEdit, onCon
   const [connectOpen, setConnectOpen] = useState(false);
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(["instagram", "tiktok"]);
   const [postStatus, setPostStatus] = useState<"idle" | "success" | "error">("idle");
+  const [postProductionActive, setPostProductionActive] = useState(false);
   const [socialAccounts, setSocialAccounts] = useState<Record<string, { username: string; connectedAt: string }>>(() => {
     try {
       const stored = localStorage.getItem("social_accounts");
@@ -34,6 +35,7 @@ const StepFinal = ({ roteiroData, seoData, videoUrl, onNewVersion, onEdit, onCon
     }
   });
   const videoRef = useRef<HTMLDivElement>(null);
+  const playerRef = useRef<HTMLVideoElement>(null);
   const postRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -47,6 +49,40 @@ const StepFinal = ({ roteiroData, seoData, videoUrl, onNewVersion, onEdit, onCon
   useEffect(() => {
     localStorage.setItem("social_accounts", JSON.stringify(socialAccounts));
   }, [socialAccounts]);
+
+  useEffect(() => {
+    setVideoFailed(false);
+    if (!resolvedVideoUrl) return;
+    const video = playerRef.current;
+    if (!video) return;
+
+    const safePlay = () => {
+      try {
+        video.load();
+        const promise = video.play();
+        if (promise && typeof promise.catch === "function") {
+          promise.catch(() => {});
+        }
+      } catch {
+        // ignore autoplay failures
+      }
+    };
+
+    if (video.readyState >= 2) {
+      safePlay();
+      return;
+    }
+
+    const handleCanPlay = () => {
+      safePlay();
+      video.removeEventListener("canplay", handleCanPlay);
+    };
+
+    video.addEventListener("canplay", handleCanPlay);
+    return () => {
+      video.removeEventListener("canplay", handleCanPlay);
+    };
+  }, [resolvedVideoUrl]);
 
   const copyAll = () => {
     const parts = [];
@@ -155,6 +191,29 @@ const StepFinal = ({ roteiroData, seoData, videoUrl, onNewVersion, onEdit, onCon
     toast.success("Postado com sucesso 🚀");
   };
 
+  const handlePostProduction = () => {
+    if (!resolvedVideoUrl) {
+      toast.error("Video indisponivel para pos-producao.");
+      return;
+    }
+    setPostProductionActive(true);
+    toast.success("Pos-producao PDG ativada.");
+  };
+
+  const forcePlay = () => {
+    const video = playerRef.current;
+    if (!video) return;
+    try {
+      video.load();
+      const promise = video.play();
+      if (promise && typeof promise.catch === "function") {
+        promise.catch(() => {});
+      }
+    } catch {
+      // ignore
+    }
+  };
+
   const togglePlatform = (platform: string) => {
     setSelectedPlatforms((prev) => (prev.includes(platform) ? prev.filter((item) => item !== platform) : [...prev, platform]));
   };
@@ -179,6 +238,24 @@ const StepFinal = ({ roteiroData, seoData, videoUrl, onNewVersion, onEdit, onCon
         </div>
       </div>
 
+      <div className="glass-card p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <h3 className="text-lg font-semibold">Pos-producao PDG</h3>
+            <p className="text-xs text-muted-foreground">Tratamento automatico de cor, audio e ritmo.</p>
+          </div>
+          <Button variant={postProductionActive ? "neon" : "glass"} onClick={handlePostProduction}>
+            {postProductionActive ? "Ativa" : "Ativar agora"}
+          </Button>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-muted-foreground">
+          <div className="rounded-lg border border-border/40 bg-muted/30 px-3 py-2">Color grading e nitidez premium</div>
+          <div className="rounded-lg border border-border/40 bg-muted/30 px-3 py-2">Normalizacao e remocao de ruido</div>
+          <div className="rounded-lg border border-border/40 bg-muted/30 px-3 py-2">Fade in/out + micro animacoes</div>
+          <div className="rounded-lg border border-border/40 bg-muted/30 px-3 py-2">Ritmo otimizado e cortes inteligentes</div>
+        </div>
+      </div>
+
       <div ref={videoRef} className="space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold">Preview do video</h3>
@@ -187,11 +264,15 @@ const StepFinal = ({ roteiroData, seoData, videoUrl, onNewVersion, onEdit, onCon
         <div className="glass-card p-1 rounded-2xl overflow-hidden">
           {resolvedVideoUrl && !videoFailed ? (
             <video
+              ref={playerRef}
               src={resolvedVideoUrl}
               controls
               autoPlay
               muted
+              playsInline
+              preload="auto"
               className="w-full aspect-video object-cover rounded-xl"
+              onClick={forcePlay}
               onError={() => setVideoFailed(true)}
             />
           ) : (
@@ -202,6 +283,11 @@ const StepFinal = ({ roteiroData, seoData, videoUrl, onNewVersion, onEdit, onCon
                 </div>
                 <p className="text-sm text-muted-foreground">Thumbnail do video</p>
                 <p className="text-xs text-muted-foreground">Sem preview disponivel, mas o download segue ativo.</p>
+                {resolvedVideoUrl && (
+                  <Button variant="glass" size="sm" onClick={forcePlay}>
+                    Tentar reproduzir
+                  </Button>
+                )}
               </div>
             </div>
           )}
