@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
@@ -18,6 +18,7 @@ import StepMontagem from "./StepMontagem";
 import StepFinal from "./StepFinal";
 import StepPublicacao from "./StepPublicacao";
 import type { ManualInputData } from "./InputManualScreen";
+import MainContentFallback from "@/components/MainContentFallback";
 
 interface ProdutoPronto {
   id: string;
@@ -720,89 +721,110 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
 
   const unlockedSteps = useMemo(() => [7, 8, 9], []);
 
+  const fallbackToEntrada = () => {
+    setStep(1);
+    setEntryType(null);
+  };
+
+  let stepContent: ReactNode = null;
+  if (step === 1) {
+    stepContent = (
+      <StepEntrada
+        selected={entryType}
+        onSelect={setEntryType}
+        onContinue={() => goTo(2)}
+        onFileSelected={(f) => setFile(f)}
+        onManualSubmit={handleManualStart}
+      />
+    );
+  } else if (step === 2) {
+    if (entryType) {
+      stepContent = (
+        <StepConteudo
+          entryType={entryType}
+          formData={formData}
+          onFormChange={setFormData}
+          file={file}
+          onFileChange={setFile}
+          videoLink={videoLink}
+          onVideoLinkChange={setVideoLink}
+          onContinue={handleAnalyze}
+        />
+      );
+    }
+  } else if (step === 3) {
+    stepContent = <StepAnalise analysisData={analysisData} isLoading={isLoading} onContinue={() => goTo(4)} />;
+  } else if (step === 4) {
+    stepContent = (
+      <StepModo
+        selected={generationMode}
+        onSelect={setGenerationMode}
+        onGenerate={handleGenerateRoteiro}
+        isLoading={isLoading}
+      />
+    );
+  } else if (step === 5) {
+    stepContent = (
+      <StepRoteiro
+        data={roteiroData}
+        onRegenerate={handleRegenerateRoteiro}
+        onContinue={handleGoToSeo}
+        isLoading={isLoading}
+      />
+    );
+  } else if (step === 6) {
+    stepContent = (
+      <StepSeo
+        data={seoData}
+        onRegenerate={handleGenerateSeo}
+        onContinue={() => goTo(7)}
+        isLoading={isLoading}
+      />
+    );
+  } else if (step === 7) {
+    stepContent = (
+      <StepVariacoes
+        variacoesData={variacoesData}
+        variacoesCount={variacoesCount}
+        onSelectCount={setVariacoesCount}
+        onGenerate={handleGenerateVariacoes}
+        onContinue={() => goTo(8)}
+        isLoading={isLoading}
+      />
+    );
+  } else if (step === 8) {
+    stepContent = <StepMontagem onContinue={() => goTo(9)} />;
+  } else if (step === 9) {
+    stepContent = (
+      <StepFinal
+        roteiroData={roteiroData}
+        seoData={seoData}
+        viralData={viralData}
+        videoUrl={videoUrl}
+        onNewVersion={handleNewVersion}
+        onEdit={() => goTo(8)}
+        onActivateViral={() =>
+          handleGenerateViralPack({
+            imageUrl: imageUrl || undefined,
+            videoUrl: videoUrl || undefined,
+          })
+        }
+        isViralLoading={isViralLoading}
+        onContinue={() => goTo(10)}
+      />
+    );
+  } else if (step === 10) {
+    stepContent = <StepPublicacao roteiroData={roteiroData} seoData={seoData} />;
+  }
+
   return (
     <div className="space-y-6">
       <Stepper currentStep={step} onStepClick={goTo} unlockedSteps={unlockedSteps} />
 
       <div className="step-transition" key={step}>
-        {step === 1 && (
-          <StepEntrada
-            selected={entryType}
-            onSelect={setEntryType}
-            onContinue={() => goTo(2)}
-            onFileSelected={(f) => setFile(f)}
-            onManualSubmit={handleManualStart}
-          />
+        {stepContent ?? (
+          <MainContentFallback showWarning onAction={fallbackToEntrada} />
         )}
-        {step === 2 && (
-          <StepConteudo
-            entryType={entryType!}
-            formData={formData}
-            onFormChange={setFormData}
-            file={file}
-            onFileChange={setFile}
-            videoLink={videoLink}
-            onVideoLinkChange={setVideoLink}
-            onContinue={handleAnalyze}
-          />
-        )}
-        {step === 3 && (
-          <StepAnalise analysisData={analysisData} isLoading={isLoading} onContinue={() => goTo(4)} />
-        )}
-        {step === 4 && (
-          <StepModo
-            selected={generationMode}
-            onSelect={setGenerationMode}
-            onGenerate={handleGenerateRoteiro}
-            isLoading={isLoading}
-          />
-        )}
-        {step === 5 && (
-          <StepRoteiro
-            data={roteiroData}
-            onRegenerate={handleRegenerateRoteiro}
-            onContinue={handleGoToSeo}
-            isLoading={isLoading}
-          />
-        )}
-        {step === 6 && (
-          <StepSeo
-            data={seoData}
-            onRegenerate={handleGenerateSeo}
-            onContinue={() => goTo(7)}
-            isLoading={isLoading}
-          />
-        )}
-        {step === 7 && (
-          <StepVariacoes
-            variacoesData={variacoesData}
-            variacoesCount={variacoesCount}
-            onSelectCount={setVariacoesCount}
-            onGenerate={handleGenerateVariacoes}
-            onContinue={() => goTo(8)}
-            isLoading={isLoading}
-          />
-        )}
-        {step === 8 && <StepMontagem onContinue={() => goTo(9)} />}
-        {step === 9 && (
-            <StepFinal
-              roteiroData={roteiroData}
-              seoData={seoData}
-              viralData={viralData}
-              videoUrl={videoUrl}
-              onNewVersion={handleNewVersion}
-              onEdit={() => goTo(8)}
-            onActivateViral={() =>
-              handleGenerateViralPack({
-                imageUrl: imageUrl || undefined,
-                videoUrl: videoUrl || undefined,
-              })
-            }
-            isViralLoading={isViralLoading}
-            onContinue={() => goTo(10)}
-          />
-        )}
-        {step === 10 && <StepPublicacao roteiroData={roteiroData} seoData={seoData} />}
       </div>
       <PlanBlockedDialog
         open={Boolean(blocked)}
