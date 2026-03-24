@@ -51,7 +51,7 @@ const ProdutosProntos = () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
-        .from("produtos_gerados")
+        .from("produtos_gerados" as any)
         .select("*")
         .eq("user_id", userId)
         .order("created_at", { ascending: false });
@@ -105,7 +105,7 @@ const ProdutosProntos = () => {
   const handleDuplicate = async (produto: ProdutoGerado) => {
     if (!user) return;
     const { data, error } = await supabase
-      .from("produtos_gerados")
+      .from("produtos_gerados" as any)
       .insert({
         user_id: user.id,
         nome: `${produto.nome} (Copia)`,
@@ -127,7 +127,7 @@ const ProdutosProntos = () => {
   };
 
   const handleDelete = async (produto: ProdutoGerado) => {
-    const { error } = await supabase.from("produtos_gerados").delete().eq("id", produto.id);
+    const { error } = await supabase.from("produtos_gerados" as any).delete().eq("id", produto.id);
     if (error) {
       toast.error("Erro ao excluir produto");
       return;

@@ -42,7 +42,7 @@ export const processVideoJob = async (payload: CreateVideoJobInput & { jobId: st
 };
 
 export const fetchVideoJob = async (jobId: string) => {
-  const { data, error } = await supabase.from("video_jobs").select("*").eq("id", jobId).maybeSingle();
+  const { data, error } = await supabase.from("video_jobs" as any).select("*").eq("id", jobId).maybeSingle();
   if (error) throw error;
   return data as VideoJob | null;
 };
