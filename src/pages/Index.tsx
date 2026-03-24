@@ -6,6 +6,7 @@ import VideoWizard from "@/components/wizard/VideoWizard";
 import Content30Days from "@/components/Content30Days";
 import DarkFlowEngine from "@/components/DarkFlowEngine";
 import SalesMachine from "@/components/SalesMachine";
+import VideoGeneratorUI from "@/components/VideoGeneratorUI";
 
 const Index = () => {
   const { signOut, isAdmin, profile } = useAuth();
@@ -181,6 +182,8 @@ const Index = () => {
         </button>
 
         {showDarkFlow && <DarkFlowEngine />}
+
+        <VideoGeneratorUI />
 
         {/* Wizard */}
         <VideoWizard initialProduto={initialProduto} autoStart={autoStart} />

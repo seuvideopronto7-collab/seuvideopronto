@@ -85,21 +85,21 @@ const AdminOverview = () => {
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-lg font-semibold">Taxa de sucesso</h3>
-              <p className="text-xs text-muted-foreground">Render + publicacao</p>
+              <p className="text-xs text-muted-foreground">Render + publicação</p>
             </div>
             <Badge variant="secondary">98%</Badge>
           </div>
           <div className="space-y-3">
             <div>
               <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>Render cinematografico</span>
+                <span>Render cinematográfico</span>
                 <span>96%</span>
               </div>
               <Progress value={96} />
             </div>
             <div>
               <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>Publicacao automatica</span>
+                <span>Publicação automática</span>
                 <span>92%</span>
               </div>
               <Progress value={92} />
@@ -175,23 +175,23 @@ const AdminOverview = () => {
       <section className="cinema-panel p-5">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold">Logs recentes</h3>
-          <Badge variant="secondary">Sistema estavel</Badge>
+            <Badge variant="secondary">Sistema estável</Badge>
         </div>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Horario</TableHead>
+              <TableHead>Horário</TableHead>
               <TableHead>Evento</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Origem</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {[
-              { time: "19:42", event: "Render final entregue", status: "CONCLUIDO", origin: "Runway" },
-              { time: "19:36", event: "Fallback SEO aplicado", status: "PROCESSANDO", origin: "IA" },
-              { time: "19:30", event: "Autopost agendado", status: "CONCLUIDO", origin: "Scheduler" },
-            ].map((log) => (
+              {[
+                { time: "19:42", event: "Render final entregue", status: "CONCLUIDO", origin: "Runway" },
+                { time: "19:36", event: "Fallback SEO aplicado", status: "PROCESSANDO", origin: "IA" },
+                { time: "19:30", event: "Autopost agendado", status: "CONCLUIDO", origin: "Scheduler" },
+              ].map((log) => (
               <TableRow key={log.time}>
                 <TableCell className="text-xs text-muted-foreground">{log.time}</TableCell>
                 <TableCell>{log.event}</TableCell>
