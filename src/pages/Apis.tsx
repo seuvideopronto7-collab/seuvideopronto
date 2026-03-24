@@ -27,6 +27,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
+import { setApiRegistry } from "@/lib/apiRegistry";
 
 type ConnectionStatus = "connected" | "error" | "expired" | "testing" | "disconnected";
 type ConnectionStatusDb = "connected" | "error" | "expired";
@@ -284,6 +285,21 @@ const Apis = () => {
     setEduzzStatus(eduzz ? eduzz.status : "disconnected");
     setEduzzConnectedAt(eduzz?.createdAt || null);
   }, [connections]);
+
+  useEffect(() => {
+    const registry = Object.values(connections).reduce<Record<string, any>>((acc, connection) => {
+      const payload = payloads[connection.platformKey];
+      acc[connection.platformKey] = {
+        nome: connection.platformName,
+        status: connection.status,
+        token: payload?.token || connection.accessToken || null,
+        conectado: connection.status === "connected",
+        atualizadoEm: Date.now(),
+      };
+      return acc;
+    }, {});
+    setApiRegistry(registry);
+  }, [connections, payloads]);
 
   useEffect(() => {
     if (!loaded || autoValidatedRef.current) return;

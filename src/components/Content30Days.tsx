@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +13,9 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Calendar, Sparkles, Link2, Clock } from "lucide-react";
+import { buscarAPI } from "@/lib/apiRegistry";
+import { gerarConteudoIA } from "@/lib/aiEngine";
+import { addSystemLog } from "@/lib/systemLog";
 
 interface ConteudoItem {
   dia: number;
@@ -24,6 +28,7 @@ interface ConteudoItem {
 }
 
 const Content30Days = () => {
+  const navigate = useNavigate();
   const [form, setForm] = useState({
     nicho: "",
     objetivo: "vendas",
@@ -37,17 +42,48 @@ const Content30Days = () => {
   const [connected, setConnected] = useState({ tiktok: false, instagram: false, youtube: false });
   const [autopost, setAutopost] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
+  const [showConnectHint, setShowConnectHint] = useState(false);
+  const cacheKey = useMemo(() => `svz_30dias_${btoa(JSON.stringify({ ...form, modoViral }))}`, [form, modoViral]);
 
   const update = (key: string, value: string) => setForm((p) => ({ ...p, [key]: value }));
+
+  useEffect(() => {
+    const registry = {
+      tiktok: buscarAPI("tiktok").conectado,
+      instagram: buscarAPI("instagram").conectado,
+      youtube: buscarAPI("youtube").conectado,
+    };
+    setConnected(registry);
+    try {
+      const stored = localStorage.getItem("svz_autopost_30d");
+      if (stored) setAutopost(JSON.parse(stored));
+    } catch {
+      setAutopost(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("svz_autopost_30d", JSON.stringify(autopost));
+  }, [autopost]);
 
   const handleGenerate = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("generate-viral", {
-        body: {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        const parsed = JSON.parse(cached) as { conteudos: ConteudoItem[]; createdAt: number };
+        if (Date.now() - parsed.createdAt < 6 * 60 * 60 * 1000) {
+          setConteudos(parsed.conteudos);
+          setLogs((prev) => [`${new Date().toLocaleTimeString()} • Cache aplicado (30 conteúdos)`, ...prev]);
+          toast.success("Calendário recuperado do cache.");
+          return;
+        }
+      }
+
+      const { data } = await gerarConteudoIA(
+        "calendario_30_dias",
+        {
           ...form,
-          tipo: "calendario_30_dias",
-          modo: modoViral ? "viral" : "autoridade",
           contextoMestre: {
             tema: form.nicho,
             publico: form.publico,
@@ -57,15 +93,28 @@ const Content30Days = () => {
             tom: "especialista",
           },
         },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      setConteudos(data?.conteudos || []);
+        { modo: modoViral ? "viral" : "autoridade", timeoutMs: 5000 },
+      );
+      const nextConteudos = (data as any)?.conteudos || [];
+      setConteudos(nextConteudos);
+      localStorage.setItem(cacheKey, JSON.stringify({ conteudos: nextConteudos, createdAt: Date.now() }));
       setLogs((prev) => [`${new Date().toLocaleTimeString()} • 30 conteúdos gerados`, ...prev]);
+      setLogs((prev) => [`${new Date().toLocaleTimeString()} • Pipeline processado 30/30`, ...prev]);
+      addSystemLog({
+        level: "info",
+        etapa: "conteudo_30_dias",
+        status: "concluido",
+      });
       toast.success("Calendário de 30 dias pronto! 📅");
     } catch (err: any) {
       console.error(err);
       toast.error(err.message || "Erro ao gerar conteúdo");
+      addSystemLog({
+        level: "warning",
+        etapa: "conteudo_30_dias",
+        status: "fallback",
+        motivo: err?.message || "Falha ao gerar conteúdo",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -84,6 +133,7 @@ const Content30Days = () => {
     if (!anyConnected) {
       toast.warning("Conecte ao menos uma rede para ativar o autopost.");
       setLogs((prev) => [`${new Date().toLocaleTimeString()} • Autopost aguardando conexao`, ...prev]);
+      setShowConnectHint(true);
       return;
     }
     setAutopost(true);
@@ -179,6 +229,14 @@ const Content30Days = () => {
         <Button variant="viral" size="lg" className="w-full" onClick={handleAutopost}>
           <Clock className="w-4 h-4" /> Ativar autopost (30 dias)
         </Button>
+        {showConnectHint && (
+          <div className="rounded-lg border border-accent/40 bg-accent/10 p-3 text-xs text-muted-foreground flex items-center justify-between">
+            <span>APIs nao conectadas. Conecte para liberar autopost.</span>
+            <Button variant="glass" size="sm" onClick={() => navigate("/apis")}>
+              Conectar
+            </Button>
+          </div>
+        )}
       </div>
 
       {logs.length > 0 && (
