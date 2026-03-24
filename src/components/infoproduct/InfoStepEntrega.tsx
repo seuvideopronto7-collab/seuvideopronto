@@ -95,7 +95,7 @@ const InfoStepEntrega = ({ estruturaData, conteudoData, vslData, kitData, onNewP
         return null;
       }
 
-      const statusByPlatform = data.reduce<Record<string, "connected" | "error" | "expired" | "disconnected">>(
+      const statusByPlatform = (data as any[]).reduce<Record<string, "connected" | "error" | "expired" | "disconnected">>(
         (acc, item) => {
           if (item.status === "connected" || item.status === "error" || item.status === "expired") {
             acc[item.platform] = item.status;
