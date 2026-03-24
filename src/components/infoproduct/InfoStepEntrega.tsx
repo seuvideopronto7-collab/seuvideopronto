@@ -18,10 +18,6 @@ interface Props {
 }
 
 const InfoStepEntrega = ({ estruturaData, conteudoData, vslData, kitData, onNewProduct }: Props) => {
-  const { user, profile } = useAuth();
-  const userId = profile?.id || user?.id || null;
-  const autoValidatedRef = useRef(false);
-
   const [copiedPlatform, setCopiedPlatform] = useState<string | null>(null);
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
   const [connectedPlatform, setConnectedPlatform] = useState<string | null>(null);
@@ -35,9 +31,7 @@ const InfoStepEntrega = ({ estruturaData, conteudoData, vslData, kitData, onNewP
   const [hotmartBasicAuth, setHotmartBasicAuth] = useState("");
   const [hotmartConnected, setHotmartConnected] = useState(false);
   const [hotmartStatusLabel, setHotmartStatusLabel] = useState("Desconectado");
-  const [eduzzConnected, setEduzzConnected] = useState(false);
   const [eduzzStatusLabel, setEduzzStatusLabel] = useState("Desconectado");
-  const [kiwifyConnected, setKiwifyConnected] = useState(false);
   const [kiwifyStatusLabel, setKiwifyStatusLabel] = useState("Desconectado");
   const [integrationStatus, setIntegrationStatus] = useState<
     Record<string, "connected" | "error" | "expired" | "disconnected">
@@ -52,6 +46,10 @@ const InfoStepEntrega = ({ estruturaData, conteudoData, vslData, kitData, onNewP
     url_capa: "",
     conteudo_url: "",
   });
+
+  const { user, profile } = useAuth();
+  const userId = profile?.id || user?.id || null;
+  const autoValidatedRef = useRef(false);
 
   const statusLabelMap: Record<string, string> = {
     connected: "Conectado",
@@ -90,11 +88,9 @@ const InfoStepEntrega = ({ estruturaData, conteudoData, vslData, kitData, onNewP
         .in("platform", ["eduzz", "hotmart", "kiwify", "monetizze"]);
       if (error || !data) {
         setIntegrationStatus({});
-        setEduzzConnected(false);
         setEduzzStatusLabel("Desconectado");
         setHotmartConnected(false);
         setHotmartStatusLabel("Desconectado");
-        setKiwifyConnected(false);
         setKiwifyStatusLabel("Desconectado");
         return null;
       }
@@ -115,11 +111,9 @@ const InfoStepEntrega = ({ estruturaData, conteudoData, vslData, kitData, onNewP
       const eduzzStatus = statusByPlatform.eduzz || "disconnected";
       const hotmartStatusValue = statusByPlatform.hotmart || "disconnected";
       const kiwifyStatusValue = statusByPlatform.kiwify || "disconnected";
-      setEduzzConnected(eduzzStatus === "connected");
       setEduzzStatusLabel(statusLabelMap[eduzzStatus]);
       setHotmartConnected(hotmartStatusValue === "connected");
       setHotmartStatusLabel(statusLabelMap[hotmartStatusValue]);
-      setKiwifyConnected(kiwifyStatusValue === "connected");
       setKiwifyStatusLabel(statusLabelMap[kiwifyStatusValue]);
       return statusByPlatform;
     };
@@ -377,6 +371,7 @@ const InfoStepEntrega = ({ estruturaData, conteudoData, vslData, kitData, onNewP
         </div>
       </div>
 
+      {/* Resumo */}
       <div className="bg-muted/30 rounded-xl p-4 border border-border/30 space-y-2">
         <p className="text-sm font-semibold">📦 Resumo do Produto</p>
         {estruturaData && (
@@ -396,6 +391,7 @@ const InfoStepEntrega = ({ estruturaData, conteudoData, vslData, kitData, onNewP
         </div>
       </div>
 
+      {/* Plataformas */}
       <div className="space-y-3">
         {["Hotmart", "Eduzz", "Monetizze", "Kiwify"].map((p) => (
           <Button

@@ -108,8 +108,8 @@ serve(async (req) => {
       Boolean(value && blockedMediaPatterns.some((pattern) => pattern.test(value)));
 
     if (isBlockedMedia(imageUrl) || isBlockedMedia(videoUrl)) {
-      return new Response(JSON.stringify({ error: "Midia bloqueada. Envie conteudo real relacionado ao produto." }), {
-        status: 422,
+      return new Response(JSON.stringify({ success: false, error: "Midia bloqueada. Envie conteudo real relacionado ao produto." }), {
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -407,13 +407,13 @@ Retorne EXATAMENTE este formato JSON:
 
       if (!response.ok) {
         if (response.status === 429) {
-          return new Response(JSON.stringify({ error: "Rate limit excedido. Tente novamente em alguns segundos." }), {
-            status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          return new Response(JSON.stringify({ success: false, error: "Rate limit excedido. Tente novamente em alguns segundos." }), {
+            status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
         if (response.status === 402) {
-          return new Response(JSON.stringify({ error: "Créditos insuficientes. Adicione fundos em Settings > Workspace > Usage." }), {
-            status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          return new Response(JSON.stringify({ success: false, error: "Créditos insuficientes. Adicione fundos em Settings > Workspace > Usage." }), {
+            status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
         const text = await response.text();
@@ -446,8 +446,8 @@ Retorne EXATAMENTE este formato JSON:
       if (result instanceof Response) return result;
       const retryValidation = validateResult(tipo, result, contexto);
       if (!retryValidation.ok && isVideoType) {
-        return new Response(JSON.stringify({ error: "quality_blocked", reason: retryValidation.reason }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        return new Response(JSON.stringify({ success: false, error: "quality_blocked", reason: retryValidation.reason }), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       if (!retryValidation.ok) {
@@ -460,8 +460,8 @@ Retorne EXATAMENTE este formato JSON:
     });
   } catch (e) {
     console.error("Error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    return new Response(JSON.stringify({ success: false, error: e instanceof Error ? e.message : "Unknown error" }), {
+      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });

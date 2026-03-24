@@ -69,6 +69,79 @@ interface DarkFlowResult {
   };
 }
 
+const buildFallbackDarkFlow = (payload: {
+  produto?: string;
+  nicho?: string;
+  objetivo?: string;
+  marca?: string;
+  publico?: string;
+  plataforma?: string;
+  checkout?: string;
+  landing?: string;
+}): DarkFlowResult => {
+  const temaBase = payload.nicho || payload.produto || "produto";
+  const publicoBase = payload.publico || "seu público";
+  const objetivoBase = payload.objetivo || "vendas";
+  const marcaBase = payload.marca || "sua marca";
+  const cleanHashtag = (value: string) => `#${value.replace(/[^a-z0-9]/gi, "")}`.toLowerCase();
+
+  return {
+    hook: `Você está perdendo vendas em ${temaBase} por um erro simples.`,
+    contexto: `Conteúdo rápido para ${publicoBase} com foco em ${objetivoBase}.`,
+    lista: [
+      "Você comunica o benefício errado",
+      "Seu gancho não cria urgência",
+      "Seu CTA não deixa claro o próximo passo",
+    ],
+    solucao: `Ajuste o gancho, a promessa e o CTA para fechar mais com ${marcaBase}.`,
+    cta: "LINK NA BIO",
+    legenda: `Se ${temaBase} é sua prioridade, mude isso hoje.`,
+    hashtags: [cleanHashtag(temaBase), "#darkflow", "#marketing", "#vendas", "#conteudoviral"],
+    texto_falado: `Se você quer ${objetivoBase}, pare de fazer isso em ${temaBase}. Aqui vai o ajuste que muda o jogo.`,
+    design: {
+      fundo: "#000000",
+      texto: "#FFFFFF",
+      destaque: "#FF0000",
+      check: "#00FF7F",
+      tipografia: "BOLD, CAIXA ALTA, ALTA LEGIBILIDADE",
+      efeitos: ["glow vermelho leve", "sombra leve", "centralizado"],
+    },
+    imagem: {
+      prompt: `Imagem dark com texto central destacando ${temaBase}, estilo agressivo e contraste alto.`,
+      elementos: ["texto central", "destaque vermelho", "check verde"],
+      formato: "9:16",
+    },
+    video: {
+      narracao: `Narracao direta para ${publicoBase}, com promessa clara e CTA final para ${marcaBase}.`,
+      texto_animado: ["ERRO", "AJUSTE", "CTA"],
+      fundo_dinamico: "texturas dark + motion blur",
+      musica: "leve e tensa",
+      formatos: ["9:16", "1:1"],
+    },
+    voz: {
+      estilo: "Masculina brasileira",
+      tom: "confiante",
+      ritmo: "medio",
+      naturalidade: "natural",
+    },
+    avatar: {
+      opcional: true,
+      servicos: ["HeyGen", "Runway ML"],
+      persona: "Homem 30-40 anos, aparencia profissional, comunicacao direta",
+    },
+    links: {
+      checkout: payload.checkout || "",
+      landing: payload.landing || "",
+    },
+    assets: {
+      copies: ["hook + contexto + lista + solucao + cta"],
+      scripts: ["roteiro completo"],
+      imagens: ["prompt de imagem"],
+      videos: ["spec de video"],
+    },
+  };
+};
+
 const DarkFlowEngine = () => {
   const [form, setForm] = useState({
     produto: "",
@@ -113,27 +186,33 @@ const DarkFlowEngine = () => {
   const handleGenerate = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("generate-viral", {
-        body: {
-          ...form,
-          tipo: "dark_flow_engine",
-          contextoMestre: {
-            tema: form.nicho || form.produto,
-            publico: form.publico,
-            problema: "",
-            objetivo: form.objetivo,
-            linguagem: "pt-BR",
-            tom: "especialista",
-          },
+      const payload = {
+        ...form,
+        tipo: "dark_flow_engine",
+        contextoMestre: {
+          tema: form.nicho || form.produto,
+          publico: form.publico,
+          problema: "",
+          objetivo: form.objetivo,
+          linguagem: "pt-BR",
+          tom: "especialista",
         },
+      };
+      console.log("Payload gerar dark:", payload);
+
+      const { data, error } = await supabase.functions.invoke("generate-viral", {
+        body: payload,
       });
       if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      if (data?.error || data?.success === false) throw new Error(data?.error || "Erro ao gerar conteudo dark");
+      if (!data) throw new Error("Resposta vazia ao gerar conteudo dark");
       setResult(data || null);
       toast.success("Conteudo Dark gerado");
     } catch (err: any) {
       console.error(err);
-      toast.error(err.message || "Erro ao gerar conteudo dark");
+      const fallback = buildFallbackDarkFlow(form);
+      setResult(fallback);
+      toast.warning("Falha ao gerar conteudo dark. Usando fallback local.");
     } finally {
       setIsLoading(false);
     }
@@ -255,7 +334,7 @@ const DarkFlowEngine = () => {
           <Zap className="w-4 h-4" /> {isDetecting ? "Detectando nichos..." : "Detectar nichos quentes"}
         </Button>
         <Button variant="neon" size="lg" className="w-full" onClick={handleGenerate} disabled={isLoading}>
-          <Sparkles className="w-4 h-4" /> {isLoading ? "Gerando..." : "GERAR CONTEUDO DARK"}
+          <Sparkles className="w-4 h-4" /> {isLoading ? "Gerando..." : "GERAR CONTEÚDO DARK"}
         </Button>
       </div>
 
