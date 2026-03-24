@@ -31,6 +31,33 @@
       </header>
 
       <main class="grid">
+        <section class="card products">
+          <div class="products-header">
+            <h2>Produtos Prontos</h2>
+            <button id="btnProdutosAtualizar" class="ghost" type="button">Atualizar</button>
+          </div>
+          <p id="produtosVazio" class="note">Nenhum produto ainda. Crie o primeiro.</p>
+          <ul id="produtosLista" class="products-list"></ul>
+          <div class="divider"></div>
+          <div class="form">
+            <div class="field">
+              <label for="produtoNome">Nome do produto</label>
+              <input id="produtoNome" type="text" placeholder="Ex: Curso Vendas com IA" />
+            </div>
+            <div class="field">
+              <label for="produtoTipo">Tipo</label>
+              <select id="produtoTipo">
+                <option value="ebook">Ebook</option>
+                <option value="curso">Curso</option>
+                <option value="vsl">VSL</option>
+                <option value="combo">Combo</option>
+              </select>
+            </div>
+            <button id="btnProdutoCriar" class="primary" type="button">Criar novo</button>
+            <div id="produtosStatus" class="note"></div>
+          </div>
+        </section>
+
         <section class="card">
           <h2>Material</h2>
           <div class="form">

@@ -17,13 +17,21 @@ const btnBaixarVideo = document.getElementById("btnBaixarVideo");
 const btnCopiarCopy = document.getElementById("btnCopiarCopy");
 const btnReenviar = document.getElementById("btnReenviar");
 const btnRegerar = document.getElementById("btnRegerar");
+const btnProdutosAtualizar = document.getElementById("btnProdutosAtualizar");
+const btnProdutoCriar = document.getElementById("btnProdutoCriar");
 const saveStatus = document.getElementById("saveStatus");
 const infoAviso = document.getElementById("infoAviso");
 const ytConnected = document.getElementById("ytConnected");
 const ytStatus = document.getElementById("ytStatus");
+const produtosLista = document.getElementById("produtosLista");
+const produtosVazio = document.getElementById("produtosVazio");
+const produtosStatus = document.getElementById("produtosStatus");
+const produtoNome = document.getElementById("produtoNome");
+const produtoTipo = document.getElementById("produtoTipo");
 
 const STORAGE_KEY = "material_salvo";
 const QUEUE_KEY = "fila_publicacao";
+const PRODUTOS_KEY = "produtos_prontos";
 
 const setStatus = (message, tone) => {
   saveStatus.textContent = message;
@@ -33,6 +41,11 @@ const setStatus = (message, tone) => {
 const setInfo = (message, tone) => {
   infoAviso.textContent = message;
   infoAviso.style.color = tone === "warning" ? "#d97706" : "#6f6f6f";
+};
+
+const setProdutosStatus = (message, tone) => {
+  produtosStatus.textContent = message;
+  produtosStatus.style.color = tone === "warning" ? "#d97706" : "#6f6f6f";
 };
 
 const getMaterial = () => {
@@ -93,6 +106,112 @@ const addToQueue = (material) => {
   const queue = raw ? JSON.parse(raw) : [];
   queue.push({ ...material, queuedAt: new Date().toISOString() });
   localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+};
+
+const gerarMockProdutos = () => [
+  {
+    id: 1,
+    nome: "Metodo Emagrecimento 21 Dias",
+    tipo: "ebook",
+    status: "pronto"
+  },
+  {
+    id: 2,
+    nome: "Curso Vendas com IA",
+    tipo: "curso",
+    status: "pronto"
+  }
+];
+
+const salvarProdutosLocal = (produtos) => {
+  localStorage.setItem(PRODUTOS_KEY, JSON.stringify(produtos));
+};
+
+const carregarProdutosLocal = () => {
+  const raw = localStorage.getItem(PRODUTOS_KEY);
+  if (!raw) {
+    const seed = gerarMockProdutos();
+    salvarProdutosLocal(seed);
+    return seed;
+  }
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    const seed = gerarMockProdutos();
+    salvarProdutosLocal(seed);
+    return seed;
+  }
+};
+
+const carregarProdutos = async () => {
+  try {
+    const res = await fetch("/api/produtos");
+    if (!res.ok) throw new Error("Resposta invalida");
+    const data = await res.json();
+    if (!Array.isArray(data)) throw new Error("Formato invalido");
+    salvarProdutosLocal(data);
+    setProdutosStatus("Produtos carregados da API.", "success");
+    return data;
+  } catch (error) {
+    console.warn("API falhou, usando local", error);
+    setProdutosStatus("API indisponivel. Usando dados locais.", "warning");
+    return carregarProdutosLocal();
+  }
+};
+
+const renderProdutos = (produtos) => {
+  produtosLista.innerHTML = "";
+  const lista = Array.isArray(produtos) ? produtos : [];
+  produtosVazio.style.display = lista.length ? "none" : "block";
+
+  lista.forEach((produto) => {
+    const item = document.createElement("li");
+    item.className = "product-item";
+
+    const meta = document.createElement("div");
+    meta.className = "product-meta";
+
+    const nome = document.createElement("div");
+    nome.className = "product-name";
+    nome.textContent = produto.nome || "Produto sem nome";
+
+    const sub = document.createElement("div");
+    sub.className = "product-sub";
+    sub.textContent = `Status: ${produto.status || "pronto"}`;
+
+    const badge = document.createElement("div");
+    badge.className = "badge";
+    badge.textContent = produto.tipo || "produto";
+
+    meta.appendChild(nome);
+    meta.appendChild(sub);
+
+    item.appendChild(meta);
+    item.appendChild(badge);
+    produtosLista.appendChild(item);
+  });
+};
+
+const criarProduto = () => {
+  const nome = produtoNome.value.trim();
+  const tipo = produtoTipo.value;
+  if (!nome) {
+    setProdutosStatus("Informe o nome do produto.", "warning");
+    return;
+  }
+  const lista = carregarProdutosLocal();
+  const novo = {
+    id: Date.now(),
+    nome,
+    tipo,
+    status: "pronto"
+  };
+  lista.push(novo);
+  salvarProdutosLocal(lista);
+  renderProdutos(lista);
+  produtoNome.value = "";
+  produtoTipo.value = "ebook";
+  setProdutosStatus("Produto criado e salvo localmente.", "success");
 };
 
 const baixarVideo = async (material) => {
@@ -202,6 +321,11 @@ btnReenviar.addEventListener("click", () => {
 
 btnRegerar.addEventListener("click", resetarConteudo);
 ytConnected.addEventListener("change", atualizarYoutubeStatus);
+btnProdutosAtualizar.addEventListener("click", () => {
+  carregarProdutos().then(renderProdutos);
+});
+btnProdutoCriar.addEventListener("click", criarProduto);
 
 loadMaterial();
 atualizarYoutubeStatus();
+carregarProdutos().then(renderProdutos);
