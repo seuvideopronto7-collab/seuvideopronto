@@ -187,6 +187,11 @@ h1 {
   box-shadow: var(--shadow);
 }
 
+h3 {
+  margin: 12px 0 12px;
+  font-size: 16px;
+}
+
 h2 {
   margin: 0 0 16px;
   font-size: 20px;
@@ -277,6 +282,70 @@ button:hover {
 .info {
   font-size: 13px;
   color: var(--muted);
+}
+
+.stack-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  margin-top: 14px;
+}
+
+.stack-block {
+  background: #f7f4ef;
+  border-radius: 12px;
+  padding: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.stack-title {
+  font-weight: 600;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.stack-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.stack-list li {
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: #f0eee7;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.code-section {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.code-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+
+.code-block {
+  background: #101418;
+  color: #f4f4f4;
+  border-radius: 14px;
+  padding: 14px;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-x: auto;
+  border: 1px solid rgba(0, 0, 0, 0.3);
+  white-space: pre-wrap;
 }
 
 .log {

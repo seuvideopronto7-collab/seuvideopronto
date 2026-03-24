@@ -100,6 +100,100 @@
             </section>
 
             <section class="card">
+              <h2>Arquitetura real (producao)</h2>
+              <p class="subtitle">
+                Stack real com APIs, orquestracao e edicao automatica de video.
+              </p>
+              <div class="stack-grid">
+                <div class="stack-block">
+                  <div class="stack-title">Voz</div>
+                  <ul class="stack-list">
+                    <li>ElevenLabs (TTS principal)</li>
+                    <li>PlayHT / OpenAI (fallback)</li>
+                  </ul>
+                </div>
+                <div class="stack-block">
+                  <div class="stack-title">Video</div>
+                  <ul class="stack-list">
+                    <li>Runway (texto/imagem → cenas)</li>
+                    <li>Pika Labs (alternativa)</li>
+                    <li>D-ID (face talking opcional)</li>
+                  </ul>
+                </div>
+                <div class="stack-block">
+                  <div class="stack-title">Edicao</div>
+                  <ul class="stack-list">
+                    <li>FFmpeg em backend (Edge Function ou n8n)</li>
+                    <li>Padrao vertical 1080x1920</li>
+                  </ul>
+                </div>
+                <div class="stack-block">
+                  <div class="stack-title">Infra</div>
+                  <ul class="stack-list">
+                    <li>Supabase (storage + functions)</li>
+                    <li>n8n (orquestracao e filas)</li>
+                  </ul>
+                </div>
+              </div>
+              <div class="divider"></div>
+              <h3>Fluxo real (pipeline)</h3>
+              <ol class="flow-steps">
+                <li>Entrada (texto + imagem)</li>
+                <li>Roteiro com IA</li>
+                <li>Voz TTS (ElevenLabs)</li>
+                <li>Video (Runway)</li>
+                <li>Montagem (FFmpeg)</li>
+                <li>Upload no Supabase</li>
+              </ol>
+              <p class="note">Sem simulacao: APIs reais e fallback obrigatorio.</p>
+            </section>
+
+            <section class="card">
+              <h2>APIs reais + n8n</h2>
+              <div class="code-section">
+                <div class="code-label">ElevenLabs (TTS)</div>
+                <pre class="code-block"><code>POST https://api.elevenlabs.io/v1/text-to-speech/{voice_id}
+headers: xi-api-key: SUA_KEY
+body: { text, model_id: "eleven_multilingual_v2" }</code></pre>
+              </div>
+              <div class="code-section">
+                <div class="code-label">Runway (Video)</div>
+                <pre class="code-block"><code>POST https://api.runwayml.com/v1/generate
+body: { prompt, image?, style: "cinematic" }</code></pre>
+              </div>
+              <div class="code-section">
+                <div class="code-label">FFmpeg (Montagem)</div>
+                <pre class="code-block"><code>ffmpeg -i video.mp4 -i audio.mp3 \
+-filter_complex "[0:v]scale=1080:1920[v]" \
+-map "[v]" -map 1:a -shortest output.mp4</code></pre>
+              </div>
+              <div class="divider"></div>
+              <h3>Fluxo no n8n</h3>
+              <ul class="stack-list">
+                <li>Webhook → OpenAI (roteiro)</li>
+                <li>HTTP → ElevenLabs</li>
+                <li>HTTP → Runway</li>
+                <li>Function → preparar assets</li>
+                <li>Execute Command → FFmpeg</li>
+                <li>Upload Supabase → URL final</li>
+              </ul>
+            </section>
+
+            <section class="card">
+              <h2>Prompt unico (implementacao)</h2>
+              <p class="subtitle">
+                Copie e cole no Lovable para gerar o fluxo completo com fallback real.
+              </p>
+              <pre id="promptVideo" class="code-block"></pre>
+              <div class="actions">
+                <button class="primary" type="button" data-action="copiar-prompt-video">
+                  Copiar prompt de implementacao
+                </button>
+              </div>
+              <div id="promptInfo" class="note"></div>
+            </section>
+
+            <section class="card">
               <h2>Conteudo para 30 dias</h2>
               <p class="subtitle">Coleta rapida e calendario automatico com autopost.</p>
               <div class="form">

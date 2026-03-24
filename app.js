@@ -43,6 +43,8 @@ const darkflowLog = document.getElementById("darkflowLog");
 const btnConteudo30 = document.getElementById("btnConteudo30");
 const conteudo30Status = document.getElementById("conteudo30Status");
 const conteudo30Calendario = document.getElementById("conteudo30Calendario");
+const promptVideo = document.getElementById("promptVideo");
+const promptInfo = document.getElementById("promptInfo");
 const nichoField = document.getElementById("nicho");
 const objetivoField = document.getElementById("objetivo");
 const marcaField = document.getElementById("marca");
@@ -68,6 +70,57 @@ const ROUTE_STATE_KEY = "route_state_material";
 const DARKFLOW_PROJECTS_KEY = "darkflow_projects";
 const DARKFLOW_CALENDAR_KEY = "darkflow_calendar";
 
+const PROMPT_VIDEO = `id="svp_real_engine"
+Crie um sistema real de geracao de videos automatizados com IA.
+
+FUNCIONAMENTO:
+
+1. Usuario insere:
+- texto
+- opcional: imagem
+
+2. Sistema gera roteiro estruturado:
+- gancho
+- promessa
+- demonstracao
+- CTA
+
+3. Integracao com ElevenLabs:
+- gerar narracao real via API
+- salvar audio
+
+4. Integracao com Runway:
+- gerar cenas a partir do texto e imagem
+
+5. Backend (Supabase Edge Function):
+- usar FFmpeg para:
+  - unir video + audio
+  - ajustar formato vertical (1080x1920)
+  - otimizar qualidade
+
+6. Upload automatico:
+- salvar video final no Supabase Storage
+- gerar URL publica
+
+7. Frontend:
+- botao "GERAR VIDEO"
+- mostrar loading real
+- barra de progresso
+- preview automatico
+
+REGRAS:
+- tudo deve funcionar em tempo real
+- nenhuma simulacao
+- tratamento de erro obrigatorio
+- fallback se API falhar
+
+EXTRA:
+- permitir download
+- permitir repost automatico
+
+OBJETIVO:
+Transformar texto + imagem em video pronto para redes sociais`;
+
 const setStatus = (message, tone) => {
   saveStatus.textContent = message;
   saveStatus.style.color = tone === "success" ? "#2ea44f" : "#6f6f6f";
@@ -86,6 +139,12 @@ const setProdutosStatus = (message, tone) => {
 const setAutopostStatus = (message, tone) => {
   autopostStatus.textContent = message;
   autopostStatus.style.color = tone === "warning" ? "#d97706" : "#6f6f6f";
+};
+
+const setPromptStatus = (message, tone) => {
+  if (!promptInfo) return;
+  promptInfo.textContent = message;
+  promptInfo.style.color = tone === "warning" ? "#d97706" : "#6f6f6f";
 };
 
 const appendDarkflowLog = (message) => {
@@ -747,6 +806,28 @@ const copiarCopy = async () => {
   setInfo("Copy copiada para a area de transferencia.", "success");
 };
 
+const copiarTexto = async (text, target) => {
+  if (!text) return;
+  try {
+    await navigator.clipboard.writeText(text);
+    if (target) {
+      target.textContent = "Prompt copiado para a area de transferencia.";
+      target.style.color = "#2ea44f";
+    }
+  } catch (error) {
+    const fallback = document.createElement("textarea");
+    fallback.value = text;
+    document.body.appendChild(fallback);
+    fallback.select();
+    document.execCommand("copy");
+    document.body.removeChild(fallback);
+    if (target) {
+      target.textContent = "Prompt copiado (modo alternativo).";
+      target.style.color = "#2ea44f";
+    }
+  }
+};
+
 const resetarConteudo = () => {
   Object.values(fields).forEach((field) => {
     if (field.type === "file") {
@@ -814,6 +895,7 @@ const actionRegistry = {
     return baixarPacote(material);
   },
   "copiar-copy": () => copiarCopy(),
+  "copiar-prompt-video": () => copiarTexto(PROMPT_VIDEO, promptInfo),
   "reenviar-fila": () => {
     const material = getMaterial();
     addToQueue(material);
@@ -899,6 +981,10 @@ carregarProdutos().then(renderProdutos);
 renderCalendario30Dias(
   JSON.parse(localStorage.getItem(DARKFLOW_CALENDAR_KEY) || "[]")
 );
+
+if (promptVideo) {
+  promptVideo.textContent = PROMPT_VIDEO;
+}
 
 const allowedRoutes = new Set([
   "/",
