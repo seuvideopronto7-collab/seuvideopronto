@@ -86,6 +86,7 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
   const buildEstrutura = (override?: Partial<typeof formData>, overrideEntryType?: EntryType | null) => ({
     entryType: overrideEntryType || entryType,
     formData: { ...formData, ...override },
+    generationMode,
     analysisData,
     roteiroData,
     seoData,
@@ -369,6 +370,10 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
 
   // Step 4 → 5: Generate roteiro
   const handleGenerateRoteiro = async () => {
+    if (!generationMode) {
+      toast.warning("Selecione um tipo de vídeo para continuar.");
+      return;
+    }
     setIsLoading(true);
     try {
       const videoKey = getVideoDailyKey(planId);
@@ -572,6 +577,7 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
     setRoteiroData(estrutura.roteiroData || null);
     setSeoData(estrutura.seoData || null);
     setViralData(estrutura.viralData || null);
+    setGenerationMode(estrutura.generationMode || null);
     setVariacoesData(estrutura.variacoesData || null);
     setVariacoesCount(estrutura.variacoesCount || null);
     setProdutoId(initialProduto.id);

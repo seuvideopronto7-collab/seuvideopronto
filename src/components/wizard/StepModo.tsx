@@ -45,12 +45,11 @@ const StepModo = ({ selected, onSelect, onGenerate, isLoading }: StepModoProps) 
           <button
             key={mode.id}
             onClick={() => onSelect(mode.id)}
+            type="button"
+            aria-pressed={selected === mode.id}
             className={`
-              glass-card p-6 text-left transition-all duration-200 hover:scale-[1.02]
-              ${selected === mode.id
-                ? "ring-2 ring-primary shadow-[0_0_25px_-5px_hsl(var(--primary)/0.4)]"
-                : ""
-              }
+              mode-card glass-card p-6 text-left
+              ${selected === mode.id ? "mode-card--active" : ""}
             `}
           >
             <mode.icon className={`w-8 h-8 mb-3 ${mode.color}`} />
