@@ -131,6 +131,82 @@ const VideoGeneratorUI = () => {
     runChecks();
   }, []);
 
+  const shortText = (value: string, max = 36) => {
+    const clean = value.replace(/\s+/g, " ").trim();
+    if (!clean) return "";
+    if (clean.length <= max) return clean;
+    return `${clean.slice(0, Math.max(1, max - 3))}...`;
+  };
+
+  const buildOnScreenText = (hook: string, benefits: string[], cta: string) => {
+    const raw = [hook, ...benefits, cta].filter(Boolean);
+    const unique = Array.from(new Set(raw.map((item) => shortText(item))));
+    return unique.slice(0, 6);
+  };
+
+  const buildFallbackScript = () => {
+    const baseScript = buildScript(productType.toLowerCase(), styleType.toLowerCase());
+    const hook = baseScript.split(".")[0]?.trim() || "Apresentacao premium que prende no primeiro olhar.";
+    const benefits = [
+      "Impacto visual imediato",
+      "Valor percebido premium",
+      "Conversao com estilo comercial",
+    ];
+    const cta = "Garanta o seu agora.";
+    const onScreenText = buildOnScreenText(hook, benefits, cta);
+    return { hook, benefits, cta, fullScript: baseScript, onScreenText, isFallback: true } as ScriptData;
+  };
+
+  const generateScript = async () => {
+    setIsGeneratingScript(true);
+    try {
+      const objectiveLabel = objective || objectives[0];
+      const response = await supabase.functions.invoke("generate-viral", {
+        body: {
+          tipo: "roteiro",
+          produto: productName || productType,
+          nicho: niche || styleType,
+          publico: "Compradores premium",
+          objetivo: modePro
+            ? `${objectiveLabel} | PRO: storytelling, cenas simuladas, CTA agressivo`
+            : objectiveLabel,
+          marca: brandName || undefined,
+          modo: "comercial",
+        },
+      });
+
+      if (response.error) throw response.error;
+
+      const payload = response.data || {};
+      const roteiro = payload?.roteiro || payload?.result?.roteiro || {};
+      const hook = roteiro?.hook || payload?.hook || "Seu produto precisa parecer premium agora.";
+      const cta = roteiro?.cta || payload?.cta || "Clique e garanta o seu agora.";
+      const benefitsCandidate = [roteiro?.dor, roteiro?.identificacao, roteiro?.solucao].filter(Boolean);
+      const baseBenefits = [
+        "Resultado comercial imediato",
+        "Impacto visual com prova",
+        "Conversao elevada no feed",
+      ];
+      const benefits = [...benefitsCandidate, ...baseBenefits].slice(0, 3);
+      const fullScript =
+        payload?.roteiro_completo ||
+        payload?.roteiroCompleto ||
+        roteiro?.roteiro_completo ||
+        buildScript(productType.toLowerCase(), styleType.toLowerCase());
+      const onScreenText = buildOnScreenText(hook, benefits, cta);
+      const result = { hook, benefits, cta, fullScript, onScreenText } as ScriptData;
+      setScriptData(result);
+      return result;
+    } catch (error) {
+      console.error("Erro ao gerar roteiro:", error);
+      const fallback = buildFallbackScript();
+      setScriptData(fallback);
+      return fallback;
+    } finally {
+      setIsGeneratingScript(false);
+    }
+  };
+
   const handleFile = (next?: File | null) => {
     if (!next) return;
     if (!/[.](jpg|jpeg|png|webp)$/i.test(next.name)) {
@@ -174,12 +250,18 @@ const VideoGeneratorUI = () => {
         return;
       }
 
+      const script = await generateScript();
+      const promptText = buildCinematicPrompt(productType, styleType, useDarkflow, useViral, modePro);
+
       const payload = {
         imageUrl: resolvedImageUrl,
         productType,
         style: styleType,
         useDarkflow,
         useViral,
+        promptText,
+        modePro,
+        script,
       };
       const { id } = await createVideoJob(payload);
       setJobId(id);

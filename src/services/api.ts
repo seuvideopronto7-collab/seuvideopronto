@@ -6,6 +6,9 @@ export type CreateVideoJobInput = {
   style: string;
   useDarkflow?: boolean;
   useViral?: boolean;
+  prompt?: string;
+  textoNaTela?: string[];
+  narracao?: string;
 };
 
 export type VideoJob = {

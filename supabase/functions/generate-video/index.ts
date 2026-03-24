@@ -9,7 +9,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { imageUrl, image, estilo, movimento, duracao, conteudoRelacionado } = await req.json();
+    const { imageUrl, image, estilo, movimento, duracao, conteudoRelacionado, prompt, textoNaTela, narracao } = await req.json();
     const resolvedImageUrl = imageUrl || image;
     const blockedMediaPatterns = [/big[_-]?buck[_-]?bunny/i, /\bdefault\b/i];
     const isBlockedMedia = (value?: string) =>
@@ -52,6 +52,9 @@ serve(async (req) => {
           style: estilo || "cinematografico",
           motion: movimento || "leve zoom + parallax",
           duration: duracao || 5,
+          prompt,
+          text_overlay: textoNaTela,
+          narration: narracao,
         }),
       });
 
@@ -81,6 +84,9 @@ serve(async (req) => {
           style: estilo || "cinematografico",
           motion: movimento || "leve zoom + parallax",
           duration: duracao || 5,
+          prompt,
+          text_overlay: textoNaTela,
+          narration: narracao,
         }),
       });
 

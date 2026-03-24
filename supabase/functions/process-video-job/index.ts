@@ -32,7 +32,7 @@ serve(async (req) => {
   }
 
   try {
-    const { jobId, imageUrl, productType, style, useDarkflow, useViral } = await req.json();
+    const { jobId, imageUrl, productType, style, useDarkflow, useViral, prompt, textoNaTela, narracao } = await req.json();
 
     if (!jobId || !imageUrl) {
       return new Response(JSON.stringify({ error: "jobId e imageUrl sao obrigatorios" }), {
@@ -60,6 +60,9 @@ serve(async (req) => {
         conteudoRelacionado: true,
         produto: productType,
         nicho: style,
+        prompt,
+        textoNaTela,
+        narracao,
       }),
     });
 

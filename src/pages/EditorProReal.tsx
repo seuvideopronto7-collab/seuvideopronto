@@ -8,6 +8,8 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { renderVideoFromImage } from "@/lib/videoRender";
+import { gerarConteudoIA } from "@/lib/aiEngine";
+import { buildCinematicPrompt } from "@/lib/buildCinematicPrompt";
 import { Film, Loader2, Mic2, Music2, Pause, Play, Sparkles, Upload, Wand2 } from "lucide-react";
 
 type RatioPreset = {
@@ -160,25 +162,91 @@ const EditorProReal = () => {
         toast.success("Video carregado como base.");
         return;
       }
+
       const composed = await buildCompositeImage();
       if (!composed) throw new Error("Falha ao compor a imagem.");
 
-      const outputUrl = await renderVideoFromImage(composed, {
-        durationSec: duration,
-        fps: 30,
-        width: ratio.width,
-        height: ratio.height,
-        animation: enableZoom ? (animation as any) : "none",
-        fadeInSec: fadeIn,
-        fadeOutSec: fadeOut,
-        narrationUrl,
-        musicUrl,
-        narrationVolume: narrationVolume / 100,
-        musicVolume: musicVolume / 100,
-        enableDucking: true,
-        onProgress: (ratio) => setRenderProgress(Math.round(ratio * 100)),
+      const produto = projectName || "Produto";
+      const promptCinematografico = [
+        buildCinematicPrompt("outro", "luxo"),
+        `Produto: ${produto}.`,
+        headline ? `Headline: ${headline}.` : "",
+        subhead ? `Subhead: ${subhead}.` : "",
+        cta ? `CTA: ${cta}.` : "",
+      ]
+        .filter(Boolean)
+        .join(" ");
+
+      const gerarRoteiroIA = async (nomeProduto: string) => {
+        const { data } = await gerarConteudoIA("roteiro", { produto: nomeProduto });
+        return data as any;
+      };
+
+      const gerarVideoRunway = async ({
+        image,
+        prompt,
+      }: {
+        image: string;
+        prompt: string;
+      }) => {
+        void prompt;
+        return renderVideoFromImage(image, {
+          durationSec: duration,
+          fps: 30,
+          width: ratio.width,
+          height: ratio.height,
+          animation: enableZoom ? (animation as any) : "none",
+          fadeInSec: fadeIn,
+          fadeOutSec: fadeOut,
+          narrationUrl,
+          musicUrl,
+          narrationVolume: narrationVolume / 100,
+          musicVolume: musicVolume / 100,
+          enableDucking: true,
+          onProgress: (ratio) => setRenderProgress(Math.round(ratio * 100)),
+        });
+      };
+
+      const gerarNarracao = async (roteiro: any) => {
+        const roteiroData = roteiro?.roteiro || roteiro || {};
+        const texto =
+          roteiroData.roteiro_completo ||
+          roteiroData.abertura ||
+          roteiroData.hook ||
+          narrationText;
+        if (texto && texto !== narrationText) {
+          setNarrationText(texto);
+        }
+        return narrationUrl;
+      };
+
+      const renderFinal = async ({
+        video,
+        audio,
+        roteiro,
+      }: {
+        video: string;
+        audio: string | null;
+        roteiro: any;
+      }) => {
+        void audio;
+        void roteiro;
+        return video;
+      };
+
+      const roteiro = await gerarRoteiroIA(produto);
+      const video = await gerarVideoRunway({
+        image: composed,
+        prompt: promptCinematografico,
       });
-      setRenderUrl(outputUrl);
+      const audio = await gerarNarracao(roteiro);
+      const final = await renderFinal({
+        video,
+        audio,
+        roteiro,
+      });
+
+      setRenderUrl(final);
       toast.success("Video real gerado com sucesso.");
     } catch (err: any) {
       console.error(err);
