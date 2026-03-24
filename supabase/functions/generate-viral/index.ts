@@ -9,7 +9,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { produto, nicho, publico, dor, beneficio, link, tipo, marca, objetivo, plataforma, modo } = await req.json();
+    const { produto, nicho, publico, dor, beneficio, link, tipo, marca, objetivo, plataforma, modo, imageUrl, videoUrl } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
@@ -96,6 +96,37 @@ Retorne EXATAMENTE este formato JSON:
   ]
 }
 Gere exatamente 30 itens.`;
+    } else if (tipo === "viral_video") {
+      systemPrompt = `Você é um diretor criativo de vídeos virais. Gere uma entrega completa pronta para publicação. Sempre responda em JSON válido.`;
+      userPrompt = `Transforme a imagem em um vídeo viral completo com narração, música, legendas e copy de alta conversão.
+${context}
+Imagem: ${imageUrl || ""}
+Video: ${videoUrl || ""}
+
+Retorne EXATAMENTE este formato JSON:
+{
+  "narracao": "texto narrado completo (30-60s, voz masculina suave e persuasiva)",
+  "musica": {
+    "estilo": "motivacional + leve suspense",
+    "volume": "baixo",
+    "crescimento": "progressivo"
+  },
+  "legendas": ["🔥 ALIVIO RAPIDO", "💥 RESULTADO REAL", "⚡ TECNOLOGIA OZONIZADA"],
+  "copy": {
+    "gancho": "gancho forte (0-3s)",
+    "quebra_padrao": "quebra de padrão",
+    "curiosidade": "curiosidade",
+    "cta": "Clique no link e garanta o seu agora"
+  },
+  "formatos": ["9:16 Reels/TikTok/Shorts", "1:1 Feed", "16:9 YouTube"],
+  "cta_link": "Clique no link e garanta o seu agora",
+  "assets": {
+    "video_style": "cinematografico",
+    "movimento": "Ken Burns + parallax leve",
+    "iluminacao": "premium",
+    "qualidade": "4K"
+  }
+}`;
     }
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -110,20 +141,22 @@ Gere exatamente 30 itens.`;
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        tools: [{
-          type: "function",
-          function: {
-            name: "generate_content",
-            description: "Generate viral content in structured format",
-            parameters: {
-              type: "object",
-              properties: {
-                result: { type: "object" }
+        tools: [
+          {
+            type: "function",
+            function: {
+              name: "generate_content",
+              description: "Generate viral content in structured format",
+              parameters: {
+                type: "object",
+                properties: {
+                  result: { type: "object" },
+                },
+                required: ["result"],
               },
-              required: ["result"]
-            }
-          }
-        }],
+            },
+          },
+        ],
         tool_choice: { type: "function", function: { name: "generate_content" } },
       }),
     });

@@ -59,6 +59,7 @@ const StepConteudo = ({
   const isUpload = ["image", "video", "audio"].includes(entryType);
   const isLink = entryType === "link";
   const isReference = entryType === "reference";
+  const isImageFile = file?.type.startsWith("image/");
 
   const canContinue = isManual
     ? formData.produto.trim() !== ""
@@ -174,9 +175,9 @@ const StepConteudo = ({
               </div>
             )}
           </div>
-          {preview && file?.type.startsWith("image/") && (
-            <div className="rounded-xl overflow-hidden border border-border/50 max-w-sm">
-              <img src={preview} alt="Preview" className="w-full h-48 object-cover" />
+          {preview && isImageFile && (
+            <div className="rounded-xl border border-border/50 max-w-sm p-4 text-sm text-muted-foreground bg-muted/30">
+              Imagem recebida. O video cinematografico sera gerado automaticamente no proximo passo.
             </div>
           )}
           {preview && file?.type.startsWith("video/") && (

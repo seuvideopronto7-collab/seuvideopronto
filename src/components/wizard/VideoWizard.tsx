@@ -53,6 +53,7 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
   const [generationMode, setGenerationMode] = useState<string | null>(null);
   const [roteiroData, setRoteiroData] = useState<any>(null);
   const [seoData, setSeoData] = useState<any>(null);
+  const [viralData, setViralData] = useState<any>(null);
   const [variacoesData, setVariacoesData] = useState<any>(null);
   const [variacoesCount, setVariacoesCount] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -88,6 +89,7 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
     analysisData,
     roteiroData,
     seoData,
+    viralData,
     variacoesData,
     videoLink,
     videoUrl,
@@ -98,6 +100,20 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
     if (!url) return false;
     const clean = url.split("?")[0].toLowerCase();
     return /\.(mp4|webm|mov|m4v)$/.test(clean);
+  };
+
+  const generateVideoFromImage = async (imageUrl: string) => {
+    const { data, error } = await supabase.functions.invoke("generate-video", {
+      body: {
+        imageUrl,
+        estilo: "cinematografico",
+        movimento: "leve zoom + parallax",
+        duracao: 5,
+      },
+    });
+    if (error) throw error;
+    if (!data?.videoUrl) throw new Error("Falha ao gerar video");
+    return data.videoUrl as string;
   };
 
   const persistProduto = async (override?: { status?: "rascunho" | "finalizado" | "publicado"; formData?: Partial<typeof formData> }) => {
@@ -184,6 +200,55 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
     };
   };
 
+  const buildViralFallback = (reason?: string) => {
+    const tituloBase = formData.produto || formData.nicho || "Seu produto";
+    const ctaText = "Clique no link e garanta o seu agora";
+    return {
+      narracao: `Se você busca resultados rápidos com ${tituloBase}, precisa conhecer isso. Em poucos segundos você entende por que está viralizando.`,
+      musica: {
+        estilo: "motivacional + leve suspense",
+        volume: "baixo",
+        crescimento: "progressivo",
+      },
+      legendas: ["🔥 RESULTADO RÁPIDO", "⚡ SENSAÇÃO IMEDIATA", `💥 ${tituloBase.toUpperCase()}`],
+      copy: {
+        gancho: "Pare agora e veja isso",
+        quebra_padrao: "Ninguém te contou esse detalhe",
+        curiosidade: "O motivo real está aqui",
+        cta: ctaText,
+      },
+      formatos: ["9:16 Reels/TikTok/Shorts", "1:1 Feed", "16:9 YouTube"],
+      cta_link: formData.link ? `${ctaText} — ${formData.link}` : ctaText,
+      _fallback: true,
+      _reason: reason || "Falha na geração do modo viral",
+    };
+  };
+
+  const handleGenerateViralPack = async (override?: { imageUrl?: string; videoUrl?: string; formData?: Partial<typeof formData> }) => {
+    const resolvedFormData = { ...formData, ...(override?.formData || {}) };
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-viral", {
+        body: {
+          ...resolvedFormData,
+          tipo: "viral_video",
+          imageUrl: override?.imageUrl,
+          videoUrl: override?.videoUrl,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setViralData(data);
+      await persistProduto({ formData: resolvedFormData });
+      toast.success("Modo viral ativado ⚡");
+    } catch (err: any) {
+      console.error(err);
+      const fallback = buildViralFallback(err?.message);
+      setViralData(fallback);
+      await persistProduto({ formData: resolvedFormData });
+      toast.warning("Modo viral falhou. Fallback aplicado automaticamente.");
+    }
+  };
+
   // Step 2 → 3: Analyze content
   const handleAnalyze = async (override?: { entryType?: EntryType; formData?: Partial<typeof formData>; referenceLink?: string }) => {
     setStep(3);
@@ -233,6 +298,7 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
       } else {
         // Upload file if needed
         let fileUrl = "";
+        let analyzeUrl = "";
         if (file) {
           const ext = file.name.split(".").pop();
           const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
@@ -242,12 +308,32 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
           if (uploadError) throw uploadError;
           const { data: urlData } = supabase.storage.from("media-uploads").getPublicUrl(path);
           fileUrl = urlData.publicUrl;
-          setVideoUrl(fileUrl);
+          const isImageUpload = file.type.startsWith("image/");
+          if (isImageUpload) {
+            try {
+              const generatedUrl = await generateVideoFromImage(fileUrl);
+              analyzeUrl = generatedUrl;
+              setVideoUrl(generatedUrl);
+              void handleGenerateViralPack({ imageUrl: fileUrl, videoUrl: generatedUrl, formData: resolvedFormData });
+            } catch (err) {
+              console.error(err);
+              const fallbackUrl = "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4";
+              analyzeUrl = fallbackUrl;
+              setVideoUrl(fallbackUrl);
+              void handleGenerateViralPack({ imageUrl: fileUrl, videoUrl: fallbackUrl, formData: resolvedFormData });
+              toast.warning("Geracao de video falhou. Usando fallback.");
+            }
+          } else {
+            analyzeUrl = fileUrl;
+            if (file.type.startsWith("video/")) {
+              setVideoUrl(fileUrl);
+            }
+          }
         }
 
         const { data, error } = await supabase.functions.invoke("analyze-content", {
           body: {
-            fileUrl,
+            fileUrl: analyzeUrl || fileUrl,
             videoLink: resolvedLink.trim(),
             modo: "viral",
             ...resolvedFormData,
@@ -271,6 +357,9 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
         _fallback: true,
       };
       setAnalysisData(fallback);
+      if (resolvedEntryType === "image") {
+        void handleGenerateViralPack({ formData: resolvedFormData });
+      }
       await persistProduto({ formData: resolvedFormData });
       toast.warning("Analise falhou. Fallback aplicado automaticamente.");
     } finally {
@@ -433,6 +522,7 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
     setStep(1);
     setRoteiroData(null);
     setSeoData(null);
+    setViralData(null);
     setVariacoesData(null);
     setAnalysisData(null);
     setGenerationMode(null);
@@ -481,6 +571,7 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
     setAnalysisData(estrutura.analysisData || null);
     setRoteiroData(estrutura.roteiroData || null);
     setSeoData(estrutura.seoData || null);
+    setViralData(estrutura.viralData || null);
     setVariacoesData(estrutura.variacoesData || null);
     setVariacoesCount(estrutura.variacoesCount || null);
     setProdutoId(initialProduto.id);
@@ -571,6 +662,7 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
           <StepFinal
             roteiroData={roteiroData}
             seoData={seoData}
+            viralData={viralData}
             videoUrl={videoUrl}
             onNewVersion={handleNewVersion}
             onEdit={() => goTo(8)}
