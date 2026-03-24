@@ -79,7 +79,7 @@ export const renderVideoFromImage = async (imageUrl: string, options?: RenderOpt
     : null;
 
   if (progressHandler) {
-    ffmpeg.on("progress", progressHandler);
+    ffmpeg.on("progress", progressHandler as any);
   }
 
   const duration = options?.durationSec ?? 5;
