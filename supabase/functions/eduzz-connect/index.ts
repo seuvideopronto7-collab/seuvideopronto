@@ -3,8 +3,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Allow-Headers": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 };
 
 type TokenResponse = {
@@ -20,11 +20,14 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const clientId = body?.client_id?.trim();
     const clientSecret = body?.client_secret?.trim();
+    const responseHeaders = { ...corsHeaders, "Content-Type": "application/json" };
+
+    console.log("Eduzz payload recebido:", { hasClientId: !!clientId, hasClientSecret: !!clientSecret });
 
     if (!clientId || !clientSecret) {
-      return new Response(JSON.stringify({ error: "Informe client_id e client_secret." }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return new Response(JSON.stringify({ success: false, error: "Informe client_id e client_secret." }), {
+        status: 200,
+        headers: responseHeaders,
       });
     }
 
@@ -33,9 +36,9 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
     if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
-      return new Response(JSON.stringify({ error: "Supabase env not configured." }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return new Response(JSON.stringify({ success: false, error: "Supabase env not configured." }), {
+        status: 200,
+        headers: responseHeaders,
       });
     }
 
@@ -49,9 +52,9 @@ serve(async (req) => {
     } = await authClient.auth.getUser();
 
     if (userError || !user) {
-      return new Response(JSON.stringify({ error: "Usuário não autenticado." }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return new Response(JSON.stringify({ success: false, error: "Usuário não autenticado." }), {
+        status: 200,
+        headers: responseHeaders,
       });
     }
 
@@ -78,13 +81,14 @@ serve(async (req) => {
     if (!tokenResponse.ok) {
       return new Response(
         JSON.stringify({
+          success: false,
           error:
             "Falha na conexão com a Eduzz. Verifique credenciais, escopos e formato da requisição.",
           details: tokenRaw,
         }),
         {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+          headers: responseHeaders,
         },
       );
     }
@@ -93,9 +97,9 @@ serve(async (req) => {
     const accessToken = tokenData?.access_token;
 
     if (!accessToken) {
-      return new Response(JSON.stringify({ error: "Token de acesso não retornado pela Eduzz." }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return new Response(JSON.stringify({ success: false, error: "Token de acesso não retornado pela Eduzz." }), {
+        status: 200,
+        headers: responseHeaders,
       });
     }
 
@@ -113,13 +117,14 @@ serve(async (req) => {
       });
       return new Response(
         JSON.stringify({
+          success: false,
           error:
             "Falha na conexão com a Eduzz. Verifique credenciais, escopos e formato da requisição.",
           details: validateRaw,
         }),
         {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+          headers: responseHeaders,
         },
       );
     }
@@ -139,24 +144,26 @@ serve(async (req) => {
       );
 
     if (upsertError) {
-      return new Response(JSON.stringify({ error: "Falha ao salvar integração." }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return new Response(JSON.stringify({ success: false, error: "Falha ao salvar integração." }), {
+        status: 200,
+        headers: responseHeaders,
       });
     }
 
-    return new Response(JSON.stringify({ status: "connected" }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    return new Response(JSON.stringify({ success: true, status: "connected" }), {
+      status: 200,
+      headers: responseHeaders,
     });
   } catch (error) {
     return new Response(
       JSON.stringify({
+        success: false,
         error:
           "Falha na conexão com a Eduzz. Verifique credenciais, escopos e formato da requisição.",
         details: error instanceof Error ? error.message : "Unknown error",
       }),
       {
-        status: 500,
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       },
     );

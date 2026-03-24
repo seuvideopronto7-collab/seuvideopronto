@@ -4,7 +4,7 @@ import { ShoppingCart, Flame, Award } from "lucide-react";
 interface StepModoProps {
   selected: string | null;
   onSelect: (mode: string) => void;
-  onGenerate: () => void;
+  onGenerate: (modeOverride?: string) => void;
   isLoading: boolean;
 }
 
@@ -59,9 +59,20 @@ const StepModo = ({ selected, onSelect, onGenerate, isLoading }: StepModoProps) 
         ))}
       </div>
 
-      <Button variant="viral" size="lg" disabled={!selected || isLoading} onClick={onGenerate} className="w-full sm:w-auto">
+      <div className="flex flex-wrap gap-3">
+        <Button variant="viral" size="lg" disabled={!selected || isLoading} onClick={() => onGenerate()} className="w-full sm:w-auto">
         {isLoading ? "Gerando..." : "Gerar Roteiro →"}
-      </Button>
+        </Button>
+        <Button
+          variant="neon"
+          size="lg"
+          disabled={isLoading}
+          onClick={() => onGenerate("comercial")}
+          className="w-full sm:w-auto"
+        >
+          GERAR VIDEO COMERCIAL
+        </Button>
+      </div>
     </div>
   );
 };

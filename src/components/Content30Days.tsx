@@ -48,6 +48,14 @@ const Content30Days = () => {
           ...form,
           tipo: "calendario_30_dias",
           modo: modoViral ? "viral" : "autoridade",
+          contextoMestre: {
+            tema: form.nicho,
+            publico: form.publico,
+            problema: "",
+            objetivo: form.objetivo,
+            linguagem: "pt-BR",
+            tom: "especialista",
+          },
         },
       });
       if (error) throw error;

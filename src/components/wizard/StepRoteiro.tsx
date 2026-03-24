@@ -29,6 +29,10 @@ const StepRoteiro = ({ data, onRegenerate, onContinue, isLoading }: StepRoteiroP
   const copyAll = () => {
     const text = [
       `HOOK: ${roteiro?.hook}`,
+      `DOR: ${roteiro?.dor || ""}`,
+      `IDENTIFICACAO: ${roteiro?.identificacao || ""}`,
+      `QUEBRA DE CRENCA: ${roteiro?.quebra_crenca || ""}`,
+      `SOLUCAO: ${roteiro?.solucao || ""}`,
       `CURIOSIDADE: ${roteiro?.curiosidade || roteiro?.abertura || ""}`,
       `DESENVOLVIMENTO: ${roteiro?.conexao_tendencia || roteiro?.desenvolvimento || ""}`,
       `PRODUTO: ${roteiro?.insercao_produto || ""}`,
@@ -56,6 +60,10 @@ const StepRoteiro = ({ data, onRegenerate, onContinue, isLoading }: StepRoteiroP
 
       <div className="glass-card p-5 space-y-3">
         {roteiro?.hook && <CopyField label="Hook (0-3s)" emoji="🎯" value={roteiro.hook} />}
+        {roteiro?.dor && <CopyField label="Dor" emoji="⚡" value={roteiro.dor} />}
+        {roteiro?.identificacao && <CopyField label="Identificacao" emoji="🧩" value={roteiro.identificacao} />}
+        {roteiro?.quebra_crenca && <CopyField label="Quebra de crenca" emoji="💥" value={roteiro.quebra_crenca} />}
+        {roteiro?.solucao && <CopyField label="Solucao" emoji="✅" value={roteiro.solucao} />}
         {(roteiro?.curiosidade || roteiro?.abertura) && (
           <CopyField label="Curiosidade / Abertura" emoji="❓" value={roteiro.curiosidade || roteiro.abertura} />
         )}

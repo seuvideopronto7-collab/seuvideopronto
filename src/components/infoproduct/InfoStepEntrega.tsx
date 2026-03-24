@@ -3,10 +3,11 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Check, Copy, Download, ExternalLink, Link2, Loader2, Rocket, Send, ShieldCheck } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { zipSync, strToU8 } from "fflate";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 interface Props {
   estruturaData: any;
@@ -30,10 +31,11 @@ const InfoStepEntrega = ({ estruturaData, conteudoData, vslData, kitData, onNewP
   const [hotmartBasicAuth, setHotmartBasicAuth] = useState("");
   const [hotmartConnected, setHotmartConnected] = useState(false);
   const [hotmartStatusLabel, setHotmartStatusLabel] = useState("Desconectado");
-  const [eduzzConnected, setEduzzConnected] = useState(false);
   const [eduzzStatusLabel, setEduzzStatusLabel] = useState("Desconectado");
-  const [kiwifyConnected, setKiwifyConnected] = useState(false);
   const [kiwifyStatusLabel, setKiwifyStatusLabel] = useState("Desconectado");
+  const [integrationStatus, setIntegrationStatus] = useState<
+    Record<string, "connected" | "error" | "expired" | "disconnected">
+  >({});
   const [eduzzPosting, setEduzzPosting] = useState(false);
   const [eduzzError, setEduzzError] = useState<string | null>(null);
   const [eduzzResult, setEduzzResult] = useState<{ id?: string; url?: string } | null>(null);
@@ -47,35 +49,66 @@ const InfoStepEntrega = ({ estruturaData, conteudoData, vslData, kitData, onNewP
 
   useEffect(() => {
     const loadIntegrations = async () => {
+      if (!userId) return null;
       const { data, error } = await supabase
         .from("integrations")
         .select("platform, status")
-        .in("platform", ["eduzz", "hotmart", "kiwify"]);
+        .eq("user_id", userId)
+        .in("platform", ["eduzz", "hotmart", "kiwify", "monetizze"]);
       if (error || !data) {
-        setEduzzConnected(false);
+        setIntegrationStatus({});
         setEduzzStatusLabel("Desconectado");
         setHotmartConnected(false);
         setHotmartStatusLabel("Desconectado");
-        setKiwifyConnected(false);
         setKiwifyStatusLabel("Desconectado");
-        return;
+        return null;
       }
-      const statusByPlatform = data.reduce<Record<string, string>>((acc, item) => {
-        acc[item.platform] = item.status;
-        return acc;
-      }, {});
-      const eduzzOk = statusByPlatform.eduzz === "connected";
-      const hotmartOk = statusByPlatform.hotmart === "connected";
-      const kiwifyOk = statusByPlatform.kiwify === "connected";
-      setEduzzConnected(eduzzOk);
-      setEduzzStatusLabel(eduzzOk ? "Conectado" : "Desconectado");
-      setHotmartConnected(hotmartOk);
-      setHotmartStatusLabel(hotmartOk ? "Conectado" : "Desconectado");
-      setKiwifyConnected(kiwifyOk);
-      setKiwifyStatusLabel(kiwifyOk ? "Conectado" : "Desconectado");
+
+      const statusByPlatform = data.reduce<Record<string, "connected" | "error" | "expired" | "disconnected">>(
+        (acc, item) => {
+          if (item.status === "connected" || item.status === "error" || item.status === "expired") {
+            acc[item.platform] = item.status;
+          } else {
+            acc[item.platform] = "disconnected";
+          }
+          return acc;
+        },
+        {},
+      );
+
+      setIntegrationStatus(statusByPlatform);
+      const eduzzStatus = statusByPlatform.eduzz || "disconnected";
+      const hotmartStatusValue = statusByPlatform.hotmart || "disconnected";
+      const kiwifyStatusValue = statusByPlatform.kiwify || "disconnected";
+      setEduzzStatusLabel(statusLabelMap[eduzzStatus]);
+      setHotmartConnected(hotmartStatusValue === "connected");
+      setHotmartStatusLabel(statusLabelMap[hotmartStatusValue]);
+      setKiwifyStatusLabel(statusLabelMap[kiwifyStatusValue]);
+      return statusByPlatform;
     };
-    loadIntegrations();
-  }, []);
+
+    const revalidateIntegrations = async (statusByPlatform: Record<string, string>) => {
+      const tasks: Promise<unknown>[] = [];
+      if (statusByPlatform.hotmart) {
+        tasks.push(supabase.functions.invoke("hotmart-test"));
+      }
+      if (statusByPlatform.eduzz) {
+        tasks.push(supabase.functions.invoke("eduzz-test"));
+      }
+      if (tasks.length === 0) return;
+      await Promise.allSettled(tasks);
+    };
+
+    const run = async () => {
+      const statusByPlatform = await loadIntegrations();
+      if (!statusByPlatform || autoValidatedRef.current) return;
+      autoValidatedRef.current = true;
+      await revalidateIntegrations(statusByPlatform);
+      await loadIntegrations();
+    };
+
+    run();
+  }, [userId]);
 
   useEffect(() => {
     setEduzzPayload((prev) => ({
@@ -221,16 +254,20 @@ const InfoStepEntrega = ({ estruturaData, conteudoData, vslData, kitData, onNewP
       setLogs((prev) => [`${new Date().toLocaleTimeString()} • Payload Hotmart preparado`, ...prev]);
       console.log("Hotmart payload preparado", payload);
     }
-    if (!eduzzConnected) {
-      setLogs((prev) => [`${new Date().toLocaleTimeString()} • Eduzz não conectada`, ...prev]);
-      toast.error("Conecte a Eduzz antes de publicar.");
-      return;
-    }
-    if (!connectedPlatform) {
+    const platformName = selectedPlatform || connectedPlatform;
+    if (!platformName) {
       setStatus("Fallback");
       setLogs((prev) => [`${new Date().toLocaleTimeString()} • Fallback ativado: pacote pronto`, ...prev]);
       buildZipPackage();
       toast.warning("API indisponível. Pacote gerado para envio manual.");
+      return;
+    }
+    const platformKey = platformKeyFromName(platformName);
+    if (!platformKey || resolveStatus(platformKey) !== "connected") {
+      setStatus("Fallback");
+      setLogs((prev) => [`${new Date().toLocaleTimeString()} • ${platformName} não conectada`, ...prev]);
+      buildZipPackage();
+      toast.warning("API não conectada. Pacote gerado para envio manual.");
       return;
     }
     setStatus("Enviado");
@@ -248,7 +285,7 @@ const InfoStepEntrega = ({ estruturaData, conteudoData, vslData, kitData, onNewP
   };
 
   const handleEduzzPost = async () => {
-    if (!eduzzConnected) {
+    if (resolveStatus("eduzz") !== "connected") {
       setLogs((prev) => [`${new Date().toLocaleTimeString()} • Eduzz não conectada`, ...prev]);
       toast.error("Conecte a Eduzz antes de publicar.");
       return;
@@ -433,19 +470,13 @@ const InfoStepEntrega = ({ estruturaData, conteudoData, vslData, kitData, onNewP
           )}
         </div>
         <div className="flex flex-wrap gap-2">
-          <span
-            className={`text-xs rounded-full px-2 py-1 ${hotmartConnected ? "bg-emerald-500/15 text-emerald-300" : "bg-rose-500/15 text-rose-300"}`}
-          >
+          <span className={`text-xs rounded-full px-2 py-1 ${statusColorMap[resolveStatus("hotmart")]}`}>
             Hotmart: {hotmartStatusLabel}
           </span>
-          <span
-            className={`text-xs rounded-full px-2 py-1 ${eduzzConnected ? "bg-emerald-500/15 text-emerald-300" : "bg-rose-500/15 text-rose-300"}`}
-          >
+          <span className={`text-xs rounded-full px-2 py-1 ${statusColorMap[resolveStatus("eduzz")]}`}>
             Eduzz: {eduzzStatusLabel}
           </span>
-          <span
-            className={`text-xs rounded-full px-2 py-1 ${kiwifyConnected ? "bg-emerald-500/15 text-emerald-300" : "bg-rose-500/15 text-rose-300"}`}
-          >
+          <span className={`text-xs rounded-full px-2 py-1 ${statusColorMap[resolveStatus("kiwify")]}`}>
             Kiwify: {kiwifyStatusLabel}
           </span>
           {status && (
@@ -586,3 +617,33 @@ const InfoStepEntrega = ({ estruturaData, conteudoData, vslData, kitData, onNewP
 };
 
 export default InfoStepEntrega;
+  const { user, profile } = useAuth();
+  const userId = profile?.id || user?.id || null;
+  const autoValidatedRef = useRef(false);
+
+  const statusLabelMap: Record<string, string> = {
+    connected: "Conectado",
+    error: "Erro",
+    expired: "Expirado",
+    disconnected: "Desconectado",
+  };
+
+  const statusColorMap: Record<string, string> = {
+    connected: "bg-emerald-500/15 text-emerald-300",
+    error: "bg-rose-500/15 text-rose-300",
+    expired: "bg-amber-500/15 text-amber-300",
+    disconnected: "bg-rose-500/15 text-rose-300",
+  };
+
+  const platformKeyFromName = (platform?: string | null) => {
+    if (!platform) return null;
+    const normalized = platform.toLowerCase();
+    if (normalized.includes("hotmart")) return "hotmart";
+    if (normalized.includes("eduzz")) return "eduzz";
+    if (normalized.includes("kiwify")) return "kiwify";
+    if (normalized.includes("monetizze")) return "monetizze";
+    return null;
+  };
+
+  const resolveStatus = (platformKey?: string | null) =>
+    (platformKey && integrationStatus[platformKey]) || "disconnected";

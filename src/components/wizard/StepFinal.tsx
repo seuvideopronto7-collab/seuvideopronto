@@ -99,6 +99,11 @@ const StepFinal = ({ roteiroData, seoData, viralData, videoUrl, onNewVersion, on
     if (seo?.hashtags) parts.push(`HASHTAGS: ${seo.hashtags.join(" ")}`);
     if (viral?.narracao) parts.push(`NARRACAO:\n${viral.narracao}`);
     if (viral?.legendas?.length) parts.push(`LEGENDAS:\n${viral.legendas.join("\n")}`);
+    if (viral?.cenas?.length) parts.push(`CENAS:\n${viral.cenas.join("\n")}`);
+    if (viral?.imagens?.length) {
+      const prompts = viral.imagens.map((img: any) => (typeof img === "string" ? img : img?.descricao || "")).filter(Boolean);
+      if (prompts.length) parts.push(`IMAGENS:\n${prompts.join("\n")}`);
+    }
     if (viral?.musica) parts.push(`MUSICA: ${viral.musica.estilo} | volume ${viral.musica.volume} | crescimento ${viral.musica.crescimento}`);
     if (viral?.copy?.cta) parts.push(`CTA: ${viral.copy.cta}`);
     if (viral?.cta_link) parts.push(`LINK CTA: ${viral.cta_link}`);
@@ -378,6 +383,15 @@ const StepFinal = ({ roteiroData, seoData, viralData, videoUrl, onNewVersion, on
           {seo?.hashtags && <CopyField label="Hashtags" emoji="🔥" value={seo.hashtags.join(" ")} />}
           {viral?.narracao && <CopyField label="Narracao" emoji="🎙️" value={viral.narracao} multiline />}
           {viral?.legendas?.length && <CopyField label="Legendas" emoji="✨" value={viral.legendas.join("\n")} multiline />}
+          {viral?.cenas?.length && <CopyField label="Cenas" emoji="🎬" value={viral.cenas.join("\n")} multiline />}
+          {viral?.imagens?.length && (
+            <CopyField
+              label="Prompts de imagem"
+              emoji="🖼️"
+              value={viral.imagens.map((img: any) => (typeof img === "string" ? img : img?.descricao || "")).filter(Boolean).join("\n")}
+              multiline
+            />
+          )}
           {viral?.musica && (
             <CopyField
               label="Musica"

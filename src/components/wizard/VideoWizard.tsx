@@ -103,6 +103,18 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
     variacoesCount,
   });
 
+  const buildContextoMestre = (override?: Partial<typeof formData>) => {
+    const data = { ...formData, ...(override || {}) };
+    return {
+      tema: (data.nicho || data.produto || "").trim(),
+      publico: (data.publico || "").trim(),
+      problema: (data.dor || "").trim(),
+      objetivo: (data.objetivo || "").trim(),
+      linguagem: "pt-BR",
+      tom: "especialista",
+    };
+  };
+
   const isPlayableVideoUrl = (url?: string | null) => {
     if (!url) return false;
     const clean = url.split("?")[0].toLowerCase();
@@ -263,6 +275,8 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
         body: {
           ...resolvedFormData,
           tipo: "viral_video",
+          modo: generationMode || resolvedFormData.objetivo?.toLowerCase(),
+          contextoMestre: buildContextoMestre(resolvedFormData),
           imageUrl: override?.imageUrl,
           videoUrl: override?.videoUrl,
         },
@@ -273,20 +287,22 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
       await persistProduto({ formData: resolvedFormData });
       toast.success("Modo viral ativado ⚡");
     } catch (err: any) {
-      console.error(err);
       const message = String(err?.message || err?.error || "").toLowerCase();
       const blocked =
         message.includes("midia bloqueada") ||
         message.includes("conteudo nao relacionado") ||
         message.includes("conteúdo nao relacionado") ||
         message.includes("contexto insuficiente") ||
+        message.includes("contexto_obrigatorio") ||
+        message.includes("quality_blocked") ||
         message.includes("big_buck_bunny") ||
         message.includes("default");
       if (blocked) {
-        setViralData({ _blocked: true, _reason: err?.message || "Midia bloqueada." });
+        setViralData({ _blocked: true, _reason: err?.message || "Conteudo bloqueado." });
         await persistProduto({ formData: resolvedFormData });
-        toast.error("Conteudo bloqueado. Envie midia real e relacionada ao produto.");
+        toast.error("Conteudo bloqueado por baixa coerencia ou midia invalida.");
       } else {
+        console.error(err);
         const fallback = buildViralFallback(err?.message);
         setViralData(fallback);
         await persistProduto({ formData: resolvedFormData });
@@ -419,13 +435,15 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
   };
 
   // Step 4 → 5: Generate roteiro
-  const handleGenerateRoteiro = async () => {
-    if (!generationMode) {
+  const handleGenerateRoteiro = async (modeOverride?: string) => {
+    const resolvedMode = modeOverride || generationMode;
+    if (!resolvedMode) {
       toast.warning("Selecione um tipo de vídeo para continuar.");
       return;
     }
     setIsLoading(true);
     try {
+      if (modeOverride) setGenerationMode(modeOverride);
       const videoKey = getVideoDailyKey(planId);
       const gate = await consume(videoKey, 1);
       if (!gate.allowed) {
@@ -438,7 +456,7 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
       }
       setStep(5);
       const { data, error } = await supabase.functions.invoke("generate-viral", {
-        body: { ...formData, tipo: "roteiro" },
+        body: { ...formData, tipo: "roteiro", modo: resolvedMode, contextoMestre: buildContextoMestre() },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -446,6 +464,12 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
       toast.success("Roteiro gerado! 🎬");
       await persistProduto();
     } catch (err: any) {
+      const message = String(err?.message || err?.error || "").toLowerCase();
+      if (message.includes("quality_blocked") || message.includes("contexto_obrigatorio")) {
+        toast.error("Roteiro bloqueado por baixa coerencia com o contexto.");
+        setStep(4);
+        return;
+      }
       console.error(err);
       const fallback = {
         roteiro: {
@@ -482,7 +506,7 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
         }
       }
       const { data, error } = await supabase.functions.invoke("generate-viral", {
-        body: { ...formData, tipo: "seo" },
+        body: { ...formData, tipo: "seo", modo: generationMode || formData.objetivo?.toLowerCase(), contextoMestre: buildContextoMestre() },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -505,7 +529,7 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
     setIsLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("generate-viral", {
-        body: { ...formData, tipo: "variacoes" },
+        body: { ...formData, tipo: "variacoes", modo: generationMode || formData.objetivo?.toLowerCase(), contextoMestre: buildContextoMestre() },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -535,7 +559,7 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
     setIsLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("generate-viral", {
-        body: { ...formData, tipo: "roteiro" },
+        body: { ...formData, tipo: "roteiro", modo: generationMode || formData.objetivo?.toLowerCase(), contextoMestre: buildContextoMestre() },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -543,6 +567,11 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
       toast.success("Roteiro regenerado! 🎬");
       await persistProduto();
     } catch (err: any) {
+      const message = String(err?.message || err?.error || "").toLowerCase();
+      if (message.includes("quality_blocked") || message.includes("contexto_obrigatorio")) {
+        toast.error("Roteiro bloqueado por baixa coerencia com o contexto.");
+        return;
+      }
       toast.error(err.message || "Erro");
     } finally {
       setIsLoading(false);

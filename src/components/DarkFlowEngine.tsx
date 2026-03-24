@@ -117,6 +117,14 @@ const DarkFlowEngine = () => {
         body: {
           ...form,
           tipo: "dark_flow_engine",
+          contextoMestre: {
+            tema: form.nicho || form.produto,
+            publico: form.publico,
+            problema: "",
+            objetivo: form.objetivo,
+            linguagem: "pt-BR",
+            tom: "especialista",
+          },
         },
       });
       if (error) throw error;
