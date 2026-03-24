@@ -154,12 +154,12 @@ export const usePlan = () => {
           [key]: (currentUsage[key] || 0) + amount,
         };
 
-        const { data, error } = await supabase
-          .from("usuarios_planos")
-          .update({ uso_hoje_json: nextUsage })
+        const { data, error } = await (supabase
+          .from("usuarios_planos" as any)
+          .update({ uso_hoje_json: nextUsage } as any)
           .eq("user_id", user.id)
           .select("*")
-          .single();
+          .single() as any);
 
         if (error) {
           console.error("PDG PLAN ERROR: consume", error);
