@@ -132,6 +132,30 @@ export type Database = {
         }
         Relationships: []
       }
+      video_jobs: {
+        Row: {
+          id: string
+          status: string | null
+          progress: number | null
+          video_url: string | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          status?: string | null
+          progress?: number | null
+          video_url?: string | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          status?: string | null
+          progress?: number | null
+          video_url?: string | null
+          created_at?: string | null
+        }
+        Relationships: []
+      }
       usuarios_planos: {
         Row: {
           id: string
