@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import UserDashboard from "./pages/UserDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
+import VideoGeneratorPage from "./pages/admin/video-generator";
 import Infoproduct from "./pages/Infoproduct";
 import ProdutosProntos from "./pages/ProdutosProntos";
 import Planos from "./pages/Planos";
@@ -48,6 +49,14 @@ const App = () => (
               element={
                 <ProtectedRoute requireAdmin>
                   <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/video-generator"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <VideoGeneratorPage />
                 </ProtectedRoute>
               }
             />
