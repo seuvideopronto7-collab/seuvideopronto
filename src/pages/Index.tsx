@@ -1,7 +1,8 @@
-import { Suspense, useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import SafeRender from "@/components/SafeRender";
 
 // 🔥 IMPORT DIRETO (SEM LAZY PARA NÃO MATAR A TELA)
 import VideoGeneratorUI from "@/components/VideoGeneratorUI";
@@ -15,19 +16,21 @@ const Index = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [showCalendar, setShowCalendar] = useState(false);
-  const [showDarkFlow, setShowDarkFlow] = useState(false);
-  const [showSalesMachine, setShowSalesMachine] = useState(false);
-  const [showGenerator, setShowGenerator] = useState(false);
-  const [showWizard, setShowWizard] = useState(false);
+  const [activeTab, setActiveTab] = useState<
+    "generator" | "darkflow" | "sales" | "calendar" | "wizard" | null
+  >(null);
 
   const initialProduto = (location.state as any)?.produto || null;
   const autoStart = Boolean((location.state as any)?.autoStart);
 
   // 🚀 AUTO START DO SISTEMA (TELA NUNCA MAIS MORTA)
   useEffect(() => {
-    console.log("🔥 PDG FULL ATIVO");
-    setShowGenerator(true);
+    console.log("🔥 PDG SAFE ENGINE ATIVO");
+    const timer = setTimeout(() => {
+      setActiveTab("generator");
+    }, 300);
+
+    return () => clearTimeout(timer);
   }, []);
 
   return (
@@ -86,68 +89,77 @@ const Index = () => {
         {/* BOTÕES */}
         <div className="grid gap-4">
 
-          <Button onClick={() => setShowGenerator(true)}>
+          <Button onClick={() => setActiveTab("generator")}>
             🎥 Gerador de Vídeo
           </Button>
 
-          <Button onClick={() => setShowDarkFlow(true)}>
+          <Button onClick={() => setActiveTab("darkflow")}>
             🔥 Dark Flow
           </Button>
 
-          <Button onClick={() => setShowSalesMachine(true)}>
+          <Button onClick={() => setActiveTab("sales")}>
             ⚡ Máquina de Vendas
           </Button>
 
-          <Button onClick={() => setShowCalendar(true)}>
+          <Button onClick={() => setActiveTab("calendar")}>
             📅 Conteúdo 30 Dias
           </Button>
 
-          <Button onClick={() => setShowWizard(true)}>
+          <Button onClick={() => setActiveTab("wizard")}>
             🧭 Video Wizard
           </Button>
 
         </div>
 
         {/* 🔥 MOTOR PRINCIPAL (SEMPRE ATIVO) */}
-        {showGenerator && (
-          <div className="bg-black p-6 rounded-xl border border-green-500">
-            <h2 className="text-white text-xl font-bold mb-2">
-              🎬 Sistema de Vídeo Ativo
-            </h2>
-
-            <VideoGeneratorUI />
-          </div>
+        {activeTab === "generator" && (
+          <SafeRender label="PDG Safe Mode">
+            <div className="bg-black p-6 rounded-xl border border-green-500">
+              <h2 className="text-white text-xl font-bold mb-2">
+                🎬 Sistema de Vídeo Ativo
+              </h2>
+              <VideoGeneratorUI />
+            </div>
+          </SafeRender>
         )}
 
         {/* DARK FLOW */}
-        {showDarkFlow && (
-          <div className="p-4 border rounded-xl">
-            <DarkFlowEngine />
-          </div>
+        {activeTab === "darkflow" && (
+          <SafeRender label="PDG Safe Mode">
+            <div className="p-4 border rounded-xl">
+              <DarkFlowEngine />
+            </div>
+          </SafeRender>
         )}
 
         {/* SALES */}
-        {showSalesMachine && (
-          <div className="p-4 border rounded-xl">
-            <SalesMachine />
-          </div>
+        {activeTab === "sales" && (
+          <SafeRender label="PDG Safe Mode">
+            <div className="p-4 border rounded-xl">
+              <SalesMachine />
+            </div>
+          </SafeRender>
         )}
 
         {/* CALENDÁRIO */}
-        {showCalendar && (
-          <div className="p-4 border rounded-xl">
-            <Content30Days />
-          </div>
+        {activeTab === "calendar" && (
+          <SafeRender label="PDG Safe Mode">
+            <div className="p-4 border rounded-xl">
+              <Content30Days />
+            </div>
+          </SafeRender>
         )}
 
         {/* WIZARD */}
-        {showWizard && (
-          <div className="p-4 border rounded-xl">
-            <VideoWizard
-              initialProduto={initialProduto}
-              autoStart={autoStart}
-            />
-          </div>
+        {activeTab === "wizard" && (
+          <SafeRender label="PDG Safe Mode">
+            <div className="p-4 border rounded-xl">
+              <VideoWizard
+                initialProduto={initialProduto}
+                autoStart={autoStart}
+              />
+            </div>
+          </SafeRender>
         )}
 
       </main>
