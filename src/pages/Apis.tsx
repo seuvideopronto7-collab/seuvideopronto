@@ -491,30 +491,32 @@ const Apis = () => {
           setSaving(false);
           return;
         }
+        const fb = fallback as any;
         updated = {
-          id: fallback.id,
-          platformKey: fallback.platform,
+          id: fb.id,
+          platformKey: fb.platform,
           platformName: platformName,
-          status: mapDbStatus(fallback.status),
-          credentials: parseEncryptedBlob(fallback.credentials),
-          accessToken: fallback.access_token,
-          lastChecked: fallback.last_test_at,
-          createdAt: fallback.created_at,
-          updatedAt: fallback.updated_at,
-          clientId: fallback.client_id,
+          status: mapDbStatus(fb.status),
+          credentials: parseEncryptedBlob(fb.credentials),
+          accessToken: fb.access_token,
+          lastChecked: fb.last_test_at,
+          createdAt: fb.created_at,
+          updatedAt: fb.updated_at,
+          clientId: fb.client_id,
         };
       } else {
+        const d = data as any;
         updated = {
-          id: data.id,
-          platformKey: data.platform,
+          id: d.id,
+          platformKey: d.platform,
           platformName: platformName,
-          status: mapDbStatus(data.status),
-          credentials: parseEncryptedBlob(data.credentials),
-          accessToken: data.access_token,
-          lastChecked: data.last_test_at,
-          createdAt: data.created_at,
-          updatedAt: data.updated_at,
-          clientId: data.client_id,
+          status: mapDbStatus(d.status),
+          credentials: parseEncryptedBlob(d.credentials),
+          accessToken: d.access_token,
+          lastChecked: d.last_test_at,
+          createdAt: d.created_at,
+          updatedAt: d.updated_at,
+          clientId: d.client_id,
         };
       }
     } else if (editTarget) {
@@ -535,17 +537,18 @@ const Apis = () => {
         setSaving(false);
         return;
       }
+      const d2 = data as any;
       updated = {
-        id: data.id,
-        platformKey: data.platform,
+        id: d2.id,
+        platformKey: d2.platform,
         platformName: platformName,
-        status: mapDbStatus(data.status),
-        credentials: parseEncryptedBlob(data.credentials),
-        accessToken: data.access_token,
-        lastChecked: data.last_test_at,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
-        clientId: data.client_id,
+        status: mapDbStatus(d2.status),
+        credentials: parseEncryptedBlob(d2.credentials),
+        accessToken: d2.access_token,
+        lastChecked: d2.last_test_at,
+        createdAt: d2.created_at,
+        updatedAt: d2.updated_at,
+        clientId: d2.client_id,
       };
     }
 

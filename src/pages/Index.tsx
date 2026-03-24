@@ -3,6 +3,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import SafeRender from "@/components/SafeRender";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 // 🔥 IMPORT DIRETO (SEM LAZY PARA NÃO MATAR A TELA)
 import VideoGeneratorUI from "@/components/VideoGeneratorUI";
@@ -12,16 +14,50 @@ import SalesMachine from "@/components/SalesMachine";
 import VideoWizard from "@/components/wizard/VideoWizard";
 
 const Index = () => {
-  const { signOut, isAdmin, profile } = useAuth();
+  const { signOut, isAdmin, profile, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   const [activeTab, setActiveTab] = useState<
     "generator" | "darkflow" | "sales" | "calendar" | "wizard" | null
   >(null);
+  const [testLoading, setTestLoading] = useState(false);
 
   const initialProduto = (location.state as any)?.produto || null;
   const autoStart = Boolean((location.state as any)?.autoStart);
+
+  const criarVideoTeste = async () => {
+    try {
+      setTestLoading(true);
+      toast.info("Criando job de vídeo teste...");
+
+      const { data, error } = await supabase.functions.invoke("generate-video", {
+        body: {
+          imageUrl: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800",
+          estilo: "cinematografico",
+          movimento: "zoom cinematografico",
+          duracao: 5,
+          conteudoRelacionado: true,
+          prompt: "Produto premium em destaque com iluminação cinematográfica",
+        },
+      });
+
+      if (error) throw error;
+      if (data?.error) {
+        toast.warning(`Fallback ativo: ${data.error}`);
+      } else if (data?.videoUrl) {
+        toast.success("Vídeo gerado com sucesso!");
+        console.log("Video URL:", data.videoUrl);
+      } else {
+        toast.info("Job criado. Aguardando processamento...");
+      }
+    } catch (err: any) {
+      console.error("Erro ao gerar vídeo teste:", err);
+      toast.error("Erro ao gerar vídeo teste. Sistema protegido pelo Safe Mode.");
+    } finally {
+      setTestLoading(false);
+    }
+  };
 
   // 🚀 AUTO START DO SISTEMA (TELA NUNCA MAIS MORTA)
   useEffect(() => {
@@ -107,6 +143,15 @@ const Index = () => {
 
           <Button onClick={() => setActiveTab("wizard")}>
             🧭 Video Wizard
+          </Button>
+
+          <Button
+            onClick={criarVideoTeste}
+            disabled={testLoading}
+            variant="outline"
+            className="border-primary text-primary"
+          >
+            {testLoading ? "⏳ Gerando..." : "🚀 Gerar Vídeo Teste"}
           </Button>
 
         </div>
