@@ -1,4 +1,4 @@
-import { Suspense, lazy, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,10 @@ const Index = () => {
   const [showWizard, setShowWizard] = useState(false);
   const initialProduto = (location.state as any)?.produto || null;
   const autoStart = Boolean((location.state as any)?.autoStart);
+
+  useEffect(() => {
+    setShowGenerator(true);
+  }, []);
 
   const handleShowCalendar = () => {
     console.log("Conteudo 30 dias ativado");
