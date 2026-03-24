@@ -232,6 +232,26 @@ const VideoGeneratorUI = () => {
   const detectNiche = async () => {
     setIsDetectingNiche(true);
     try {
+      const resolvedImageUrl = await uploadToStorage();
+      if (resolvedImageUrl) {
+        const { data, error } = await supabase.functions.invoke("analyze-content", {
+          body: {
+            fileUrl: resolvedImageUrl,
+            modo: "vendas",
+            produto: productName || productType,
+            nicho: niche || styleType,
+          },
+        });
+        if (error) throw error;
+        if ((data as any)?.error) throw new Error((data as any).error);
+        const tema = data?.analise?.tema || data?.novo_roteiro?.hook || "";
+        if (tema) {
+          setNiche(String(tema).trim());
+          toast.success("Nicho detectado.");
+          return;
+        }
+      }
+
       const response = await supabase.functions.invoke("generate-viral", {
         body: {
           tipo: "seo",
@@ -458,7 +478,7 @@ const VideoGeneratorUI = () => {
         modePro,
         script,
         textoNaTela: script?.onScreenText || [],
-        narracao: script?.fullScript || "",
+        narracao: narrationText || script?.fullScript || "",
       };
       const { id } = await createVideoJob(payload);
       setJobId(id);
@@ -478,8 +498,11 @@ const VideoGeneratorUI = () => {
     if (jobStatus === "completed") return "Concluído";
     if (jobStatus === "failed") return "Erro";
     if (jobStatus === "fallback") return "Fallback";
+    if (jobStatus === "render_local") return "Render local";
     return jobStatus.replace(/_/g, " ");
   }, [jobStatus]);
+
+  const progressValue = isLocalRendering ? localProgress : progress;
 
   const apiErrors = useMemo(() => apiChecks.filter((item) => item.status === "error"), [apiChecks]);
 
@@ -752,6 +775,25 @@ const VideoGeneratorUI = () => {
               ))}
             </div>
           </div>
+          <Button variant="glass" onClick={generateScript} disabled={isGeneratingScript}>
+            <Sparkles className="h-4 w-4" /> {isGeneratingScript ? "Gerando roteiro..." : "Gerar roteiro IA"}
+          </Button>
+        </div>
+
+        <div className="cinema-panel p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">Prompt cinematográfico</h2>
+              <p className="text-xs text-muted-foreground">Estilo Apple + Nike + TikTok Ads</p>
+            </div>
+            <Badge variant="secondary">Etapa 7</Badge>
+          </div>
+          <div className="rounded-xl border border-border/50 bg-muted/10 p-4 text-xs leading-relaxed">
+            {cinematicPrompt}
+          </div>
+          <Button variant="glass" onClick={() => copyText(cinematicPrompt, "Prompt")}>
+            <Copy className="h-4 w-4" /> Copiar prompt
+          </Button>
         </div>
 
         <div className="cinema-panel p-6 space-y-4">
@@ -760,7 +802,7 @@ const VideoGeneratorUI = () => {
               <h2 className="text-lg font-semibold">Narração e trilha sonora</h2>
               <p className="text-xs text-muted-foreground">Voz masculina comercial + música épica</p>
             </div>
-            <Badge variant="secondary">Etapa 7</Badge>
+            <Badge variant="secondary">Etapa 8</Badge>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
             <div className="rounded-xl border border-border/50 bg-muted/20 p-3">
@@ -772,6 +814,40 @@ const VideoGeneratorUI = () => {
               <div className="font-semibold">Epica / Comercial · Volume adaptativo</div>
             </div>
           </div>
+          <div className="space-y-3">
+            <Textarea
+              rows={4}
+              placeholder="Texto da narração (auto)"
+              value={narrationText}
+              onChange={(event) => setNarrationText(event.target.value)}
+            />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <Button variant="glass" onClick={generateVoiceover} disabled={isGeneratingVoice}>
+                <Mic2 className="h-4 w-4" /> {isGeneratingVoice ? "Gerando narração..." : "Gerar narração"}
+              </Button>
+              <Button variant="glass" onClick={generateSoundtrack} disabled={isGeneratingMusic}>
+                <Music2 className="h-4 w-4" /> {isGeneratingMusic ? "Gerando trilha..." : "Gerar trilha sonora"}
+              </Button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="rounded-xl border border-border/50 bg-muted/10 p-3 space-y-2">
+                <div className="text-xs text-muted-foreground">Preview narração</div>
+                {narrationUrl ? (
+                  <audio controls src={narrationUrl} className="w-full" />
+                ) : (
+                  <div className="text-xs text-muted-foreground">Nenhuma narração gerada</div>
+                )}
+              </div>
+              <div className="rounded-xl border border-border/50 bg-muted/10 p-3 space-y-2">
+                <div className="text-xs text-muted-foreground">Preview trilha</div>
+                {musicUrl ? (
+                  <audio controls src={musicUrl} className="w-full" />
+                ) : (
+                  <div className="text-xs text-muted-foreground">Nenhuma trilha gerada</div>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="cinema-panel p-6 space-y-4">
@@ -780,11 +856,16 @@ const VideoGeneratorUI = () => {
               <h2 className="text-lg font-semibold">Iniciar pipeline</h2>
               <p className="text-xs text-muted-foreground">Cria o job e executa o processamento</p>
             </div>
-            <Badge variant="secondary">Etapa 8</Badge>
+            <Badge variant="secondary">Etapa 9</Badge>
           </div>
-          <Button variant="neon" onClick={startJob} disabled={isProcessing}>
-            <Wand2 className="h-4 w-4" /> {isProcessing ? "Processando..." : "GERAR VÍDEO AGORA 🎬🔥"}
-          </Button>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <Button variant="neon" onClick={startJob} disabled={isProcessing}>
+              <Wand2 className="h-4 w-4" /> {isProcessing ? "Processando..." : "GERAR VÍDEO AGORA 🎬🔥"}
+            </Button>
+            <Button variant="glass" onClick={renderLocalVideo} disabled={isLocalRendering}>
+              {isLocalRendering ? "Render local..." : "Renderizar localmente"}
+            </Button>
+          </div>
         </div>
       </section>
 
@@ -795,9 +876,9 @@ const VideoGeneratorUI = () => {
               <h2 className="text-lg font-semibold">Status do job</h2>
               <p className="text-xs text-muted-foreground">Monitoramento em tempo real</p>
             </div>
-            <span className="text-xs text-muted-foreground">{Math.round(progress)}%</span>
+            <span className="text-xs text-muted-foreground">{Math.round(progressValue)}%</span>
           </div>
-          <Progress value={progress} />
+          <Progress value={progressValue} />
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground">{jobId ? `Job ${jobId}` : "Nenhum job ativo"}</span>
             <Badge variant="secondary">{progressLabel}</Badge>
