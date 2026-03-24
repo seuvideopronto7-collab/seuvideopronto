@@ -1,4 +1,10 @@
 import { supabase } from "@/integrations/supabase/client";
+import {
+  assertApiAllowed,
+  assertPayloadValid,
+  assertRateLimit,
+  sanitizeText,
+} from "./apiSecurity";
 
 export type SocialNetwork = "instagram" | "tiktok" | "facebook" | "youtube";
 
@@ -33,6 +39,26 @@ const invokePost = async (endpoint: string, conteudo: SocialContent) => {
   return data as { url?: string };
 };
 
+const sanitizeSocialContent = (conteudo: SocialContent): SocialContent => {
+  const legenda = sanitizeText(conteudo.legenda, "legenda");
+  const hashtags = conteudo.hashtags
+    .map((tag) => sanitizeText(tag, "hashtags"))
+    .filter((tag) => tag.length > 0);
+
+  const titulo = conteudo.titulo ? sanitizeText(conteudo.titulo, "titulo") : undefined;
+  const thumbnail_url = conteudo.thumbnail_url
+    ? sanitizeText(conteudo.thumbnail_url, "thumbnail_url")
+    : undefined;
+
+  return {
+    ...conteudo,
+    legenda,
+    hashtags,
+    titulo,
+    thumbnail_url,
+  };
+};
+
 export const postarInstagram = (conteudo: SocialContent) => invokePost("instagram-post", conteudo);
 export const postarTikTok = (conteudo: SocialContent) => invokePost("tiktok-post", conteudo);
 export const postarFacebook = (conteudo: SocialContent) => invokePost("facebook-post", conteudo);
@@ -44,25 +70,33 @@ export const publicarRedesSociais = async (
   onProgress?: (progress: SocialProgress) => void,
 ) => {
   const resultados: SocialResult[] = [];
+  const conteudoSanitizado = sanitizeSocialContent(conteudo);
 
   for (const rede of redes) {
     try {
+      assertPayloadValid({
+        categoria: "conteudo",
+        destino: rede,
+        payload: conteudoSanitizado as unknown as Record<string, unknown>,
+      });
+      assertApiAllowed({ categoria: "conteudo", destino: rede, payload: conteudoSanitizado });
+      assertRateLimit(`conteudo:${rede}`, "conteudo", rede);
       onProgress?.({ nome: rede, status: "enviando" });
 
       let response: { url?: string } | undefined;
 
       switch (rede) {
         case "instagram":
-          response = await postarInstagram(conteudo);
+          response = await postarInstagram(conteudoSanitizado);
           break;
         case "tiktok":
-          response = await postarTikTok(conteudo);
+          response = await postarTikTok(conteudoSanitizado);
           break;
         case "facebook":
-          response = await postarFacebook(conteudo);
+          response = await postarFacebook(conteudoSanitizado);
           break;
         case "youtube":
-          response = await postarYouTube(conteudo);
+          response = await postarYouTube(conteudoSanitizado);
           break;
       }
 
