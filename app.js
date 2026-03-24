@@ -214,11 +214,23 @@ const createDarkflowState = () => ({
   erros: []
 });
 
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 const gerarRoteiro = (input) => [
   `Hook viral para ${input.nicho}`,
   `Storytelling com ${input.objetivo}`,
   `CTA para ${input.marca}`
 ];
+
+const gerarAudio = async () => {
+  await delay(900);
+  return { audioUrl: null, status: "ok" };
+};
+
+const gerarVideo = async () => {
+  await delay(1200);
+  return { videoUrl: null, status: "ok" };
+};
 
 const gerarVariacoes = (input) => ({
   titulos: Array.from({ length: 5 }, (_, i) => `Titulo ${i + 1} - ${input.nicho}`),
@@ -336,6 +348,10 @@ const executarAcaoReal = async (nome, payload) => {
       return navegarReal(payload);
     }
 
+    if (nome === "gerar-video") {
+      return executarPipelineVideo();
+    }
+
     if (["salvar", "salvar-distribuir", "salvar-material"].includes(nome)) {
       return salvarReal(payload || getMaterial());
     }
@@ -374,6 +390,29 @@ const salvarReal = (dados) => {
 const gerarReal = (input) => {
   if (!input) return null;
   return executarFluxoCompleto(input);
+};
+
+const executarPipelineVideo = async () => {
+  try {
+    setStatus("gerando roteiro");
+    const input = getDarkflowInput();
+    const roteiro = await Promise.resolve(gerarRoteiro(input));
+    fields.roteiro.value = roteiro.join("\n");
+
+    setStatus("gerando voz");
+    const audio = await gerarAudio(roteiro, input);
+
+    setStatus("renderizando vídeo");
+    const video = await gerarVideo(roteiro, audio, input);
+    if (video?.videoUrl) {
+      fields.videoUrl.value = video.videoUrl;
+    }
+
+    setStatus("concluído", "success");
+  } catch (error) {
+    setStatus("erro", "warning");
+    console.error(error);
+  }
 };
 
 const publicarReal = async (dados) => {
@@ -888,6 +927,7 @@ const actionRegistry = {
       setInfo("Material salvo. Publique manualmente.", "warning");
     }
   },
+  "gerar-video": () => executarPipelineVideo(),
   "baixar-video": () => baixarVideo(getMaterial()),
   "baixar-pacote": () => {
     const material = getMaterial();
