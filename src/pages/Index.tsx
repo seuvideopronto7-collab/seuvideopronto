@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import VideoWizard from "@/components/wizard/VideoWizard";
 import Content30Days from "@/components/Content30Days";
 import DarkFlowEngine from "@/components/DarkFlowEngine";
+import SalesMachine from "@/components/SalesMachine";
 
 const Index = () => {
   const { signOut, isAdmin, profile } = useAuth();
@@ -12,6 +13,7 @@ const Index = () => {
   const location = useLocation();
   const [showCalendar, setShowCalendar] = useState(false);
   const [showDarkFlow, setShowDarkFlow] = useState(false);
+  const [showSalesMachine, setShowSalesMachine] = useState(false);
   const initialProduto = (location.state as any)?.produto || null;
   const autoStart = Boolean((location.state as any)?.autoStart);
 
@@ -136,6 +138,27 @@ const Index = () => {
         </button>
 
         {showCalendar && <Content30Days />}
+
+        {/* CTA Máquina de Vendas */}
+        <button
+          onClick={() => setShowSalesMachine((prev) => !prev)}
+          className="w-full group relative overflow-hidden rounded-2xl border border-primary/40 bg-gradient-to-r from-primary/15 via-amber-500/10 to-accent/10 p-6 text-left transition-all hover:border-primary/70 hover:shadow-[0_0_40px_-8px_hsl(var(--neon-pink)/0.35)]"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary to-amber-400 flex items-center justify-center text-2xl shrink-0">
+              ⚡
+            </div>
+            <div>
+              <h3 className="text-lg font-bold">ATIVAR MÁQUINA</h3>
+              <p className="text-sm text-muted-foreground">
+                Gerador → Conteúdo → Funil → Venda → Afiliado → Escala
+              </p>
+            </div>
+          </div>
+          <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-amber-400/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+        </button>
+
+        {showSalesMachine && <SalesMachine />}
 
         {/* CTA Dark Flow */}
         <button

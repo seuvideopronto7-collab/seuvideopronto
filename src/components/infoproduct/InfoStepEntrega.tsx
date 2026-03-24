@@ -18,24 +18,6 @@ interface Props {
 }
 
 const InfoStepEntrega = ({ estruturaData, conteudoData, vslData, kitData, onNewProduct }: Props) => {
-  const { user, profile } = useAuth();
-  const userId = profile?.id || user?.id || null;
-  const autoValidatedRef = useRef(false);
-
-  const statusLabelMap: Record<string, string> = {
-    connected: "Conectado",
-    error: "Erro",
-    expired: "Expirado",
-    disconnected: "Desconectado",
-  };
-
-  const statusColorMap: Record<string, string> = {
-    connected: "bg-emerald-500/15 text-emerald-300",
-    error: "bg-rose-500/15 text-rose-300",
-    expired: "bg-amber-500/15 text-amber-300",
-    disconnected: "bg-rose-500/15 text-rose-300",
-  };
-
   const [copiedPlatform, setCopiedPlatform] = useState<string | null>(null);
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
   const [connectedPlatform, setConnectedPlatform] = useState<string | null>(null);
@@ -64,6 +46,24 @@ const InfoStepEntrega = ({ estruturaData, conteudoData, vslData, kitData, onNewP
     url_capa: "",
     conteudo_url: "",
   });
+
+  const { user, profile } = useAuth();
+  const userId = profile?.id || user?.id || null;
+  const autoValidatedRef = useRef(false);
+
+  const statusLabelMap: Record<string, string> = {
+    connected: "Conectado",
+    error: "Erro",
+    expired: "Expirado",
+    disconnected: "Desconectado",
+  };
+
+  const statusColorMap: Record<string, string> = {
+    connected: "bg-emerald-500/15 text-emerald-300",
+    error: "bg-rose-500/15 text-rose-300",
+    expired: "bg-amber-500/15 text-amber-300",
+    disconnected: "bg-rose-500/15 text-rose-300",
+  };
 
   const platformKeyFromName = (platform?: string | null) => {
     if (!platform) return null;
