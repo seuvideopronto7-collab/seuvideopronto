@@ -15,13 +15,17 @@ interface StepFinalProps {
   videoFallback?: { type: "video-fake"; url: string; animation: string } | null;
   onNewVersion: () => void;
   onEdit: () => void;
+  onActivateViral: () => void;
+  isViralLoading?: boolean;
   onContinue: () => void;
 }
 
-const StepFinal = ({ roteiroData, seoData, viralData, videoUrl, imageUrl, videoFallback, onNewVersion, onEdit, onContinue }: StepFinalProps) => {
+const StepFinal = ({ roteiroData, seoData, viralData, videoUrl, imageUrl, videoFallback, onNewVersion, onEdit, onActivateViral, isViralLoading, onContinue }: StepFinalProps) => {
   const roteiro = roteiroData?.roteiro || roteiroData?.novo_roteiro;
   const seo = seoData?.titulos ? seoData : seoData?.seo;
   const viral = viralData?.copy ? viralData : viralData?.viral;
+  const hasViral = Boolean(viral);
+  const viralFallback = Boolean(viralData?._fallback || viral?._fallback);
   const resolvedVideoUrl = videoUrl || seoData?.videoUrl || roteiroData?.videoUrl || "";
   const resolvedFallback = videoFallback?.type === "video-fake" ? videoFallback : imageUrl ? { type: "video-fake", url: imageUrl, animation: "zoom + fade" } : null;
   const [videoFailed, setVideoFailed] = useState(false);
@@ -155,6 +159,15 @@ const StepFinal = ({ roteiroData, seoData, viralData, videoUrl, imageUrl, videoF
   };
 
   const progressItems = ["Roteiro", "SEO", "Video", "Render", "Final"];
+  const conversionItems = [
+    { label: "Narracao automatica", ready: Boolean(viral?.narracao) },
+    { label: "Texto na tela", ready: Boolean(viral?.legendas?.length) },
+    { label: "Musica de fundo", ready: Boolean(viral?.musica) },
+    { label: "Gancho 0-3s", ready: Boolean(viral?.copy?.gancho) },
+    { label: "CTA final", ready: Boolean(viral?.copy?.cta || viral?.cta_link) },
+    { label: "Formato 9:16 + loop", ready: Boolean(viral?.formatos?.length) },
+    { label: "Link automatico", ready: Boolean(viral?.cta_link) },
+  ];
   const platforms = useMemo(
     () => [
       {
@@ -267,6 +280,31 @@ const StepFinal = ({ roteiroData, seoData, viralData, videoUrl, imageUrl, videoF
           <div className="rounded-lg border border-border/40 bg-muted/30 px-3 py-2">Normalizacao e remocao de ruido</div>
           <div className="rounded-lg border border-border/40 bg-muted/30 px-3 py-2">Fade in/out + micro animacoes</div>
           <div className="rounded-lg border border-border/40 bg-muted/30 px-3 py-2">Ritmo otimizado e cortes inteligentes</div>
+        </div>
+      </div>
+
+      <div className="glass-card p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <h3 className="text-lg font-semibold">Camada de conversao</h3>
+            <p className="text-xs text-muted-foreground">Narração, textos virais, musica e CTA prontos.</p>
+          </div>
+          <Button variant={hasViral ? "glass" : "neon"} onClick={onActivateViral} disabled={isViralLoading}>
+            {isViralLoading ? "Gerando..." : hasViral ? "Regerar" : "Ativar agora"}
+          </Button>
+        </div>
+        {viralFallback && (
+          <div className="rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-xs text-accent">
+            Fallback automatico aplicado
+          </div>
+        )}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+          {conversionItems.map((item) => (
+            <div key={item.label} className="flex items-center justify-between rounded-lg border border-border/40 bg-muted/30 px-3 py-2">
+              <span className={item.ready ? "text-foreground" : "text-muted-foreground"}>{item.label}</span>
+              <span className={item.ready ? "text-emerald-400" : "text-muted-foreground/60"}>{item.ready ? "Pronto" : "Aguardando"}</span>
+            </div>
+          ))}
         </div>
       </div>
 

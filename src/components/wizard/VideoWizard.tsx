@@ -59,6 +59,8 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
   const [variacoesData, setVariacoesData] = useState<any>(null);
   const [variacoesCount, setVariacoesCount] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isViralLoading, setIsViralLoading] = useState(false);
+  const [viralRequested, setViralRequested] = useState(false);
   const [produtoId, setProdutoId] = useState<string | null>(null);
   const [produtoStatus, setProdutoStatus] = useState<"rascunho" | "finalizado" | "publicado">("rascunho");
   const [blocked, setBlocked] = useState<{ title: string; description: string } | null>(null);
@@ -257,6 +259,8 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
   const handleGenerateViralPack = async (override?: { imageUrl?: string; videoUrl?: string; formData?: Partial<typeof formData> }) => {
     const resolvedFormData = { ...formData, ...(override?.formData || {}) };
     try {
+      setIsViralLoading(true);
+      setViralRequested(true);
       const { data, error } = await supabase.functions.invoke("generate-viral", {
         body: {
           ...resolvedFormData,
@@ -276,6 +280,8 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
       setViralData(fallback);
       await persistProduto({ formData: resolvedFormData });
       toast.warning("Modo viral falhou. Fallback aplicado automaticamente.");
+    } finally {
+      setIsViralLoading(false);
     }
   };
 
@@ -574,6 +580,7 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
     setVideoUrl(null);
     setImageUrl(null);
     setVideoFallback(null);
+    setViralRequested(false);
     setFormData({
       produto: "",
       nicho: "",
@@ -604,6 +611,15 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
   }, [videoLink]);
 
   useEffect(() => {
+    if (step < 8) return;
+    if (viralData || viralRequested) return;
+    void handleGenerateViralPack({
+      imageUrl: imageUrl || undefined,
+      videoUrl: videoUrl || undefined,
+    });
+  }, [step, viralData, viralRequested, imageUrl, videoUrl]);
+
+  useEffect(() => {
     if (!initialProduto) return;
     const estrutura = initialProduto.estrutura || {};
     const nextEntryType = (estrutura.entryType || "manual") as EntryType;
@@ -621,6 +637,7 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
     setGenerationMode(estrutura.generationMode || null);
     setVariacoesData(estrutura.variacoesData || null);
     setVariacoesCount(estrutura.variacoesCount || null);
+    setViralRequested(Boolean(estrutura.viralData));
     setProdutoId(initialProduto.id);
     setProdutoStatus((initialProduto.status as any) || "rascunho");
 
@@ -715,6 +732,13 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
             videoFallback={videoFallback}
             onNewVersion={handleNewVersion}
             onEdit={() => goTo(8)}
+            onActivateViral={() =>
+              handleGenerateViralPack({
+                imageUrl: imageUrl || undefined,
+                videoUrl: videoUrl || undefined,
+              })
+            }
+            isViralLoading={isViralLoading}
             onContinue={() => goTo(10)}
           />
         )}
