@@ -58,7 +58,7 @@ const ProdutosProntos = () => {
 
       if (error) throw error;
 
-      const nextData = (data as ProdutoGerado[]) || [];
+      const nextData = ((data as any) as ProdutoGerado[]) || [];
       setProdutos(nextData);
       setStatus(nextData.length ? "sucesso" : "vazio");
       saveCache(nextData);
