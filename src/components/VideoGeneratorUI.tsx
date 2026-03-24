@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Upload, Wand2, Copy, Download, Sparkles, Mic2, Music2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,7 +17,7 @@ import { buildScript } from "@/lib/buildScript";
 const productTypes = ["Natural", "Suplemento", "Cosmetico", "Tecnologia", "Outro"];
 const styleTypes = ["Luxo", "Fitness", "Saude", "Tecnologia"];
 
-const finalStatuses = new Set(["completed", "failed", "fallback"]);
+const finalStatuses = new Set(["completed", "failed", "fallback", "error"]);
 const objectives = ["Vendas", "Viral", "Autoridade"];
 
 type ScriptData = {
@@ -61,6 +61,7 @@ const VideoGeneratorUI = () => {
   const [isGeneratingMusic, setIsGeneratingMusic] = useState(false);
   const [isLocalRendering, setIsLocalRendering] = useState(false);
   const [localProgress, setLocalProgress] = useState(0);
+  const lastRealtimeStatusRef = useRef<string | null>(null);
 
   useEffect(() => {
     return () => {
@@ -92,7 +93,7 @@ const VideoGeneratorUI = () => {
       active = false;
     }, 60000);
 
-    const poll = async () => {
+    const syncJob = async () => {
       try {
         const job = await fetchVideoJob(jobId);
         if (!active || !job) return;
@@ -107,12 +108,77 @@ const VideoGeneratorUI = () => {
       }
     };
 
-    poll();
-    const interval = window.setInterval(poll, 2500);
+    syncJob();
+
+    const channel = supabase
+      .channel(`video-jobs-${jobId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "video_jobs",
+          filter: `id=eq.${jobId}`,
+        },
+        (payload) => {
+          if (!active) return;
+          const job = payload.new as any;
+          setJobStatus(job.status || null);
+          setProgress(job.progress ?? 0);
+          setVideoUrl(job.video_url || null);
+          if (job.status === "completed") toast.success("\ud83c\udfac V\u00eddeo pronto!");
+          if (job.status === "error" || job.status === "failed") {
+            toast.error(job.error || "Erro no processamento");
+          }
+          if (job.status && finalStatuses.has(job.status)) {
+            active = false;
+          }
+        }
+      )
+      .subscribe();
+
     return () => {
       active = false;
-      window.clearInterval(interval);
       window.clearTimeout(watchdog);
+      supabase.removeChannel(channel);
+    };
+  }, [jobId]);
+
+  useEffect(() => {
+    if (!jobId) return;
+    const channel = supabase
+      .channel(`video-job-${jobId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "video_jobs",
+          filter: `id=eq.${jobId}`,
+        },
+        (payload) => {
+          const next = payload.new as any;
+          if (next?.status) setJobStatus(next.status);
+          if (typeof next?.progress === "number") setProgress(next.progress);
+          if (next?.video_url) setVideoUrl(next.video_url);
+
+          const last = lastRealtimeStatusRef.current;
+          if (next?.status && next.status !== last) {
+            if (next.status === "completed") {
+              toast.success("🎬 Vídeo pronto!");
+            } else if (next.status === "error" || next.status === "failed") {
+              toast.error("Erro no processamento do vídeo");
+            } else if (next.status === "fallback") {
+              toast.warning("Fallback aplicado no processamento");
+            }
+            lastRealtimeStatusRef.current = next.status;
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
     };
   }, [jobId]);
 
@@ -497,10 +563,20 @@ const VideoGeneratorUI = () => {
   const progressLabel = useMemo(() => {
     if (!jobStatus) return "Aguardando";
     if (jobStatus === "completed") return "Concluído";
-    if (jobStatus === "failed") return "Erro";
+    if (jobStatus === "failed" || jobStatus === "error") return "Erro";
     if (jobStatus === "fallback") return "Fallback";
     if (jobStatus === "render_local") return "Render local";
     return jobStatus.replace(/_/g, " ");
+  }, [jobStatus]);
+
+  const statusMessage = useMemo(() => {
+    if (!jobStatus) return "Aguardando início do job";
+    if (jobStatus === "processing") return "Renderizando vídeo...";
+    if (jobStatus === "completed") return "Vídeo pronto para visualização";
+    if (jobStatus === "failed" || jobStatus === "error") return "Falha no processamento";
+    if (jobStatus === "fallback") return "Fallback aplicado automaticamente";
+    if (jobStatus === "render_local") return "Render local em andamento";
+    return "Processamento em andamento";
   }, [jobStatus]);
 
   const progressValue = isLocalRendering ? localProgress : progress;
@@ -884,6 +960,7 @@ const VideoGeneratorUI = () => {
             <span className="text-muted-foreground">{jobId ? `Job ${jobId}` : "Nenhum job ativo"}</span>
             <Badge variant="secondary">{progressLabel}</Badge>
           </div>
+          <div className="text-xs text-muted-foreground">{statusMessage}</div>
         </div>
 
         <div className="cinema-panel p-6 space-y-4">

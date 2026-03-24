@@ -54,7 +54,7 @@ serve(async (req) => {
       });
     }
 
-    const { imageUrl } = await req.json();
+    const { imageUrl, prompt } = await req.json();
     if (!imageUrl) {
       return new Response(JSON.stringify({ error: "imageUrl requerido" }), {
         status: 400,
@@ -64,7 +64,15 @@ serve(async (req) => {
 
     const { data, error } = await adminClient
       .from("video_jobs")
-      .insert({ user_id: authData.user.id, status: "queued", progress: 0, video_url: null })
+      .insert({
+        user_id: authData.user.id,
+        status: "queued",
+        progress: 0,
+        image_url: imageUrl,
+        prompt: prompt ?? null,
+        video_url: null,
+        error: null,
+      })
       .select("id")
       .single();
 

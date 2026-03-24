@@ -61,7 +61,8 @@ serve(async (req) => {
       });
     }
 
-    const { jobId, imageUrl, productType, style, useDarkflow, useViral, prompt, textoNaTela, narracao, modePro } = await req.json();
+    const { jobId, imageUrl, productType, style, useDarkflow, useViral, prompt, textoNaTela, narracao, modePro } =
+      await req.json();
 
     if (!jobId || !imageUrl) {
       return new Response(JSON.stringify({ error: "jobId e imageUrl sao obrigatorios" }), {
@@ -99,7 +100,13 @@ serve(async (req) => {
       }
     }
 
-    await updateJob(jobId, { status: "processing", progress: 5 });
+    await updateJob(jobId, {
+      status: "processing",
+      progress: 5,
+      image_url: imageUrl,
+      prompt: prompt ?? null,
+      error: null,
+    });
     await delay(400);
     await updateJob(jobId, { status: "generating_prompt", progress: 15 });
     await delay(400);
@@ -128,23 +135,31 @@ serve(async (req) => {
     if (!response.ok) {
       const text = await response.text();
       console.error("generate-video error:", response.status, text);
-      await updateJob(jobId, { status: "fallback", progress: 100, video_url: null });
-      return new Response(JSON.stringify({ id: jobId, status: "fallback", prompt, textoNaTela, narracao, modePro }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      await updateJob(jobId, {
+        status: "fallback",
+        progress: 100,
+        video_url: null,
+        error: text || "Falha ao gerar video",
       });
+      return new Response(
+        JSON.stringify({ id: jobId, status: "fallback", prompt, textoNaTela, narracao, modePro }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
     }
 
     const data = await response.json();
     const videoUrl = data?.videoUrl || data?.video_url || null;
 
     if (!videoUrl) {
-      await updateJob(jobId, { status: "failed", progress: 100, video_url: null });
-      return new Response(JSON.stringify({ id: jobId, status: "failed", prompt, textoNaTela, narracao, modePro }), {
+      await updateJob(jobId, { status: "error", progress: 100, video_url: null, error: "Video vazio" });
+      return new Response(JSON.stringify({ id: jobId, status: "error", prompt, textoNaTela, narracao, modePro }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    await updateJob(jobId, { status: "completed", progress: 100, video_url: videoUrl });
+    await updateJob(jobId, { status: "completed", progress: 100, video_url: videoUrl, error: null });
 
     return new Response(JSON.stringify({ id: jobId, status: "completed", video_url: videoUrl, prompt, textoNaTela, narracao, modePro }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
