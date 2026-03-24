@@ -30,11 +30,11 @@ export const usePlan = () => {
         return;
       }
 
-      const { data, error } = await supabase
-        .from("usuarios_planos")
+      const { data, error } = await (supabase
+        .from("usuarios_planos" as any)
         .select("*")
         .eq("user_id", user.id)
-        .maybeSingle();
+        .maybeSingle() as any);
 
       if (error) {
         console.error("PDG PLAN ERROR: fetch", error);
