@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
-import { createVideoJob, fetchVideoJob, processVideoJob } from "@/services/api";
+import { createVideoJob, fetchVideoJob } from "@/services/api";
 import { buscarAPI } from "@/lib/apiRegistry";
 import { renderVideoFromImage } from "@/lib/videoRender";
 import { generateEpicSoundtrack } from "@/lib/audioSynth";
@@ -123,14 +123,21 @@ const VideoGeneratorUI = () => {
         (payload) => {
           if (!active) return;
           const job = payload.new as any;
-          setJobStatus(job.status || null);
+          const nextStatus = job.status || null;
+          setJobStatus(nextStatus);
           setProgress(job.progress ?? 0);
           setVideoUrl(job.video_url || null);
+          if (nextStatus && nextStatus !== lastRealtimeStatusRef.current) {
           if (job.status === "completed") toast.success("\ud83c\udfac V\u00eddeo pronto!");
-          if (job.status === "error" || job.status === "failed") {
+          if (nextStatus === "error" || nextStatus === "failed") {
             toast.error(job.error || "Erro no processamento");
           }
-          if (job.status && finalStatuses.has(job.status)) {
+          if (nextStatus === "fallback") {
+            toast.warning("Fallback aplicado no processamento");
+          }
+          lastRealtimeStatusRef.current = nextStatus;
+          }
+          if (nextStatus && finalStatuses.has(nextStatus)) {
             active = false;
           }
         }
@@ -140,44 +147,6 @@ const VideoGeneratorUI = () => {
     return () => {
       active = false;
       window.clearTimeout(watchdog);
-      supabase.removeChannel(channel);
-    };
-  }, [jobId]);
-
-  useEffect(() => {
-    if (!jobId) return;
-    const channel = supabase
-      .channel(`video-job-${jobId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "video_jobs",
-          filter: `id=eq.${jobId}`,
-        },
-        (payload) => {
-          const next = payload.new as any;
-          if (next?.status) setJobStatus(next.status);
-          if (typeof next?.progress === "number") setProgress(next.progress);
-          if (next?.video_url) setVideoUrl(next.video_url);
-
-          const last = lastRealtimeStatusRef.current;
-          if (next?.status && next.status !== last) {
-            if (next.status === "completed") {
-              toast.success("🎬 Vídeo pronto!");
-            } else if (next.status === "error" || next.status === "failed") {
-              toast.error("Erro no processamento do vídeo");
-            } else if (next.status === "fallback") {
-              toast.warning("Fallback aplicado no processamento");
-            }
-            lastRealtimeStatusRef.current = next.status;
-          }
-        },
-      )
-      .subscribe();
-
-    return () => {
       supabase.removeChannel(channel);
     };
   }, [jobId]);
@@ -547,14 +516,20 @@ const VideoGeneratorUI = () => {
         textoNaTela: script?.onScreenText || [],
         narracao: narrationText || script?.fullScript || "",
       };
-      const { id } = await createVideoJob(payload);
+      const response = await createVideoJob(payload);
+      const id = response?.jobId;
+      if (!id) throw new Error("Job nao retornado pelo servidor.");
       setJobId(id);
+      setJobStatus(response?.status || "processing");
+      if (response?.videoUrl) {
+        setVideoUrl(response.videoUrl);
+        setProgress(100);
+      }
       toast.success("Job criado. Processando...");
-      await processVideoJob({ jobId: id, ...payload });
     } catch (error: any) {
       console.error("PDG DEBUG: erro detectado e tratado", error);
       toast.error(error?.message || "Falha ao iniciar o job.");
-      setJobStatus("failed");
+      setJobStatus("error");
     } finally {
       setIsProcessing(false);
     }
