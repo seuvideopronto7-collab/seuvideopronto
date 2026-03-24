@@ -23,13 +23,12 @@ const ImportContent = ({ produto, nicho, publico, dor, beneficio, link, onResult
   const [videoLink, setVideoLink] = useState("");
   const [modo, setModo] = useState<string>("viral");
   const fileRef = useRef<HTMLInputElement>(null);
-  const fallbackVideoUrl = "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4";
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
     setFile(f);
-    if (f.type.startsWith("video/")) {
+    if (f.type.startsWith("image/") || f.type.startsWith("video/")) {
       setFilePreview(URL.createObjectURL(f));
     } else {
       setFilePreview(null);
@@ -61,7 +60,6 @@ const ImportContent = ({ produto, nicho, publico, dor, beneficio, link, onResult
 
     try {
       let fileUrl = "";
-      let analyzeUrl = "";
 
       if (file) {
         const ext = file.name.split(".").pop();
@@ -75,32 +73,11 @@ const ImportContent = ({ produto, nicho, publico, dor, beneficio, link, onResult
           .from("media-uploads")
           .getPublicUrl(path);
         fileUrl = urlData.publicUrl;
-        if (file.type.startsWith("image/")) {
-          try {
-            const { data, error } = await supabase.functions.invoke("generate-video", {
-              body: {
-                imageUrl: fileUrl,
-                estilo: "cinematografico",
-                movimento: "leve zoom + parallax",
-                duracao: 5,
-              },
-            });
-            if (error) throw error;
-            if (!data?.videoUrl) throw new Error("Falha ao gerar video");
-            analyzeUrl = data.videoUrl;
-          } catch (err) {
-            console.error(err);
-            analyzeUrl = fallbackVideoUrl;
-            toast.warning("Geracao de video falhou. Usando fallback.");
-          }
-        } else {
-          analyzeUrl = fileUrl;
-        }
       }
 
       const { data, error } = await supabase.functions.invoke("analyze-content", {
         body: {
-          fileUrl: analyzeUrl || fileUrl,
+          fileUrl,
           videoLink: videoLink.trim(),
           modo: selectedModo,
           produto, nicho, publico, dor, beneficio, link,
@@ -167,9 +144,9 @@ const ImportContent = ({ produto, nicho, publico, dor, beneficio, link, onResult
           </div>
 
           {/* File Preview */}
-          {file && file.type.startsWith("image/") && (
-            <div className="rounded-lg border border-border/50 p-3 text-xs text-muted-foreground bg-muted/30">
-              Imagem recebida. O video cinematografico sera gerado automaticamente.
+          {filePreview && file?.type.startsWith("image/") && (
+            <div className="rounded-lg overflow-hidden border border-border/50">
+              <img src={filePreview} alt="Preview" className="w-full h-32 object-cover" />
             </div>
           )}
           {filePreview && file?.type.startsWith("video/") && (

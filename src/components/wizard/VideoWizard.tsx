@@ -100,20 +100,6 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
     return /\.(mp4|webm|mov|m4v)$/.test(clean);
   };
 
-  const generateVideoFromImage = async (imageUrl: string) => {
-    const { data, error } = await supabase.functions.invoke("generate-video", {
-      body: {
-        imageUrl,
-        estilo: "cinematografico",
-        movimento: "leve zoom + parallax",
-        duracao: 5,
-      },
-    });
-    if (error) throw error;
-    if (!data?.videoUrl) throw new Error("Falha ao gerar video");
-    return data.videoUrl as string;
-  };
-
   const persistProduto = async (override?: { status?: "rascunho" | "finalizado" | "publicado"; formData?: Partial<typeof formData> }) => {
     if (!user) return;
     const payload = {
@@ -247,7 +233,6 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
       } else {
         // Upload file if needed
         let fileUrl = "";
-        let analyzeUrl = "";
         if (file) {
           const ext = file.name.split(".").pop();
           const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
@@ -257,30 +242,12 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
           if (uploadError) throw uploadError;
           const { data: urlData } = supabase.storage.from("media-uploads").getPublicUrl(path);
           fileUrl = urlData.publicUrl;
-          const isImageUpload = file.type.startsWith("image/");
-          if (isImageUpload) {
-            try {
-              const generatedUrl = await generateVideoFromImage(fileUrl);
-              analyzeUrl = generatedUrl;
-              setVideoUrl(generatedUrl);
-            } catch (err) {
-              console.error(err);
-              const fallbackUrl = "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4";
-              analyzeUrl = fallbackUrl;
-              setVideoUrl(fallbackUrl);
-              toast.warning("Geracao de video falhou. Usando fallback.");
-            }
-          } else {
-            analyzeUrl = fileUrl;
-            if (file.type.startsWith("video/")) {
-              setVideoUrl(fileUrl);
-            }
-          }
+          setVideoUrl(fileUrl);
         }
 
         const { data, error } = await supabase.functions.invoke("analyze-content", {
           body: {
-            fileUrl: analyzeUrl || fileUrl,
+            fileUrl,
             videoLink: resolvedLink.trim(),
             modo: "viral",
             ...resolvedFormData,
