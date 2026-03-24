@@ -76,12 +76,12 @@ export const usePlan = () => {
         if (!current || !user) return current;
         if (!isResetDue(current.reset_at)) return current;
         const nextReset = getNextResetAt();
-        const { data, error } = await supabase
-          .from("usuarios_planos")
-          .update({ uso_hoje_json: {}, reset_at: nextReset })
+        const { data, error } = await (supabase
+          .from("usuarios_planos" as any)
+          .update({ uso_hoje_json: {}, reset_at: nextReset } as any)
           .eq("user_id", user.id)
           .select("*")
-          .single();
+          .single() as any);
         if (error) console.error("PDG PLAN ERROR: reset", error);
         return (data as PlanRecord) || current;
       } catch (error) {
