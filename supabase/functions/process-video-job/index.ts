@@ -32,7 +32,7 @@ serve(async (req) => {
   }
 
   try {
-    const { jobId, imageUrl, productType, style, useDarkflow, useViral, prompt, textoNaTela, narracao } = await req.json();
+    const { jobId, imageUrl, productType, style, useDarkflow, useViral, prompt, textoNaTela, narracao, modePro } = await req.json();
 
     if (!jobId || !imageUrl) {
       return new Response(JSON.stringify({ error: "jobId e imageUrl sao obrigatorios" }), {
@@ -63,6 +63,7 @@ serve(async (req) => {
         prompt,
         textoNaTela,
         narracao,
+        modePro: Boolean(modePro),
       }),
     });
 
@@ -70,7 +71,7 @@ serve(async (req) => {
       const text = await response.text();
       console.error("generate-video error:", response.status, text);
       await updateJob(jobId, { status: "fallback", progress: 100, video_url: null });
-      return new Response(JSON.stringify({ id: jobId, status: "fallback" }), {
+      return new Response(JSON.stringify({ id: jobId, status: "fallback", prompt, textoNaTela, narracao, modePro }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -80,14 +81,14 @@ serve(async (req) => {
 
     if (!videoUrl) {
       await updateJob(jobId, { status: "failed", progress: 100, video_url: null });
-      return new Response(JSON.stringify({ id: jobId, status: "failed" }), {
+      return new Response(JSON.stringify({ id: jobId, status: "failed", prompt, textoNaTela, narracao, modePro }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     await updateJob(jobId, { status: "completed", progress: 100, video_url: videoUrl });
 
-    return new Response(JSON.stringify({ id: jobId, status: "completed", video_url: videoUrl }), {
+    return new Response(JSON.stringify({ id: jobId, status: "completed", video_url: videoUrl, prompt, textoNaTela, narracao, modePro }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {

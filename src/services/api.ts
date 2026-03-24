@@ -9,6 +9,8 @@ export type CreateVideoJobInput = {
   prompt?: string;
   textoNaTela?: string[];
   narracao?: string;
+  modePro?: boolean;
+  script?: unknown;
 };
 
 export type VideoJob = {

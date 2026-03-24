@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Upload, Wand2, Copy, Download } from "lucide-react";
+import { Upload, Wand2, Copy, Download, Sparkles, Mic2, Music2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Textarea } from "@/components/ui/textarea";
 import { createVideoJob, fetchVideoJob, processVideoJob } from "@/services/api";
 import { buscarAPI } from "@/lib/apiRegistry";
+import { renderVideoFromImage } from "@/lib/videoRender";
+import { generateEpicSoundtrack } from "@/lib/audioSynth";
 import { buildCinematicPrompt } from "@/lib/buildCinematicPrompt";
 import { buildScript } from "@/lib/buildScript";
 
@@ -45,11 +48,19 @@ const VideoGeneratorUI = () => {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
+  const [isDetectingNiche, setIsDetectingNiche] = useState(false);
   const [scriptData, setScriptData] = useState<ScriptData | null>(null);
   const [resolution, setResolution] = useState<string | null>(null);
   const [fileSize, setFileSize] = useState<string | null>(null);
   const [apiChecks, setApiChecks] = useState<Array<{ name: string; status: "ok" | "error"; message?: string }>>([]);
   const [isCheckingApis, setIsCheckingApis] = useState(false);
+  const [narrationText, setNarrationText] = useState("");
+  const [narrationUrl, setNarrationUrl] = useState<string | null>(null);
+  const [musicUrl, setMusicUrl] = useState<string | null>(null);
+  const [isGeneratingVoice, setIsGeneratingVoice] = useState(false);
+  const [isGeneratingMusic, setIsGeneratingMusic] = useState(false);
+  const [isLocalRendering, setIsLocalRendering] = useState(false);
+  const [localProgress, setLocalProgress] = useState(0);
 
   useEffect(() => {
     return () => {
@@ -58,6 +69,17 @@ const VideoGeneratorUI = () => {
       }
     };
   }, [previewUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (narrationUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(narrationUrl);
+      }
+      if (musicUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(musicUrl);
+      }
+    };
+  }, [narrationUrl, musicUrl]);
 
   useEffect(() => {
     if (!jobId) return;
@@ -207,6 +229,39 @@ const VideoGeneratorUI = () => {
     }
   };
 
+  const detectNiche = async () => {
+    setIsDetectingNiche(true);
+    try {
+      const response = await supabase.functions.invoke("generate-viral", {
+        body: {
+          tipo: "seo",
+          produto: productName || productType,
+          nicho: niche || styleType,
+          publico: "Compradores premium",
+          objetivo: objective,
+        },
+      });
+
+      if (response.error) throw response.error;
+      const payload = response.data || {};
+      const keyword =
+        payload?.palavras_chave?.[0] ||
+        payload?.titulos?.[0] ||
+        payload?.tags_youtube?.split(",")?.[0];
+      if (keyword) {
+        setNiche(keyword.replace(/#/g, "").trim());
+        toast.success("Nicho detectado.");
+      } else {
+        toast.error("Nao foi possivel detectar o nicho.");
+      }
+    } catch (error) {
+      console.error("Erro ao detectar nicho:", error);
+      toast.error("Falha ao detectar nicho.");
+    } finally {
+      setIsDetectingNiche(false);
+    }
+  };
+
   const handleFile = (next?: File | null) => {
     if (!next) return;
     if (!/[.](jpg|jpeg|png|webp)$/i.test(next.name)) {
@@ -237,6 +292,146 @@ const VideoGeneratorUI = () => {
     return urlData.publicUrl;
   };
 
+  const cinematicPrompt = useMemo(
+    () => buildCinematicPrompt(productType, styleType, useDarkflow, useViral, modePro),
+    [productType, styleType, useDarkflow, useViral, modePro],
+  );
+
+  const supabaseFunctionHeaders = () => {
+    const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+    return {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+    };
+  };
+
+  const runAutoScript = async () => {
+    try {
+      setIsGeneratingScript(true);
+      const resolvedImageUrl = await uploadToStorage();
+      if (!resolvedImageUrl) {
+        toast.error("Informe uma URL ou envie uma imagem.");
+        return;
+      }
+      const { data, error } = await supabase.functions.invoke("analyze-content", {
+        body: {
+          fileUrl: resolvedImageUrl,
+          modo: "vendas",
+          produto: productName || undefined,
+          nicho: niche || undefined,
+        },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+
+      const tema = data?.analise?.tema || niche;
+      const hook = data?.novo_roteiro?.hook || data?.nova_copy?.headline || "Gancho forte";
+      const benefits = (data?.nova_copy?.bullet_points || []).slice(0, 3);
+      const cta = data?.novo_roteiro?.cta || data?.nova_copy?.cta_texto || "Clique e veja agora";
+      const roteiroCompleto = data?.novo_roteiro?.roteiro_completo || data?.novo_roteiro?.abertura || "";
+      const textosTela = (data?.novas_cenas || [])
+        .map((cena: any) => cena?.texto_tela)
+        .filter(Boolean);
+
+      if (tema) setNiche(tema);
+      setScriptData({ hook, benefits, cta, roteiroCompleto });
+      if (roteiroCompleto) setNarrationText(roteiroCompleto);
+      if (textosTela.length) setOnScreenText(textosTela);
+      toast.success("Roteiro e textos gerados.");
+    } catch (error: any) {
+      console.error("PDG DEBUG: erro detectado e tratado", error);
+      setScriptData({
+        hook: "Pare tudo e veja isso agora",
+        benefits: ["Benefício 1", "Benefício 2", "Benefício 3"],
+        cta: "Clique para saber mais",
+        roteiroCompleto: "Hook forte, benefícios diretos e CTA agressivo.",
+      });
+      setNarrationText("Se você busca resultados, precisa ver isso agora.");
+      setOnScreenText(["HOOK FORTE", "3 BENEFÍCIOS", "CTA DIRETO"]);
+      toast.warning("Falha ao gerar roteiro. Fallback aplicado.");
+    } finally {
+      setIsGeneratingScript(false);
+    }
+  };
+
+  const generateVoiceover = async () => {
+    if (!narrationText.trim()) {
+      toast.error("Digite ou gere um texto de narração.");
+      return;
+    }
+    try {
+      setIsGeneratingVoice(true);
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-voiceover`;
+      const response = await fetch(url, {
+        method: "POST",
+        headers: supabaseFunctionHeaders(),
+        body: JSON.stringify({ text: narrationText }),
+      });
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || "Falha ao gerar narração");
+      }
+      const blob = await response.blob();
+      if (narrationUrl?.startsWith("blob:")) URL.revokeObjectURL(narrationUrl);
+      setNarrationUrl(URL.createObjectURL(blob));
+      toast.success("Narração gerada.");
+    } catch (error: any) {
+      console.error("PDG DEBUG: erro detectado e tratado", error);
+      toast.error(error?.message || "Falha ao gerar narração.");
+    } finally {
+      setIsGeneratingVoice(false);
+    }
+  };
+
+  const generateSoundtrack = async () => {
+    try {
+      setIsGeneratingMusic(true);
+      const audioBuffer = await generateEpicSoundtrack(8);
+      const blob = new Blob([audioBuffer], { type: "audio/wav" });
+      if (musicUrl?.startsWith("blob:")) URL.revokeObjectURL(musicUrl);
+      setMusicUrl(URL.createObjectURL(blob));
+      toast.success("Trilha sonora gerada.");
+    } catch (error: any) {
+      console.error("PDG DEBUG: erro detectado e tratado", error);
+      toast.error(error?.message || "Falha ao gerar trilha sonora.");
+    } finally {
+      setIsGeneratingMusic(false);
+    }
+  };
+
+  const renderLocalVideo = async () => {
+    try {
+      setIsLocalRendering(true);
+      setLocalProgress(0);
+      const resolvedImageUrl = await uploadToStorage();
+      if (!resolvedImageUrl) {
+        toast.error("Informe uma URL ou envie uma imagem.");
+        return;
+      }
+      const url = await renderVideoFromImage(resolvedImageUrl, {
+        durationSec: 6,
+        fps: 30,
+        animation: useViral ? "zoom-in" : "kenburns",
+        narrationUrl: narrationUrl || undefined,
+        musicUrl: musicUrl || undefined,
+        narrationVolume: 1,
+        musicVolume: 0.35,
+        enableDucking: true,
+        onProgress: (ratio) => setLocalProgress(Math.round(ratio * 100)),
+      });
+      setVideoUrl(url);
+      setJobStatus("completed");
+      setProgress(100);
+      toast.success("Render local concluído.");
+    } catch (error: any) {
+      console.error("PDG DEBUG: erro detectado e tratado", error);
+      toast.error(error?.message || "Falha ao renderizar localmente.");
+    } finally {
+      setIsLocalRendering(false);
+    }
+  };
+
   const startJob = async () => {
     try {
       setIsProcessing(true);
@@ -251,7 +446,7 @@ const VideoGeneratorUI = () => {
       }
 
       const script = await generateScript();
-      const promptText = buildCinematicPrompt(productType, styleType, useDarkflow, useViral, modePro);
+      const prompt = buildCinematicPrompt(productType, styleType, useDarkflow, useViral, modePro);
 
       const payload = {
         imageUrl: resolvedImageUrl,
@@ -259,9 +454,11 @@ const VideoGeneratorUI = () => {
         style: styleType,
         useDarkflow,
         useViral,
-        promptText,
+        prompt,
         modePro,
         script,
+        textoNaTela: script?.onScreenText || [],
+        narracao: script?.fullScript || "",
       };
       const { id } = await createVideoJob(payload);
       setJobId(id);
@@ -273,15 +470,6 @@ const VideoGeneratorUI = () => {
       setJobStatus("failed");
     } finally {
       setIsProcessing(false);
-    }
-  };
-
-  const gerarVideoReal = () => {
-    console.log("Gerar vídeo agora");
-    try {
-      void startJob();
-    } catch (e) {
-      console.error("Erro gerar video:", e);
     }
   };
 
@@ -392,10 +580,55 @@ const VideoGeneratorUI = () => {
         <div className="cinema-panel p-6 space-y-4">
           <div className="flex items-center justify-between">
             <div>
+              <h2 className="text-lg font-semibold">Briefing do produto</h2>
+              <p className="text-xs text-muted-foreground">Base para roteiro e copy premium</p>
+            </div>
+            <Badge variant="secondary">Etapa 2</Badge>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Input
+              placeholder="Nome do produto"
+              value={productName}
+              onChange={(event) => setProductName(event.target.value)}
+            />
+            <Input
+              placeholder="Nome da marca"
+              value={brandName}
+              onChange={(event) => setBrandName(event.target.value)}
+            />
+          </div>
+          <Input
+            placeholder="Nicho (opcional)"
+            value={niche}
+            onChange={(event) => setNiche(event.target.value)}
+          />
+          <Button variant="glass" onClick={detectNiche} disabled={isDetectingNiche}>
+            {isDetectingNiche ? "Detectando nicho..." : "Detectar nicho (IA)"}
+          </Button>
+          <div className="grid grid-cols-3 gap-2">
+            {objectives.map((item) => (
+              <button
+                key={item}
+                onClick={() => setObjective(item)}
+                className={`rounded-xl border px-3 py-2 text-xs transition-all ${
+                  objective === item
+                    ? "border-[#22d3ee] bg-[#22d3ee]/10 text-[#22d3ee]"
+                    : "border-border/50 text-muted-foreground hover:border-[#22d3ee]/60"
+                }`}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="cinema-panel p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
               <h2 className="text-lg font-semibold">Tipo do produto</h2>
               <p className="text-xs text-muted-foreground">Ajusta a estética do prompt</p>
             </div>
-            <Badge variant="secondary">Etapa 2</Badge>
+            <Badge variant="secondary">Etapa 3</Badge>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
             {productTypes.map((item) => (
@@ -420,7 +653,7 @@ const VideoGeneratorUI = () => {
               <h2 className="text-lg font-semibold">Estilo de geração</h2>
               <p className="text-xs text-muted-foreground">Luxo, fitness, saúde ou tecnologia</p>
             </div>
-            <Badge variant="secondary">Etapa 3</Badge>
+            <Badge variant="secondary">Etapa 4</Badge>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
             {styleTypes.map((item) => (
@@ -445,7 +678,7 @@ const VideoGeneratorUI = () => {
               <h2 className="text-lg font-semibold">Modos avançados</h2>
               <p className="text-xs text-muted-foreground">Ative variações do motor</p>
             </div>
-            <Badge variant="secondary">Etapa 4</Badge>
+            <Badge variant="secondary">Etapa 5</Badge>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <button
@@ -467,6 +700,78 @@ const VideoGeneratorUI = () => {
               {useViral ? "Viral boost ativo" : "Ativar Viral boost"}
             </button>
           </div>
+          <button
+            onClick={() => setModePro((prev) => !prev)}
+            className={`rounded-xl border px-4 py-3 text-xs transition-all ${
+              modePro
+                ? "border-[#f5c451] bg-[#f5c451]/10 text-[#f5c451]"
+                : "border-border/50 text-muted-foreground hover:border-[#f5c451]/60"
+            }`}
+          >
+            {modePro ? "Modo PRO ativado" : "Ativar Modo PRO"}
+          </button>
+        </div>
+
+        <div className="cinema-panel p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">Roteiro automático</h2>
+              <p className="text-xs text-muted-foreground">Gancho + 3 benefícios + CTA</p>
+            </div>
+            <Badge variant="secondary">Etapa 6</Badge>
+          </div>
+          <div className="rounded-xl border border-border/50 bg-muted/20 p-4 text-sm space-y-3">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>{isGeneratingScript ? "Gerando roteiro..." : scriptData ? "Roteiro pronto" : "Aguardando"}</span>
+              {scriptData?.isFallback && <span className="text-amber-400">Fallback ativo</span>}
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground">Gancho</div>
+              <div className="font-medium">{scriptData?.hook || "—"}</div>
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground">Benefícios</div>
+              <ul className="space-y-1">
+                {(scriptData?.benefits || ["—", "—", "—"]).map((item, index) => (
+                  <li key={`${item}-${index}`} className="text-sm">• {item}</li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground">CTA</div>
+              <div className="font-medium">{scriptData?.cta || "—"}</div>
+            </div>
+          </div>
+          <div className="rounded-xl border border-border/50 bg-muted/10 p-4 text-sm">
+            <div className="text-xs text-muted-foreground mb-2">Texto na tela (auto)</div>
+            <div className="flex flex-wrap gap-2">
+              {(scriptData?.onScreenText || ["Gancho", "Beneficio 1", "Beneficio 2", "Beneficio 3", "CTA"]).map((item, index) => (
+                <span key={`${item}-${index}`} className="rounded-full border border-border/60 px-3 py-1 text-xs">
+                  {item}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="cinema-panel p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">Narração e trilha sonora</h2>
+              <p className="text-xs text-muted-foreground">Voz masculina comercial + música épica</p>
+            </div>
+            <Badge variant="secondary">Etapa 7</Badge>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+            <div className="rounded-xl border border-border/50 bg-muted/20 p-3">
+              <div className="text-muted-foreground">Voz</div>
+              <div className="font-semibold">Masculina · Tom comercial · Energia alta</div>
+            </div>
+            <div className="rounded-xl border border-border/50 bg-muted/20 p-3">
+              <div className="text-muted-foreground">Trilha</div>
+              <div className="font-semibold">Epica / Comercial · Volume adaptativo</div>
+            </div>
+          </div>
         </div>
 
         <div className="cinema-panel p-6 space-y-4">
@@ -475,13 +780,10 @@ const VideoGeneratorUI = () => {
               <h2 className="text-lg font-semibold">Iniciar pipeline</h2>
               <p className="text-xs text-muted-foreground">Cria o job e executa o processamento</p>
             </div>
-            <Badge variant="secondary">Etapa 5</Badge>
+            <Badge variant="secondary">Etapa 8</Badge>
           </div>
           <Button variant="neon" onClick={startJob} disabled={isProcessing}>
-            <Wand2 className="h-4 w-4" /> {isProcessing ? "Processando..." : "Gerar vídeo"}
-          </Button>
-          <Button variant="glass" onClick={gerarVideoReal} disabled={isProcessing}>
-            Gerar vídeo agora
+            <Wand2 className="h-4 w-4" /> {isProcessing ? "Processando..." : "GERAR VÍDEO AGORA 🎬🔥"}
           </Button>
         </div>
       </section>
