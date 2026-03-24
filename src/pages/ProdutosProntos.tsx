@@ -120,7 +120,7 @@ const ProdutosProntos = () => {
       toast.error("Erro ao duplicar produto");
       return;
     }
-    const next = [data as ProdutoGerado, ...produtos];
+    const next = [(data as any) as ProdutoGerado, ...produtos];
     setProdutos(next);
     saveCache(next);
     toast.success("Produto duplicado");

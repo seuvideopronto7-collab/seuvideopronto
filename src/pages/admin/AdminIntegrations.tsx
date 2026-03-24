@@ -26,7 +26,7 @@ const AdminIntegrations = () => {
         .from("integrations" as any)
         .select("platform, status")
         .eq("user_id", profile.id);
-      const mapped = (data || []).map((row) => ({
+      const mapped = ((data || []) as any[]).map((row: any) => ({
         name: row.platform,
         status: statusMap[row.status || ""] || "DESCONECTADO",
       }));
