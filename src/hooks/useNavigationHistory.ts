@@ -5,13 +5,17 @@ export const useNavigationHistory = () => {
   const location = useLocation();
 
   useEffect(() => {
-    const currentRoute = `${location.pathname}${location.search}${location.hash}`;
-    const previousRoute = sessionStorage.getItem("currentRoute");
+    try {
+      const currentRoute = `${location.pathname}${location.search}${location.hash}`;
+      const previousRoute = sessionStorage.getItem("currentRoute");
 
-    if (previousRoute && previousRoute !== currentRoute) {
-      sessionStorage.setItem("lastRoute", previousRoute);
+      if (previousRoute && previousRoute !== currentRoute) {
+        sessionStorage.setItem("lastRoute", previousRoute);
+      }
+
+      sessionStorage.setItem("currentRoute", currentRoute);
+    } catch (error) {
+      console.error("PDG NAV ERROR: history", error);
     }
-
-    sessionStorage.setItem("currentRoute", currentRoute);
   }, [location]);
 };

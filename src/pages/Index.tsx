@@ -6,8 +6,8 @@ import VideoWizard from "@/components/wizard/VideoWizard";
 import Content30Days from "@/components/Content30Days";
 import DarkFlowEngine from "@/components/DarkFlowEngine";
 import SalesMachine from "@/components/SalesMachine";
-import ErrorBoundary from "@/components/ErrorBoundary";
 import VideoGeneratorUI from "@/components/VideoGeneratorUI";
+import SafeRender from "@/components/SafeRender";
 
 const Index = () => {
   const { signOut, isAdmin, profile } = useAuth();
@@ -141,9 +141,9 @@ const Index = () => {
         </button>
 
         {showCalendar && (
-          <ErrorBoundary>
+          <SafeRender label="Conteudo 30 Dias" onAction={() => setShowCalendar(false)}>
             <Content30Days />
-          </ErrorBoundary>
+          </SafeRender>
         )}
 
         {/* CTA Máquina de Vendas */}
@@ -166,9 +166,9 @@ const Index = () => {
         </button>
 
         {showSalesMachine && (
-          <ErrorBoundary>
+          <SafeRender label="Sales Machine" onAction={() => setShowSalesMachine(false)}>
             <SalesMachine />
-          </ErrorBoundary>
+          </SafeRender>
         )}
 
         {/* CTA Dark Flow */}
@@ -191,24 +191,24 @@ const Index = () => {
         </button>
 
         {showDarkFlow && (
-          <ErrorBoundary>
+          <SafeRender label="Dark Flow" onAction={() => setShowDarkFlow(false)}>
             <DarkFlowEngine />
-          </ErrorBoundary>
+          </SafeRender>
         )}
 
-        <ErrorBoundary>
+        <SafeRender label="Gerador Cinematografico">
           <div className="bg-[#12121A] p-6 rounded-xl border border-[#2A2A3A]">
             <h2 className="text-white text-xl font-bold">🎬 Gerador de Vídeo Cinematográfico</h2>
             <p className="text-gray-400">Sistema carregado com proteção ativa</p>
           </div>
 
           <VideoGeneratorUI />
-        </ErrorBoundary>
+        </SafeRender>
 
         {/* Wizard */}
-        <ErrorBoundary>
+        <SafeRender label="Video Wizard">
           <VideoWizard initialProduto={initialProduto} autoStart={autoStart} />
-        </ErrorBoundary>
+        </SafeRender>
       </main>
     </div>
   );

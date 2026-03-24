@@ -85,42 +85,74 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
-    void supabase.functions.invoke("auth-bootstrap");
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          setTimeout(() => fetchProfile(session.user.id, session.user.email), 0);
-        } else {
-          setProfile(null);
-          setIsAdmin(false);
-          setIsFounder(false);
+    let subscription: { unsubscribe: () => void } | null = null;
+
+    try {
+      void supabase.functions.invoke("auth-bootstrap").catch((error) => {
+        console.error("PDG AUTH ERROR: auth-bootstrap", error);
+      });
+
+      const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
+        try {
+          setSession(session);
+          setUser(session?.user ?? null);
+          if (session?.user) {
+            setTimeout(() => fetchProfile(session.user.id, session.user.email), 0);
+          } else {
+            setProfile(null);
+            setIsAdmin(false);
+            setIsFounder(false);
+          }
+          setLoading(false);
+        } catch (error) {
+          console.error("PDG AUTH ERROR: onAuthStateChange", error);
+          setLoading(false);
         }
-        setLoading(false);
-      }
-    );
+      });
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id, session.user.email);
-      }
+      subscription = data.subscription;
+
+      supabase.auth
+        .getSession()
+        .then(({ data: { session } }) => {
+          setSession(session);
+          setUser(session?.user ?? null);
+          if (session?.user) {
+            fetchProfile(session.user.id, session.user.email);
+          }
+          setLoading(false);
+        })
+        .catch((error) => {
+          console.error("PDG AUTH ERROR: getSession", error);
+          setLoading(false);
+        });
+    } catch (error) {
+      console.error("PDG AUTH ERROR: bootstrap", error);
       setLoading(false);
-    });
+    }
 
-    return () => subscription.unsubscribe();
+    return () => {
+      try {
+        subscription?.unsubscribe();
+      } catch (error) {
+        console.error("PDG AUTH ERROR: unsubscribe", error);
+      }
+    };
   }, []);
 
   const signOut = async () => {
-    await supabase.auth.signOut();
-    localStorage.removeItem("svpa.session");
-    setUser(null);
-    setSession(null);
-    setProfile(null);
-    setIsAdmin(false);
-    setIsFounder(false);
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error("PDG AUTH ERROR: signOut", error);
+    } finally {
+      localStorage.removeItem("svpa.session");
+      setUser(null);
+      setSession(null);
+      setProfile(null);
+      setIsAdmin(false);
+      setIsFounder(false);
+    }
   };
 
   return (

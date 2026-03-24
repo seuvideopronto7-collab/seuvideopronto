@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -5,6 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/hooks/useAuth";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import SafeRender from "@/components/SafeRender";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import UserDashboard from "./pages/UserDashboard";
@@ -19,6 +21,10 @@ import EditorProReal from "./pages/EditorProReal";
 
 const queryClient = new QueryClient();
 
+const wrapSafe = (label: string, element: ReactNode) => (
+  <SafeRender label={label}>{element}</SafeRender>
+);
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -27,80 +33,107 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <Routes>
-            <Route path="/auth" element={<Auth />} />
+            <Route path="/auth" element={wrapSafe("Auth", <Auth />)} />
             <Route
               path="/"
               element={
-                <ProtectedRoute>
-                  <Index />
-                </ProtectedRoute>
+                wrapSafe(
+                  "Index",
+                  <ProtectedRoute>
+                    <Index />
+                  </ProtectedRoute>,
+                )
               }
             />
             <Route
               path="/perfil"
               element={
-                <ProtectedRoute>
-                  <UserDashboard />
-                </ProtectedRoute>
+                wrapSafe(
+                  "Perfil",
+                  <ProtectedRoute>
+                    <UserDashboard />
+                  </ProtectedRoute>,
+                )
               }
             />
             <Route
               path="/admin"
               element={
-                <ProtectedRoute requireAdmin>
-                  <AdminDashboard />
-                </ProtectedRoute>
+                wrapSafe(
+                  "Admin",
+                  <ProtectedRoute requireAdmin>
+                    <AdminDashboard />
+                  </ProtectedRoute>,
+                )
               }
             />
             <Route
               path="/admin/video-generator"
               element={
-                <ProtectedRoute requireAdmin>
-                  <VideoGeneratorPage />
-                </ProtectedRoute>
+                wrapSafe(
+                  "Admin Video Generator",
+                  <ProtectedRoute requireAdmin>
+                    <VideoGeneratorPage />
+                  </ProtectedRoute>,
+                )
               }
             />
             <Route
               path="/infoproduto"
               element={
-                <ProtectedRoute>
-                  <Infoproduct />
-                </ProtectedRoute>
+                wrapSafe(
+                  "Infoproduto",
+                  <ProtectedRoute>
+                    <Infoproduct />
+                  </ProtectedRoute>,
+                )
               }
             />
             <Route
               path="/produtos-prontos"
               element={
-                <ProtectedRoute>
-                  <ProdutosProntos />
-                </ProtectedRoute>
+                wrapSafe(
+                  "Produtos Prontos",
+                  <ProtectedRoute>
+                    <ProdutosProntos />
+                  </ProtectedRoute>,
+                )
               }
             />
             <Route
               path="/planos"
               element={
-                <ProtectedRoute>
-                  <Planos />
-                </ProtectedRoute>
+                wrapSafe(
+                  "Planos",
+                  <ProtectedRoute>
+                    <Planos />
+                  </ProtectedRoute>,
+                )
               }
             />
             <Route
               path="/apis"
               element={
-                <ProtectedRoute>
-                  <Apis />
-                </ProtectedRoute>
+                wrapSafe(
+                  "APIs",
+                  <ProtectedRoute>
+                    <Apis />
+                  </ProtectedRoute>,
+                )
               }
             />
             <Route
               path="/editor-pro-real"
               element={
-                <ProtectedRoute>
-                  <EditorProReal />
-                </ProtectedRoute>
+                wrapSafe(
+                  "Editor Pro Real",
+                  <ProtectedRoute>
+                    <EditorProReal />
+                  </ProtectedRoute>,
+                )
               }
             />
-            <Route path="*" element={<NotFound />} />
+            <Route path="*" element={wrapSafe("Not Found", <NotFound />)} />
           </Routes>
         </AuthProvider>
       </BrowserRouter>
