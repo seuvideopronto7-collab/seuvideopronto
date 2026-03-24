@@ -9,7 +9,13 @@ import AdminLayout from "@/components/admin/AdminLayout";
 import { renderVideoFromImage } from "@/lib/videoRender";
 import { buildCinematicPrompt } from "@/lib/buildCinematicPrompt";
 
-type StageStatus = "idle" | "processing" | "done" | "error" | "blocked";
+type StageStatus = "idle" | "processing" | "done" | "error" | "fallback";
+
+type StageInfo = {
+  label: string;
+  status: StageStatus;
+  note?: string;
+};
 
 const productTypes = ["Natural", "Suplemento", "Cosmetico", "Tecnologia", "Outro"];
 const styleTypes = ["Luxo", "Fitness", "Saude", "Tecnologia"];
@@ -25,8 +31,20 @@ const AdminVideoGenerator = () => {
   const [roteiro, setRoteiro] = useState<string>("");
   const [narracao, setNarracao] = useState<string>("");
   const [promptText, setPromptText] = useState<string>("");
+  const [soundtrack, setSoundtrack] = useState<string>("");
+  const [mode, setMode] = useState<"cinema" | "darkflow" | "viral" | null>(null);
   const [isRunning, setIsRunning] = useState(false);
-  const [stages, setStages] = useState<StageStatus[]>(Array(8).fill("idle"));
+  const stageBlueprint: StageInfo[] = [
+    { label: "Upload concluído", status: "idle" },
+    { label: "Preparando prompt", status: "idle" },
+    { label: "Enviando para motor de vídeo", status: "idle" },
+    { label: "Gerando roteiro", status: "idle" },
+    { label: "Gerando narração", status: "idle" },
+    { label: "Aplicando trilha", status: "idle" },
+    { label: "Renderizando vídeo final", status: "idle" },
+    { label: "Finalizado", status: "idle" },
+  ];
+  const [stages, setStages] = useState<StageInfo[]>(stageBlueprint);
 
   useEffect(() => {
     return () => {
