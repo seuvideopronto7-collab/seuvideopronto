@@ -2,13 +2,23 @@ import { Suspense, lazy, useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import SafeRender from "@/components/SafeRender";
+import VideoGeneratorUI from "@/components/VideoGeneratorUI";
 
 const VideoWizard = lazy(() => import("@/components/wizard/VideoWizard"));
 const Content30Days = lazy(() => import("@/components/Content30Days"));
 const DarkFlowEngine = lazy(() => import("@/components/DarkFlowEngine"));
 const SalesMachine = lazy(() => import("@/components/SalesMachine"));
-const VideoGeneratorUI = lazy(() => import("@/components/VideoGeneratorUI"));
+const SystemBootFallback = ({ label }: { label?: string }) => (
+  <div className="rounded-2xl border border-border/60 bg-card/50 p-5 shadow-[0_0_30px_-18px_rgba(59,130,246,0.45)]">
+    <div className="flex items-center gap-3">
+      <div className="h-10 w-10 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+      <div>
+        <p className="text-sm font-semibold">Sistema iniciando...</p>
+        <p className="text-xs text-muted-foreground">{label || "Preparando módulos essenciais"}</p>
+      </div>
+    </div>
+  </div>
+);
 
 const Index = () => {
   const { signOut, isAdmin, profile } = useAuth();
@@ -17,14 +27,37 @@ const Index = () => {
   const [showCalendar, setShowCalendar] = useState(false);
   const [showDarkFlow, setShowDarkFlow] = useState(false);
   const [showSalesMachine, setShowSalesMachine] = useState(false);
-  const [showGenerator, setShowGenerator] = useState(false);
+  const [showGenerator, setShowGenerator] = useState(true);
   const [showWizard, setShowWizard] = useState(false);
+  const [isBooting, setIsBooting] = useState(true);
   const initialProduto = (location.state as any)?.produto || null;
   const autoStart = Boolean((location.state as any)?.autoStart);
+  const hasAnyActive = showCalendar || showDarkFlow || showSalesMachine || showGenerator || showWizard;
 
   useEffect(() => {
     setShowGenerator(true);
   }, []);
+
+  useEffect(() => {
+    if (!hasAnyActive) {
+      setShowGenerator(true);
+    }
+  }, [hasAnyActive]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setIsBooting(false), 900);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    console.log("Estados de modulos", {
+      showCalendar,
+      showDarkFlow,
+      showSalesMachine,
+      showGenerator,
+      showWizard,
+    });
+  }, [showCalendar, showDarkFlow, showSalesMachine, showGenerator, showWizard]);
 
   const handleShowCalendar = () => {
     console.log("Conteudo 30 dias ativado");
@@ -53,6 +86,26 @@ const Index = () => {
     }
   };
 
+  const handleShowGenerator = () => {
+    console.log("Gerador Cinematografico ativado");
+    setShowGenerator(true);
+  };
+
+  const handleShowWizard = () => {
+    console.log("Video Wizard ativado");
+    setShowWizard(true);
+  };
+
+  const handleNavigate = (label: string, path: string) => {
+    console.log(`Navegacao: ${label}`);
+    navigate(path);
+  };
+
+  const handleSignOut = () => {
+    console.log("Sair acionado");
+    signOut();
+  };
+
   return (
       <div className="min-h-screen bg-background">
       {/* Header */}
@@ -78,26 +131,26 @@ const Index = () => {
               </span>
             )}
             {isAdmin && (
-              <Button variant="ghost" size="sm" onClick={() => navigate("/admin")}>
+              <Button variant="ghost" size="sm" onClick={() => handleNavigate("Admin", "/admin")}>
                 Admin
               </Button>
             )}
-            <Button variant="ghost" size="sm" onClick={() => navigate("/editor-pro-real")}>
+            <Button variant="ghost" size="sm" onClick={() => handleNavigate("Editor Pro Real", "/editor-pro-real")}>
               Editor Pro Real
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => navigate("/apis")}>
+            <Button variant="ghost" size="sm" onClick={() => handleNavigate("APIs", "/apis")}>
               APIs
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => navigate("/planos")}>
+            <Button variant="ghost" size="sm" onClick={() => handleNavigate("Planos", "/planos")}>
               Planos
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => navigate("/perfil")}>
+            <Button variant="ghost" size="sm" onClick={() => handleNavigate("Perfil", "/perfil")}>
               Perfil
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => navigate("/produtos-prontos")}>
+            <Button variant="ghost" size="sm" onClick={() => handleNavigate("Produtos Prontos", "/produtos-prontos")}>
               Produtos Prontos
             </Button>
-            <Button variant="ghost" size="sm" onClick={signOut}>
+            <Button variant="ghost" size="sm" onClick={handleSignOut}>
               Sair
             </Button>
           </div>
@@ -106,6 +159,7 @@ const Index = () => {
 
       {/* Main Content */}
       <main className="container max-w-5xl mx-auto px-4 py-8 space-y-6 overflow-x-hidden">
+        {isBooting && <SystemBootFallback />}
         {/* Hero */}
         <div className="text-center space-y-3 pb-2">
           <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Modo cinema automatico</p>
@@ -119,7 +173,7 @@ const Index = () => {
 
         {/* CTA Infoproduto */}
         <button
-          onClick={() => navigate("/infoproduto")}
+          onClick={() => handleNavigate("Infoproduto", "/infoproduto")}
           className="w-full group relative overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-r from-[#f5c451]/10 via-[#e53935]/10 to-[#3b82f6]/10 p-6 text-left transition-all hover:border-primary/60 hover:shadow-[0_0_40px_-8px_rgba(245,196,81,0.35)]"
         >
           <div className="flex items-center gap-4">
@@ -138,7 +192,7 @@ const Index = () => {
 
         {/* CTA Editor Pro Real */}
         <button
-          onClick={() => navigate("/editor-pro-real")}
+          onClick={() => handleNavigate("Editor Pro Real", "/editor-pro-real")}
           className="w-full group relative overflow-hidden rounded-2xl border border-red-500/40 bg-gradient-to-r from-black via-red-500/10 to-black p-6 text-left transition-all hover:border-red-500/70 hover:shadow-[0_0_40px_-8px_rgba(255,0,0,0.35)]"
         >
           <div className="flex items-center gap-4">
@@ -157,7 +211,7 @@ const Index = () => {
 
         {/* CTA Gerador de Video Premium */}
         <button
-          onClick={() => navigate("/svp-gerador-video-premium")}
+          onClick={() => handleNavigate("Gerador de Video Premium", "/svp-gerador-video-premium")}
           className="w-full group relative overflow-hidden rounded-2xl border border-cyan-400/30 bg-gradient-to-r from-[#0ea5e9]/10 via-[#7c3aed]/10 to-[#22d3ee]/10 p-6 text-left transition-all hover:border-cyan-300/60 hover:shadow-[0_0_40px_-8px_rgba(34,211,238,0.35)]"
         >
           <div className="flex items-center gap-4">
@@ -194,10 +248,8 @@ const Index = () => {
         </button>
 
         {showCalendar && (
-          <Suspense fallback={<div>Carregando calendario...</div>}>
-            <SafeRender label="Conteudo 30 Dias" onAction={() => setShowCalendar(false)}>
-              {Content30Days ? <Content30Days /> : <div>Erro ao carregar módulo</div>}
-            </SafeRender>
+          <Suspense fallback={<SystemBootFallback label="Carregando calendario" />}>
+            {Content30Days ? <Content30Days /> : <div>Erro ao carregar módulo</div>}
           </Suspense>
         )}
 
@@ -221,10 +273,8 @@ const Index = () => {
         </button>
 
         {showSalesMachine && (
-          <Suspense fallback={<div>Carregando maquina de vendas...</div>}>
-            <SafeRender label="Sales Machine" onAction={() => setShowSalesMachine(false)}>
-              {SalesMachine ? <SalesMachine /> : <div>Erro ao carregar módulo</div>}
-            </SafeRender>
+          <Suspense fallback={<SystemBootFallback label="Carregando maquina de vendas" />}>
+            {SalesMachine ? <SalesMachine /> : <div>Erro ao carregar módulo</div>}
           </Suspense>
         )}
 
@@ -248,16 +298,14 @@ const Index = () => {
         </button>
 
         {showDarkFlow && (
-          <Suspense fallback={<div>Carregando motor IA...</div>}>
-            <SafeRender label="Dark Flow" onAction={() => setShowDarkFlow(false)}>
-              {DarkFlowEngine ? <DarkFlowEngine /> : <div>Erro ao carregar módulo</div>}
-            </SafeRender>
+          <Suspense fallback={<SystemBootFallback label="Carregando motor IA" />}>
+            {DarkFlowEngine ? <DarkFlowEngine /> : <div>Erro ao carregar módulo</div>}
           </Suspense>
         )}
 
         {/* CTA Gerador Cinematografico */}
         <button
-          onClick={() => setShowGenerator(true)}
+          onClick={handleShowGenerator}
           className="w-full group relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-r from-[#10b981]/10 via-[#0ea5e9]/10 to-[#3b82f6]/10 p-6 text-left transition-all hover:border-emerald-500/60 hover:shadow-[0_0_40px_-8px_rgba(16,185,129,0.35)]"
         >
           <div className="flex items-center gap-4">
@@ -275,27 +323,19 @@ const Index = () => {
         </button>
 
         {showGenerator && (
-          <Suspense fallback={<div>Carregando gerador...</div>}>
-            <SafeRender label="Gerador Cinematografico" onAction={() => setShowGenerator(false)}>
-              {VideoGeneratorUI ? (
-                <>
-                  <div className="bg-[#12121A] p-6 rounded-xl border border-[#2A2A3A]">
-                    <h2 className="text-white text-xl font-bold">🎬 Gerador de Vídeo Cinematográfico</h2>
-                    <p className="text-gray-400">Sistema carregado com proteção ativa</p>
-                  </div>
-
-                  <VideoGeneratorUI />
-                </>
-              ) : (
-                <div>Erro ao carregar módulo</div>
-              )}
-            </SafeRender>
-          </Suspense>
+          <>
+            {isBooting && <SystemBootFallback label="Carregando gerador" />}
+            <div className="bg-[#12121A] p-6 rounded-xl border border-[#2A2A3A]">
+              <h2 className="text-white text-xl font-bold">🎬 Gerador de Vídeo Cinematográfico</h2>
+              <p className="text-gray-400">Sistema carregado com proteção ativa</p>
+            </div>
+            <VideoGeneratorUI />
+          </>
         )}
 
         {/* CTA Video Wizard */}
         <button
-          onClick={() => setShowWizard(true)}
+          onClick={handleShowWizard}
           className="w-full group relative overflow-hidden rounded-2xl border border-[#f97316]/40 bg-gradient-to-r from-[#f97316]/10 via-[#f5c451]/10 to-[#3b82f6]/10 p-6 text-left transition-all hover:border-[#f97316]/70 hover:shadow-[0_0_40px_-8px_rgba(249,115,22,0.35)]"
         >
           <div className="flex items-center gap-4">
@@ -313,14 +353,12 @@ const Index = () => {
         </button>
 
         {showWizard && (
-          <Suspense fallback={<div>Carregando wizard...</div>}>
-            <SafeRender label="Video Wizard" onAction={() => setShowWizard(false)}>
-              {VideoWizard ? (
-                <VideoWizard initialProduto={initialProduto} autoStart={autoStart} />
-              ) : (
-                <div>Erro ao carregar módulo</div>
-              )}
-            </SafeRender>
+          <Suspense fallback={<SystemBootFallback label="Carregando wizard" />}>
+            {VideoWizard ? (
+              <VideoWizard initialProduto={initialProduto} autoStart={autoStart} />
+            ) : (
+              <div>Erro ao carregar módulo</div>
+            )}
           </Suspense>
         )}
       </main>

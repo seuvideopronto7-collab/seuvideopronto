@@ -1,6 +1,5 @@
 import { useState } from "react";
 import AdminLayout from "@/components/admin/AdminLayout";
-import SafeRender from "@/components/SafeRender";
 import VideoGeneratorUI from "@/components/VideoGeneratorUI";
 
 const VideoGeneratorPage = () => {
@@ -11,12 +10,13 @@ const VideoGeneratorPage = () => {
       title="Geração de Vídeo"
       description="Pipeline real por imagem"
       actionLabel={showGenerator ? "Gerador ativo" : "Carregar gerador"}
-      onAction={() => setShowGenerator(true)}
+      onAction={() => {
+        console.log("Admin: Gerador de video acionado");
+        setShowGenerator(true);
+      }}
     >
       {showGenerator && (
-        <SafeRender label="Video Generator" onAction={() => setShowGenerator(false)}>
-          <VideoGeneratorUI />
-        </SafeRender>
+        <VideoGeneratorUI />
       )}
     </AdminLayout>
   );

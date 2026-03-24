@@ -7,7 +7,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/hooks/useAuth";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AdminRoute from "@/components/AdminRoute";
-import SafeRender from "@/components/SafeRender";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import UserDashboard from "./pages/UserDashboard";
@@ -28,9 +27,7 @@ import SvpGeradorVideoPremium from "./pages/SvpGeradorVideoPremium";
 
 const queryClient = new QueryClient();
 
-const wrapSafe = (label: string, element: ReactNode) => (
-  <SafeRender label={label}>{element}</SafeRender>
-);
+const wrapSafe = (_label: string, element: ReactNode) => element;
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
