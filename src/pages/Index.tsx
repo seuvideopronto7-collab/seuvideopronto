@@ -151,6 +151,25 @@ const Index = () => {
           <div className="absolute inset-0 bg-gradient-to-r from-red-500/10 to-black/10 opacity-0 group-hover:opacity-100 transition-opacity" />
         </button>
 
+        {/* CTA Gerador de Video Premium */}
+        <button
+          onClick={() => navigate("/svp-gerador-video-premium")}
+          className="w-full group relative overflow-hidden rounded-2xl border border-cyan-400/30 bg-gradient-to-r from-[#0ea5e9]/10 via-[#7c3aed]/10 to-[#22d3ee]/10 p-6 text-left transition-all hover:border-cyan-300/60 hover:shadow-[0_0_40px_-8px_rgba(34,211,238,0.35)]"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#22d3ee] to-[#7c3aed] flex items-center justify-center text-2xl shrink-0">
+              ✨
+            </div>
+            <div>
+              <h3 className="text-lg font-bold">GERADOR DE VÍDEO PREMIUM</h3>
+              <p className="text-sm text-muted-foreground">
+                Do briefing ao Reels pronto com visual cinematográfico
+              </p>
+            </div>
+          </div>
+          <div className="absolute inset-0 bg-gradient-to-r from-cyan-400/5 to-violet-500/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+        </button>
+
         {/* CTA Conteúdo 30 Dias */}
         <button
           onClick={handleShowCalendar}

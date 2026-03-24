@@ -3,9 +3,10 @@ export function buildCinematicPrompt(
   style: string,
   useDarkflow = false,
   useViral = false,
+  modePro = false,
 ) {
   const base =
-    "Ultra cinematic commercial product shot, premium lighting, rich contrast, depth of field, elegant camera motion, product hero frame, luxury ad aesthetic, floating particles, premium glow, realistic reflections, polished shadows.";
+    "Cinematic product video, dramatic lighting, luxury commercial, slow motion, particles, glow effects, depth of field, high contrast, 4K, premium advertising. Progressive zoom, light parallax, floating particles, dynamic lighting, hero product framing, polished shadows.";
 
   const byType: Record<string, string> = {
     natural: "Natural supplement product, botanical cues, healthy vitality, trust and purity.",
@@ -23,15 +24,21 @@ export function buildCinematicPrompt(
   };
 
   const darkflow = useDarkflow
-    ? "Darkflow mode: dramatic shadows, purple undertones, more suspense, stronger cinematic tension."
+    ? "Darkflow mode: dramatic shadows, suspense, stronger cinematic tension, dramatic contrast."
     : "";
 
   const viral = useViral
-    ? "Viral cut awareness: first seconds must feel punchy, immediate hook, stronger visual impact."
+    ? "Viral cut awareness: first seconds must feel punchy, immediate hook, faster pacing, stronger visual impact."
+    : "";
+
+  const pro = modePro
+    ? "PRO mode: add storytelling beats, simulated scenes, intensified visual effects, aggressive CTA energy. Style reference: Apple + Nike + TikTok Ads."
     : "";
 
   const typeKey = productType?.toLowerCase() || "outro";
   const styleKey = style?.toLowerCase() || "";
 
-  return [base, byType[typeKey] ?? byType.outro, byStyle[styleKey], darkflow, viral].filter(Boolean).join(" ");
+  return [base, byType[typeKey] ?? byType.outro, byStyle[styleKey], darkflow, viral, pro]
+    .filter(Boolean)
+    .join(" ");
 }

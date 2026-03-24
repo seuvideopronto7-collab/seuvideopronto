@@ -18,6 +18,7 @@ import Planos from "./pages/Planos";
 import NotFound from "./pages/NotFound";
 import Apis from "./pages/Apis";
 import EditorProReal from "./pages/EditorProReal";
+import SvpGeradorVideoPremium from "./pages/SvpGeradorVideoPremium";
 
 const queryClient = new QueryClient();
 
@@ -129,6 +130,17 @@ const App = () => (
                   "Editor Pro Real",
                   <ProtectedRoute>
                     <EditorProReal />
+                  </ProtectedRoute>,
+                )
+              }
+            />
+            <Route
+              path="/svp-gerador-video-premium"
+              element={
+                wrapSafe(
+                  "SVP Gerador Video Premium",
+                  <ProtectedRoute>
+                    <SvpGeradorVideoPremium />
                   </ProtectedRoute>,
                 )
               }

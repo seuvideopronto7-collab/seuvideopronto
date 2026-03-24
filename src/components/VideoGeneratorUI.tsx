@@ -8,25 +8,44 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { createVideoJob, fetchVideoJob, processVideoJob } from "@/services/api";
 import { buscarAPI } from "@/lib/apiRegistry";
+import { buildCinematicPrompt } from "@/lib/buildCinematicPrompt";
+import { buildScript } from "@/lib/buildScript";
 
 const productTypes = ["Natural", "Suplemento", "Cosmetico", "Tecnologia", "Outro"];
 const styleTypes = ["Luxo", "Fitness", "Saude", "Tecnologia"];
 
 const finalStatuses = new Set(["completed", "failed", "fallback"]);
+const objectives = ["Vendas", "Viral", "Autoridade"];
+
+type ScriptData = {
+  hook: string;
+  benefits: string[];
+  cta: string;
+  fullScript: string;
+  onScreenText: string[];
+  isFallback?: boolean;
+};
 
 const VideoGeneratorUI = () => {
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string>("");
+  const [productName, setProductName] = useState<string>("");
+  const [brandName, setBrandName] = useState<string>("");
+  const [niche, setNiche] = useState<string>("");
+  const [objective, setObjective] = useState<string>(objectives[0]);
   const [productType, setProductType] = useState(productTypes[0]);
   const [styleType, setStyleType] = useState(styleTypes[0]);
   const [useDarkflow, setUseDarkflow] = useState(false);
   const [useViral, setUseViral] = useState(false);
+  const [modePro, setModePro] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
   const [jobStatus, setJobStatus] = useState<string | null>(null);
   const [progress, setProgress] = useState<number>(0);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isGeneratingScript, setIsGeneratingScript] = useState(false);
+  const [scriptData, setScriptData] = useState<ScriptData | null>(null);
   const [resolution, setResolution] = useState<string | null>(null);
   const [fileSize, setFileSize] = useState<string | null>(null);
   const [apiChecks, setApiChecks] = useState<Array<{ name: string; status: "ok" | "error"; message?: string }>>([]);
