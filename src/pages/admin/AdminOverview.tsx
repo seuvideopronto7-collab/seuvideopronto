@@ -15,12 +15,12 @@ import {
 const AdminOverview = () => {
   const navigate = useNavigate();
   const stats = [
-    { label: "Videos gerados hoje", value: "148", trend: "+12%", tone: "text-emerald-300" },
-    { label: "Renderizacoes em andamento", value: "23", trend: "Processando", tone: "text-cyan-300" },
-    { label: "Renderizacoes concluidas", value: "1.284", trend: "Ultimos 7 dias", tone: "text-blue-300" },
+    { label: "Vídeos gerados hoje", value: "148", trend: "+12%", tone: "text-emerald-300" },
+    { label: "Renderizações em andamento", value: "23", trend: "Processando", tone: "text-cyan-300" },
+    { label: "Renderizações concluídas", value: "1.284", trend: "Últimos 7 dias", tone: "text-blue-300" },
     { label: "Falhas de processamento", value: "4", trend: "Fallback ativo", tone: "text-rose-300" },
     { label: "APIs conectadas", value: "6", trend: "Runway + Pika", tone: "text-amber-300" },
-    { label: "Publicacoes feitas", value: "92", trend: "Auto-post", tone: "text-emerald-300" },
+    { label: "Publicações feitas", value: "92", trend: "Auto-post", tone: "text-emerald-300" },
   ];
 
   const dailyData = [48, 72, 66, 98, 130, 110, 142];
@@ -28,22 +28,22 @@ const AdminOverview = () => {
 
   return (
     <AdminLayout
-      title="Visao Geral"
-      description="Visao executiva do motor cinematografico"
-      actionLabel="Gerar video cinematografico"
+      title="Visão Geral"
+      description="Visão executiva do motor cinematográfico"
+      actionLabel="Gerar vídeo cinematográfico"
     >
       <section className="cinema-panel p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs text-muted-foreground uppercase tracking-[0.2em]">Mensagem central</p>
             <h2 className="text-2xl font-semibold mt-2">
-              Transforme uma simples imagem de produto em um video cinematografico altamente comercial.
+              Transforme uma simples imagem de produto em um vídeo cinematográfico altamente comercial.
             </h2>
             <p className="text-sm text-muted-foreground mt-2">
-              Upload, roteiro, voz, trilha e renderizacao automatica em um unico fluxo.
+              Upload, roteiro, voz, trilha e renderização automática em um único fluxo.
             </p>
           </div>
-          <Button variant="neon" onClick={() => navigate("/admin/video-generator")}>Gerar video agora</Button>
+          <Button variant="neon" onClick={() => navigate("/admin/video-generator")}>Gerar vídeo agora</Button>
         </div>
       </section>
 
@@ -63,8 +63,8 @@ const AdminOverview = () => {
         <div className="cinema-panel p-5 space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-semibold">Geracao por dia</h3>
-              <p className="text-xs text-muted-foreground">Ultimos 7 dias</p>
+              <h3 className="text-lg font-semibold">Geração por dia</h3>
+              <p className="text-xs text-muted-foreground">Últimos 7 dias</p>
             </div>
             <Badge variant="secondary">+18% semana</Badge>
           </div>

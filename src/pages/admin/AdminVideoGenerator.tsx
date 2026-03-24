@@ -164,6 +164,7 @@ const AdminVideoGenerator = () => {
       }
 
       updateStage(3, "processing");
+      let roteiroTextoFinal = "";
       try {
         const { data, error } = await withTimeout(
           supabase.functions.invoke("generate-viral", {
@@ -186,17 +187,18 @@ const AdminVideoGenerator = () => {
         );
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
-        const roteiroTexto = data?.roteiro?.roteiro_completo || data?.roteiro?.hook || "Roteiro cinematografico pronto.";
-        setRoteiro(roteiroTexto);
+        roteiroTextoFinal = data?.roteiro?.roteiro_completo || data?.roteiro?.hook || "Roteiro cinematografico pronto.";
+        setRoteiro(roteiroTextoFinal);
         updateStage(3, "done");
       } catch (err) {
-        setRoteiro("Roteiro base pronto com gancho e CTA comercial.");
+        roteiroTextoFinal = "Roteiro base pronto com gancho e CTA comercial.";
+        setRoteiro(roteiroTextoFinal);
         updateStage(3, "fallback", "Fallback aplicado na geração de roteiro");
       }
 
       updateStage(4, "processing");
-      const narracaoBase = roteiro
-        ? `Narração comercial: ${roteiro.slice(0, 180)}...`
+      const narracaoBase = roteiroTextoFinal
+        ? `Narração comercial: ${roteiroTextoFinal.slice(0, 180)}...`
         : "Narração comercial pronta para sincronizar.";
       setNarracao(narracaoBase);
       updateStage(4, "fallback", "ElevenLabs não conectado, texto gerado");
@@ -236,26 +238,15 @@ const AdminVideoGenerator = () => {
     link.click();
   };
 
-  const stageLabels = [
-    "Upload concluido",
-    "Preparando prompt",
-    "Enviando para motor de video",
-    "Gerando roteiro",
-    "Gerando narracao",
-    "Aplicando trilha",
-    "Renderizando video final",
-    "Finalizado",
-  ];
-
   return (
-    <AdminLayout title="Geracao de Video" description="Pipeline real por imagem" actionLabel="Nova renderizacao">
+    <AdminLayout title="Geração de Vídeo" description="Pipeline real por imagem" actionLabel="Nova renderização">
       <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_0.9fr] gap-6">
         <section className="space-y-6">
           <div className="cinema-panel p-6 space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-semibold">Upload cinematografico</h2>
-                <p className="text-xs text-muted-foreground">JPG, PNG, WEBP com validacao real</p>
+                <h2 className="text-lg font-semibold">Upload cinematográfico</h2>
+                <p className="text-xs text-muted-foreground">JPG, PNG, WEBP com validação real</p>
               </div>
               <Badge variant="secondary">Etapa 1</Badge>
             </div>
@@ -298,7 +289,7 @@ const AdminVideoGenerator = () => {
                     <span>{fileSize}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Resolucao</span>
+                    <span className="text-muted-foreground">Resolução</span>
                     <span>{resolution || "Carregando"}</span>
                   </div>
                 </div>
@@ -334,8 +325,8 @@ const AdminVideoGenerator = () => {
           <div className="cinema-panel p-6 space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-semibold">Estilo de geracao</h2>
-                <p className="text-xs text-muted-foreground">Luxo, fitness, saude ou tecnologia</p>
+                <h2 className="text-lg font-semibold">Estilo de geração</h2>
+                <p className="text-xs text-muted-foreground">Luxo, fitness, saúde ou tecnologia</p>
               </div>
               <Badge variant="secondary">Etapa 3</Badge>
             </div>
@@ -359,7 +350,7 @@ const AdminVideoGenerator = () => {
           <div className="cinema-panel p-6 space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-semibold">Acoes premium</h2>
+                <h2 className="text-lg font-semibold">Ações premium</h2>
                 <p className="text-xs text-muted-foreground">Fluxo completo com fallback inteligente</p>
               </div>
               <Badge variant="secondary">Etapa 4</Badge>
@@ -389,32 +380,34 @@ const AdminVideoGenerator = () => {
             </div>
             <Progress value={progressValue} />
             <div className="space-y-2">
-              {stageLabels.map((label, index) => {
-                const status = stages[index];
+              {stages.map((stage, index) => {
                 const badgeClass =
-                  status === "done"
+                  stage.status === "done"
                     ? "status-complete"
-                    : status === "processing"
+                    : stage.status === "processing"
                       ? "status-processing"
-                      : status === "error"
+                      : stage.status === "error"
                         ? "status-error"
-                        : status === "blocked"
-                          ? "status-disconnected"
+                        : stage.status === "fallback"
+                          ? "status-warning"
                           : "status-disconnected";
                 const badgeLabel =
-                  status === "done"
-                    ? "CONCLUIDO"
-                    : status === "processing"
+                  stage.status === "done"
+                    ? "CONCLUÍDO"
+                    : stage.status === "processing"
                       ? "PROCESSANDO"
-                      : status === "error"
+                      : stage.status === "error"
                         ? "ERRO"
-                        : status === "blocked"
-                          ? "DESCONECTADO"
+                        : stage.status === "fallback"
+                          ? "FALLBACK"
                           : "PENDENTE";
                 return (
-                  <div key={label} className="flex items-center justify-between rounded-xl border border-border/50 bg-muted/20 px-3 py-2">
-                    <span className="text-xs text-muted-foreground">{label}</span>
-                    <span className={`status-pill ${badgeClass}`}>{badgeLabel}</span>
+                  <div key={`${stage.label}-${index}`} className="space-y-1 rounded-xl border border-border/50 bg-muted/20 px-3 py-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">{stage.label}</span>
+                      <span className={`status-pill ${badgeClass}`}>{badgeLabel}</span>
+                    </div>
+                    {stage.note && <div className="text-[10px] text-muted-foreground">{stage.note}</div>}
                   </div>
                 );
               })}
@@ -424,25 +417,32 @@ const AdminVideoGenerator = () => {
           <div className="cinema-panel p-6 space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-semibold">Preview</h2>
-                <p className="text-xs text-muted-foreground">Video final com player elegante</p>
+                  <h2 className="text-lg font-semibold">Preview</h2>
+                  <p className="text-xs text-muted-foreground">Vídeo final com player elegante</p>
               </div>
-              {renderUrl ? <Badge variant="secondary">Pronto</Badge> : <Badge variant="secondary">Aguardando</Badge>}
+              <div className="flex items-center gap-2">
+                {mode && (
+                  <Badge variant="secondary">
+                    {mode === "darkflow" ? "Darkflow" : mode === "viral" ? "Viral" : "Cinema"}
+                  </Badge>
+                )}
+                {renderUrl ? <Badge variant="secondary">Pronto</Badge> : <Badge variant="secondary">Aguardando</Badge>}
+              </div>
             </div>
             <div className="rounded-2xl border border-border/50 bg-black/60 p-2">
               {renderUrl ? (
                 <video src={renderUrl} controls className="w-full rounded-xl" poster={previewUrl || undefined} />
               ) : (
                 <div className="rounded-xl h-52 flex items-center justify-center text-xs text-muted-foreground">
-                  Nenhum video renderizado
+                  Nenhum vídeo renderizado
                 </div>
               )}
             </div>
             <div className="grid grid-cols-2 gap-2">
               <Button variant="glass" onClick={downloadVideo} disabled={!renderUrl}>
-                <Download className="h-4 w-4" /> Baixar video
+                <Download className="h-4 w-4" /> Baixar vídeo
               </Button>
-              <Button variant="glass" onClick={() => renderUrl && copyText(renderUrl, "Link do video")} disabled={!renderUrl}>
+              <Button variant="glass" onClick={() => renderUrl && copyText(renderUrl, "Link do vídeo")} disabled={!renderUrl}>
                 <Copy className="h-4 w-4" /> Copiar link
               </Button>
             </div>
@@ -450,12 +450,19 @@ const AdminVideoGenerator = () => {
 
           <div className="cinema-panel p-6 space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Prompt cinematografico</h2>
-              <Badge variant="secondary">Auto</Badge>
+              <h2 className="text-lg font-semibold">Prompt cinematográfico</h2>
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary">Auto</Badge>
+                {mode && (
+                  <Badge variant="secondary">
+                    {mode === "darkflow" ? "Darkflow" : mode === "viral" ? "Viral" : "Cinema"}
+                  </Badge>
+                )}
+              </div>
             </div>
             <p className="text-xs text-muted-foreground">Gerado com base no tipo do produto e estilo</p>
             <div className="rounded-xl border border-border/50 bg-muted/20 p-3 text-sm">
-              {promptText || "Aguardando selecao de produto e estilo."}
+              {promptText || "Aguardando seleção de produto e estilo."}
             </div>
             <Button
               variant="glass"
@@ -467,25 +474,32 @@ const AdminVideoGenerator = () => {
           </div>
 
           <div className="cinema-panel p-6 space-y-4">
-            <h2 className="text-lg font-semibold">Acoes finais</h2>
+            <h2 className="text-lg font-semibold">Ações finais</h2>
             <div className="space-y-3 text-xs text-muted-foreground">
               <div className="rounded-xl border border-border/50 bg-muted/20 p-3">
                 <div className="flex items-center justify-between">
                   <span>Roteiro comercial</span>
-                  <Button variant="ghost" size="sm" onClick={() => copyText(roteiro || "Roteiro indisponivel", "Roteiro")}>
+                  <Button variant="ghost" size="sm" onClick={() => copyText(roteiro || "Roteiro indisponível", "Roteiro")}>
                     <Copy className="h-3 w-3" /> Copiar
                   </Button>
                 </div>
-                <p className="mt-2 text-foreground text-sm">{roteiro || "Aguardando geracao"}</p>
+                <p className="mt-2 text-foreground text-sm">{roteiro || "Aguardando geração"}</p>
               </div>
               <div className="rounded-xl border border-border/50 bg-muted/20 p-3">
                 <div className="flex items-center justify-between">
-                  <span>Narracao</span>
-                  <Button variant="ghost" size="sm" onClick={() => copyText(narracao || "N/A", "Narracao")}>
+                  <span>Narração</span>
+                  <Button variant="ghost" size="sm" onClick={() => copyText(narracao || "N/A", "Narração")}>
                     <Copy className="h-3 w-3" /> Copiar
                   </Button>
                 </div>
-                <p className="mt-2 text-foreground text-sm">{narracao || "Integracao pendente"}</p>
+                <p className="mt-2 text-foreground text-sm">{narracao || "Integração pendente"}</p>
+              </div>
+              <div className="rounded-xl border border-border/50 bg-muted/20 p-3">
+                <div className="flex items-center justify-between">
+                  <span>Trilha sonora</span>
+                  <span className="text-[10px] text-muted-foreground">Auto</span>
+                </div>
+                <p className="mt-2 text-foreground text-sm">{soundtrack || "Biblioteca aguardando seleção"}</p>
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
