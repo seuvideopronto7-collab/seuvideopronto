@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Upload, Wand2, Copy, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
