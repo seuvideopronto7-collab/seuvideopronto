@@ -256,6 +256,63 @@ button:hover {
   color: var(--muted);
 }
 
+.log {
+  margin-top: 14px;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 12px;
+  background: #f7f4ef;
+  border: 1px dashed rgba(0, 0, 0, 0.08);
+  min-height: 60px;
+  font-size: 13px;
+}
+
+.calendar {
+  margin-top: 16px;
+  display: grid;
+  gap: 10px;
+}
+
+.calendar-item {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #f7f4ef;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #f0f0f0;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.chip input {
+  margin: 0;
+}
+
+.btn-inline {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: #f0f0f0;
+}
+
 .products-header {
   display: flex;
   align-items: center;

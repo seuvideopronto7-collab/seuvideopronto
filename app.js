@@ -37,11 +37,30 @@ const flowInfo = document.getElementById("flowInfo");
 const resumeTitulo = document.getElementById("resumeTitulo");
 const resumeCta = document.getElementById("resumeCta");
 const resumeHashtags = document.getElementById("resumeHashtags");
+const btnAtivarMaquina = document.getElementById("btnAtivarMaquina");
+const btnPublicarInfoproduto = document.getElementById("btnPublicarInfoproduto");
+const darkflowLog = document.getElementById("darkflowLog");
+const btnConteudo30 = document.getElementById("btnConteudo30");
+const conteudo30Status = document.getElementById("conteudo30Status");
+const conteudo30Calendario = document.getElementById("conteudo30Calendario");
+const nichoField = document.getElementById("nicho");
+const objetivoField = document.getElementById("objetivo");
+const marcaField = document.getElementById("marca");
+const publicoField = document.getElementById("publico");
+const plataformaField = document.getElementById("plataforma");
+const canalInstagram = document.getElementById("canalInstagram");
+const canalTikTok = document.getElementById("canalTikTok");
+const canalYouTube = document.getElementById("canalYouTube");
+const btnConectarRedes = document.getElementById("btnConectarRedes");
+const btnAtivarAutopost = document.getElementById("btnAtivarAutopost");
+const autopostStatus = document.getElementById("autopostStatus");
 
 const STORAGE_KEY = "material_salvo";
 const QUEUE_KEY = "fila_publicacao";
 const PRODUTOS_KEY = "produtos_prontos";
 const ROUTE_STATE_KEY = "route_state_material";
+const DARKFLOW_PROJECTS_KEY = "darkflow_projects";
+const DARKFLOW_CALENDAR_KEY = "darkflow_calendar";
 
 const setStatus = (message, tone) => {
   saveStatus.textContent = message;
@@ -56,6 +75,21 @@ const setInfo = (message, tone) => {
 const setProdutosStatus = (message, tone) => {
   produtosStatus.textContent = message;
   produtosStatus.style.color = tone === "warning" ? "#d97706" : "#6f6f6f";
+};
+
+const setAutopostStatus = (message, tone) => {
+  autopostStatus.textContent = message;
+  autopostStatus.style.color = tone === "warning" ? "#d97706" : "#6f6f6f";
+};
+
+const appendDarkflowLog = (message) => {
+  const line = document.createElement("div");
+  line.textContent = message;
+  darkflowLog.appendChild(line);
+};
+
+const resetDarkflowLog = () => {
+  darkflowLog.innerHTML = "";
 };
 
 const getMaterial = () => {
@@ -99,6 +133,127 @@ const getFallbackMaterial = () => ({
     landing: ""
   }
 });
+
+const getDarkflowInput = () => ({
+  nicho: nichoField.value.trim() || "conteudo",
+  objetivo: objetivoField.value || "vendas",
+  marca: marcaField.value.trim() || "Produto",
+  publico: publicoField.value.trim() || "publico geral",
+  plataforma: plataformaField.value || "instagram"
+});
+
+const createDarkflowState = () => ({
+  etapa: "roteiro",
+  progresso: 0,
+  dados: {},
+  erros: []
+});
+
+const gerarRoteiro = (input) => [
+  `Hook viral para ${input.nicho}`,
+  `Storytelling com ${input.objetivo}`,
+  `CTA para ${input.marca}`
+];
+
+const gerarVariacoes = (input) => ({
+  titulos: Array.from({ length: 5 }, (_, i) => `Titulo ${i + 1} - ${input.nicho}`),
+  descricoes: Array.from({ length: 5 }, (_, i) => `Descricao ${i + 1} focada em ${input.objetivo}.`),
+  hashtags: [
+    `#${input.nicho.replace(/\s+/g, "")}`,
+    "#fature",
+    "#conteudo",
+    "#viral",
+    "#marketing"
+  ]
+});
+
+const gerarProduto = (input) => ({
+  nome: `${input.marca} - Metodo Turbo`,
+  oferta: "Acesso imediato + bonus exclusivos",
+  promessa: `Resultado perceptivel para ${input.publico}`,
+  vsl: ["Promessa", "Prova", "Oferta", "Garantia"]
+});
+
+const gerarSeo = (input, roteiro) => {
+  const fallback = {
+    palavrasChave: [input.nicho, "conteudo", "viral"],
+    titulo: `Guia rapido de ${input.nicho}`,
+    descricao: roteiro.join(" "),
+    status: "fallback"
+  };
+
+  try {
+    return {
+      palavrasChave: [input.nicho, "SEO", "ganhos"],
+      titulo: `Como dominar ${input.nicho} com IA`,
+      descricao: `Resumo estrategico para ${input.nicho}.`,
+      status: "ok"
+    };
+  } catch (error) {
+    return fallback;
+  }
+};
+
+const salvarProjetoLocal = (dados) => {
+  const raw = localStorage.getItem(DARKFLOW_PROJECTS_KEY);
+  const projetos = raw ? JSON.parse(raw) : [];
+  const novo = {
+    id: String(Date.now()),
+    nome: dados.produto?.nome || "Projeto DarkFlow",
+    tipo: "infoproduto",
+    data: new Date().toISOString(),
+    dados
+  };
+  projetos.push(novo);
+  localStorage.setItem(DARKFLOW_PROJECTS_KEY, JSON.stringify(projetos));
+  return novo;
+};
+
+const publicarConteudo = (dados, canais) => {
+  canais.forEach((canal) => {
+    console.log(`Publicado no ${canal}`);
+  });
+  return canais.map((canal) => ({ canal, status: "ok" }));
+};
+
+const executarFluxoCompleto = (input) => {
+  const state = createDarkflowState();
+  resetDarkflowLog();
+  appendDarkflowLog("Iniciando DarkFlow Engine...");
+
+  state.etapa = "roteiro";
+  state.progresso = 20;
+  const roteiro = gerarRoteiro(input);
+  appendDarkflowLog("Roteiro gerado.");
+
+  state.etapa = "produto";
+  state.progresso = 45;
+  const variacoes = gerarVariacoes(input);
+  appendDarkflowLog("Variacoes prontas.");
+
+  const produto = gerarProduto(input);
+  appendDarkflowLog("Produto gerado.");
+
+  const seo = gerarSeo(input, roteiro);
+  if (seo.status === "fallback") {
+    appendDarkflowLog("SEO em fallback. Fluxo continua sem travar.");
+  } else {
+    appendDarkflowLog("SEO OK.");
+  }
+
+  const saved = salvarProjetoLocal({ roteiro, variacoes, produto, seo, input });
+  appendDarkflowLog(`Salvo local: ${saved.nome}.`);
+
+  const canais = getCanaisSelecionados();
+  publicarConteudo({ roteiro, produto, seo }, canais);
+  appendDarkflowLog(`Publicado: ${canais.join(", ") || "sem canais"}.`);
+
+  state.etapa = "publicacao";
+  state.progresso = 100;
+  state.dados = { roteiro, variacoes, produto, seo };
+
+  return state;
+};
 
 const applyMaterialToFields = (data) => {
   if (!data) return;
@@ -267,11 +422,22 @@ const renderProdutos = (produtos) => {
     badge.className = "badge";
     badge.textContent = produto.tipo || "produto";
 
+    const reuse = document.createElement("button");
+    reuse.type = "button";
+    reuse.className = "btn-inline";
+    reuse.textContent = "Usar novamente";
+    reuse.addEventListener("click", () => {
+      produtoNome.value = produto.nome || "";
+      produtoTipo.value = produto.tipo || "ebook";
+      setProdutosStatus("Produto selecionado para reutilizar.", "success");
+    });
+
     meta.appendChild(nome);
     meta.appendChild(sub);
 
     item.appendChild(meta);
     item.appendChild(badge);
+    item.appendChild(reuse);
     produtosLista.appendChild(item);
   });
 };
@@ -296,6 +462,67 @@ const criarProduto = () => {
   produtoNome.value = "";
   produtoTipo.value = "ebook";
   setProdutosStatus("Produto criado e salvo localmente.", "success");
+};
+
+const gerarCalendario30Dias = (input) => {
+  const hoje = new Date();
+  const itens = Array.from({ length: 30 }, (_, i) => {
+    const data = new Date(hoje);
+    data.setDate(hoje.getDate() + i);
+    return {
+      id: String(Date.now() + i),
+      data: data.toISOString().split("T")[0],
+      roteiro: `Roteiro ${i + 1} - ${input.nicho}`,
+      objetivo: input.objetivo,
+      legenda: `Legenda ${i + 1} focada em ${input.objetivo}.`,
+      hashtags: `#${input.nicho.replace(/\s+/g, "")} #conteudo`,
+      textoFalado: `Mensagem principal para ${input.publico}.`,
+      canal: input.plataforma
+    };
+  });
+  localStorage.setItem(DARKFLOW_CALENDAR_KEY, JSON.stringify(itens));
+  return itens;
+};
+
+const renderCalendario30Dias = (itens) => {
+  conteudo30Calendario.innerHTML = "";
+  itens.forEach((item) => {
+    const row = document.createElement("div");
+    row.className = "calendar-item";
+    const left = document.createElement("div");
+    left.textContent = `${item.data} - ${item.roteiro}`;
+    const right = document.createElement("div");
+    right.textContent = item.canal;
+    row.appendChild(left);
+    row.appendChild(right);
+    conteudo30Calendario.appendChild(row);
+  });
+};
+
+const getCanaisSelecionados = () => {
+  const canais = [];
+  if (canalInstagram.checked) canais.push("Instagram");
+  if (canalTikTok.checked) canais.push("TikTok");
+  if (canalYouTube.checked) canais.push("YouTube");
+  return canais;
+};
+
+const conectarRedes = () => {
+  const canais = getCanaisSelecionados();
+  if (!canais.length) {
+    setAutopostStatus("Selecione ao menos um canal.", "warning");
+    return;
+  }
+  setAutopostStatus(`Conectado: ${canais.join(", ")}.`, "success");
+};
+
+const ativarAutopost = () => {
+  const canais = getCanaisSelecionados();
+  if (!canais.length) {
+    setAutopostStatus("Selecione ao menos um canal.", "warning");
+    return;
+  }
+  setAutopostStatus("Autopost ativado com agendamento inteligente.", "success");
 };
 
 const baixarVideo = async (material) => {
@@ -410,6 +637,23 @@ btnProdutosAtualizar.addEventListener("click", () => {
   carregarProdutos().then(renderProdutos);
 });
 btnProdutoCriar.addEventListener("click", criarProduto);
+btnAtivarMaquina.addEventListener("click", () => {
+  const input = getDarkflowInput();
+  executarFluxoCompleto(input);
+});
+btnPublicarInfoproduto.addEventListener("click", () => {
+  const input = getDarkflowInput();
+  const state = executarFluxoCompleto(input);
+  flowInfo.textContent = `Infoproduto pronto: ${state.dados.produto?.nome || "Produto"}.`;
+});
+btnConteudo30.addEventListener("click", () => {
+  const input = getDarkflowInput();
+  const itens = gerarCalendario30Dias(input);
+  renderCalendario30Dias(itens);
+  conteudo30Status.textContent = "Calendario de 30 dias gerado e integrado ao fluxo.";
+});
+btnConectarRedes.addEventListener("click", conectarRedes);
+btnAtivarAutopost.addEventListener("click", ativarAutopost);
 
 btnGoFlow.addEventListener("click", () => navigateTo("/infoproduto"));
 btnGoDistribuidor.addEventListener("click", () => navigateTo("/distribuidor"));
@@ -427,6 +671,9 @@ window.addEventListener("popstate", (event) => {
 loadMaterial();
 atualizarYoutubeStatus();
 carregarProdutos().then(renderProdutos);
+renderCalendario30Dias(
+  JSON.parse(localStorage.getItem(DARKFLOW_CALENDAR_KEY) || "[]")
+);
 
 const initialPath = window.location.pathname === "/distribuidor" ? "/distribuidor" : "/infoproduto";
 if (window.location.pathname !== initialPath) {

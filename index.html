@@ -67,6 +67,58 @@
             </section>
 
             <section class="card">
+              <h2>DarkFlow Engine</h2>
+              <p class="subtitle">
+                Modo automatico que executa roteiro, variacoes, produto, SEO e publicacao sem travar.
+              </p>
+              <div class="actions">
+                <button id="btnAtivarMaquina" class="primary" type="button">Ativar Modo Maquina</button>
+                <button id="btnPublicarInfoproduto" class="ghost" type="button">
+                  Publicar meu infoproduto
+                </button>
+              </div>
+              <div class="log" id="darkflowLog"></div>
+            </section>
+
+            <section class="card">
+              <h2>Conteudo para 30 dias</h2>
+              <p class="subtitle">Coleta rapida e calendario automatico com autopost.</p>
+              <div class="form">
+                <div class="field">
+                  <label for="nicho">Nicho</label>
+                  <input id="nicho" type="text" placeholder="Ex: beleza" />
+                </div>
+                <div class="field">
+                  <label for="objetivo">Objetivo</label>
+                  <select id="objetivo">
+                    <option value="vendas">Vendas</option>
+                    <option value="viral">Viral</option>
+                    <option value="autoridade">Autoridade</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="marca">Nome da marca</label>
+                  <input id="marca" type="text" placeholder="Sua marca" />
+                </div>
+                <div class="field">
+                  <label for="publico">Publico</label>
+                  <input id="publico" type="text" placeholder="Ex: mulheres 25-35" />
+                </div>
+                <div class="field">
+                  <label for="plataforma">Plataforma principal</label>
+                  <select id="plataforma">
+                    <option value="instagram">Instagram</option>
+                    <option value="tiktok">TikTok</option>
+                    <option value="youtube">YouTube Shorts</option>
+                  </select>
+                </div>
+                <button id="btnConteudo30" class="primary" type="button">Gerar 30 dias</button>
+                <div id="conteudo30Status" class="note"></div>
+              </div>
+              <div class="calendar" id="conteudo30Calendario"></div>
+            </section>
+
+            <section class="card">
               <h2>Resumo do material</h2>
               <div class="resume">
                 <div>
@@ -202,6 +254,26 @@
                 <button id="btnRegerar" class="danger">Regerar conteudo</button>
               </div>
               <div class="info" id="infoAviso"></div>
+            </section>
+
+            <section class="card">
+              <h2>Autopost &amp; Plataformas</h2>
+              <p class="subtitle">Conexao simulada com redes e envio automatico.</p>
+              <div class="form">
+                <div class="field">
+                  <label>Conectar redes</label>
+                  <div class="chips">
+                    <label class="chip"><input id="canalInstagram" type="checkbox" checked /> Instagram</label>
+                    <label class="chip"><input id="canalTikTok" type="checkbox" checked /> TikTok</label>
+                    <label class="chip"><input id="canalYouTube" type="checkbox" checked /> YouTube</label>
+                  </div>
+                </div>
+                <div class="actions">
+                  <button id="btnConectarRedes" class="ghost" type="button">Conectar redes</button>
+                  <button id="btnAtivarAutopost" class="primary" type="button">Ativar autopost</button>
+                </div>
+                <div id="autopostStatus" class="note"></div>
+              </div>
             </section>
 
             <section class="card">
