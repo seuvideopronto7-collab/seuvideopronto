@@ -23,7 +23,38 @@ const ImportContent = ({ produto, nicho, publico, dor, beneficio, link, onResult
   const [videoLink, setVideoLink] = useState("");
   const [modo, setModo] = useState<string>("viral");
   const fileRef = useRef<HTMLInputElement>(null);
-  const fallbackVideoUrl = "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4";
+
+  const generateVideoFromImage = async (imageUrl: string) => {
+    const { data, error } = await supabase.functions.invoke("generate-video", {
+      body: {
+        imageUrl,
+        estilo: "cinematografico",
+        movimento: "leve zoom + parallax",
+        duracao: 5,
+      },
+    });
+    if (error) throw error;
+    if (data?.provider === "fallback") throw new Error("Provedor de video indisponivel");
+    if (!data?.videoUrl) throw new Error("Falha ao gerar video");
+    return data.videoUrl as string;
+  };
+
+  const generateVideoObrigatorio = async (imageUrl: string) => {
+    let attempts = 0;
+    while (attempts < 3) {
+      try {
+        const videoUrl = await generateVideoFromImage(imageUrl);
+        return { videoUrl, fallback: false };
+      } catch (err) {
+        attempts += 1;
+        if (attempts >= 3) {
+          console.warn("Falha ao gerar video apos 3 tentativas", err);
+          return { videoUrl: null, fallback: true };
+        }
+      }
+    }
+    return { videoUrl: null, fallback: true };
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -77,21 +108,15 @@ const ImportContent = ({ produto, nicho, publico, dor, beneficio, link, onResult
         fileUrl = urlData.publicUrl;
         if (file.type.startsWith("image/")) {
           try {
-            const { data, error } = await supabase.functions.invoke("generate-video", {
-              body: {
-                imageUrl: fileUrl,
-                estilo: "cinematografico",
-                movimento: "leve zoom + parallax",
-                duracao: 5,
-              },
-            });
-            if (error) throw error;
-            if (!data?.videoUrl) throw new Error("Falha ao gerar video");
-            analyzeUrl = data.videoUrl;
+            const { videoUrl, fallback } = await generateVideoObrigatorio(fileUrl);
+            analyzeUrl = videoUrl || fileUrl;
+            if (fallback) {
+              toast.warning("IA de video falhou. Fallback animado aplicado.");
+            }
           } catch (err) {
             console.error(err);
-            analyzeUrl = fallbackVideoUrl;
-            toast.warning("Geracao de video falhou. Usando fallback.");
+            analyzeUrl = fileUrl;
+            toast.warning("IA de video falhou. Fallback animado aplicado.");
           }
         } else {
           analyzeUrl = fileUrl;

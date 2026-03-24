@@ -49,6 +49,8 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
   const [file, setFile] = useState<File | null>(null);
   const [videoLink, setVideoLink] = useState("");
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [videoFallback, setVideoFallback] = useState<{ type: "video-fake"; url: string; animation: string } | null>(null);
   const [analysisData, setAnalysisData] = useState<any>(null);
   const [generationMode, setGenerationMode] = useState<string | null>(null);
   const [roteiroData, setRoteiroData] = useState<any>(null);
@@ -94,6 +96,8 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
     variacoesData,
     videoLink,
     videoUrl,
+    imageUrl,
+    videoFallback,
     variacoesCount,
   });
 
@@ -113,8 +117,33 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
       },
     });
     if (error) throw error;
+    if (data?.provider === "fallback") throw new Error("Provedor de video indisponivel");
     if (!data?.videoUrl) throw new Error("Falha ao gerar video");
     return data.videoUrl as string;
+  };
+
+  const createVideoFallback = (fallbackImageUrl: string) => ({
+    type: "video-fake" as const,
+    url: fallbackImageUrl,
+    animation: "zoom + fade",
+  });
+
+  const generateVideoObrigatorio = async (fallbackImageUrl: string) => {
+    let attempts = 0;
+    let lastError: unknown;
+
+    while (attempts < 3) {
+      try {
+        const generatedUrl = await generateVideoFromImage(fallbackImageUrl);
+        return { videoUrl: generatedUrl, fallback: null };
+      } catch (err) {
+        lastError = err;
+        attempts += 1;
+      }
+    }
+
+    console.warn("Falha ao gerar video apos 3 tentativas", lastError);
+    return { videoUrl: null, fallback: createVideoFallback(fallbackImageUrl) };
   };
 
   const persistProduto = async (override?: { status?: "rascunho" | "finalizado" | "publicado"; formData?: Partial<typeof formData> }) => {
@@ -311,23 +340,30 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
           fileUrl = urlData.publicUrl;
           const isImageUpload = file.type.startsWith("image/");
           if (isImageUpload) {
+            setImageUrl(fileUrl);
             try {
-              const generatedUrl = await generateVideoFromImage(fileUrl);
-              analyzeUrl = generatedUrl;
+              const { videoUrl: generatedUrl, fallback } = await generateVideoObrigatorio(fileUrl);
+              analyzeUrl = generatedUrl || fileUrl;
               setVideoUrl(generatedUrl);
-              void handleGenerateViralPack({ imageUrl: fileUrl, videoUrl: generatedUrl, formData: resolvedFormData });
+              setVideoFallback(fallback);
+              void handleGenerateViralPack({ imageUrl: fileUrl, videoUrl: generatedUrl || undefined, formData: resolvedFormData });
+              if (fallback) {
+                toast.warning("IA de video falhou. Fallback animado aplicado.");
+              }
             } catch (err) {
               console.error(err);
-              const fallbackUrl = "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4";
-              analyzeUrl = fallbackUrl;
-              setVideoUrl(fallbackUrl);
-              void handleGenerateViralPack({ imageUrl: fileUrl, videoUrl: fallbackUrl, formData: resolvedFormData });
-              toast.warning("Geracao de video falhou. Usando fallback.");
+              const fallback = createVideoFallback(fileUrl);
+              analyzeUrl = fileUrl;
+              setVideoUrl(null);
+              setVideoFallback(fallback);
+              void handleGenerateViralPack({ imageUrl: fileUrl, formData: resolvedFormData });
+              toast.warning("IA de video falhou. Fallback animado aplicado.");
             }
           } else {
             analyzeUrl = fileUrl;
             if (file.type.startsWith("video/")) {
               setVideoUrl(fileUrl);
+              setVideoFallback(null);
             }
           }
         }
@@ -536,6 +572,8 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
     setFile(null);
     setVideoLink("");
     setVideoUrl(null);
+    setImageUrl(null);
+    setVideoFallback(null);
     setFormData({
       produto: "",
       nicho: "",
@@ -561,6 +599,7 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
   useEffect(() => {
     if (isPlayableVideoUrl(videoLink)) {
       setVideoUrl(videoLink);
+      setVideoFallback(null);
     }
   }, [videoLink]);
 
@@ -573,6 +612,8 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
     setFormData(nextForm);
     setVideoLink(estrutura.videoLink || "");
     setVideoUrl(estrutura.videoUrl || null);
+    setImageUrl(estrutura.imageUrl || null);
+    setVideoFallback(estrutura.videoFallback || null);
     setAnalysisData(estrutura.analysisData || null);
     setRoteiroData(estrutura.roteiroData || null);
     setSeoData(estrutura.seoData || null);
@@ -670,6 +711,8 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
             seoData={seoData}
             viralData={viralData}
             videoUrl={videoUrl}
+            imageUrl={imageUrl}
+            videoFallback={videoFallback}
             onNewVersion={handleNewVersion}
             onEdit={() => goTo(8)}
             onContinue={() => goTo(10)}
