@@ -175,7 +175,7 @@ export const renderVideoFromImage = async (imageUrl: string, options?: RenderOpt
   }
 
   if (progressHandler) {
-    ffmpeg.off("progress", progressHandler);
+    ffmpeg.off("progress", progressHandler as any);
   }
 
   const blob = new Blob([data.buffer], { type: "video/mp4" });
