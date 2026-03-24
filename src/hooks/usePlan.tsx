@@ -30,11 +30,11 @@ export const usePlan = () => {
         return;
       }
 
-      const { data, error } = await supabase
-        .from("usuarios_planos")
+      const { data, error } = await (supabase
+        .from("usuarios_planos" as any)
         .select("*")
         .eq("user_id", user.id)
-        .maybeSingle();
+        .maybeSingle() as any);
 
       if (error) {
         console.error("PDG PLAN ERROR: fetch", error);
@@ -42,17 +42,17 @@ export const usePlan = () => {
 
       if (!data) {
         const defaults = getPlanLimits("start");
-        const { data: created, error: createError } = await supabase
-          .from("usuarios_planos")
+        const { data: created, error: createError } = await (supabase
+          .from("usuarios_planos" as any)
           .insert({
             user_id: user.id,
             plano: "start",
             limite_diario_json: defaults,
             uso_hoje_json: {},
             reset_at: getNextResetAt(),
-          })
+          } as any)
           .select("*")
-          .single();
+          .single() as any);
 
         if (createError) {
           console.error("PDG PLAN ERROR: create", createError);
@@ -76,12 +76,12 @@ export const usePlan = () => {
         if (!current || !user) return current;
         if (!isResetDue(current.reset_at)) return current;
         const nextReset = getNextResetAt();
-        const { data, error } = await supabase
-          .from("usuarios_planos")
-          .update({ uso_hoje_json: {}, reset_at: nextReset })
+        const { data, error } = await (supabase
+          .from("usuarios_planos" as any)
+          .update({ uso_hoje_json: {}, reset_at: nextReset } as any)
           .eq("user_id", user.id)
           .select("*")
-          .single();
+          .single() as any);
         if (error) console.error("PDG PLAN ERROR: reset", error);
         return (data as PlanRecord) || current;
       } catch (error) {
@@ -154,12 +154,12 @@ export const usePlan = () => {
           [key]: (currentUsage[key] || 0) + amount,
         };
 
-        const { data, error } = await supabase
-          .from("usuarios_planos")
-          .update({ uso_hoje_json: nextUsage })
+        const { data, error } = await (supabase
+          .from("usuarios_planos" as any)
+          .update({ uso_hoje_json: nextUsage } as any)
           .eq("user_id", user.id)
           .select("*")
-          .single();
+          .single() as any);
 
         if (error) {
           console.error("PDG PLAN ERROR: consume", error);
@@ -180,12 +180,12 @@ export const usePlan = () => {
     async (plan: PlanId) => {
       try {
         if (!user) return;
-        const { data, error } = await supabase
-          .from("usuarios_planos")
-          .update({ plano: plan, limite_diario_json: getPlanLimits(plan) })
+        const { data, error } = await (supabase
+          .from("usuarios_planos" as any)
+          .update({ plano: plan, limite_diario_json: getPlanLimits(plan) } as any)
           .eq("user_id", user.id)
           .select("*")
-          .single();
+          .single() as any);
         if (error) {
           console.error("PDG PLAN ERROR: updatePlan", error);
           return;

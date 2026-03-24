@@ -88,7 +88,7 @@ export const assertApiAllowed = (request: ApiAccessRequest) => {
   const whitelist = isProduct ? PRODUCT_WHITELIST : CONTENT_WHITELIST;
   const destinoLower = String(destino).toLowerCase();
 
-  if (!whitelist.includes(destinoLower as typeof whitelist[number])) {
+  if (!(whitelist as readonly string[]).includes(destinoLower)) {
     recordAudit({
       tipo: "acesso_bloqueado",
       categoria,

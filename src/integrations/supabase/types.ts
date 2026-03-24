@@ -14,6 +14,105 @@ export type Database = {
   }
   public: {
     Tables: {
+      assets: {
+        Row: {
+          created_at: string
+          id: string
+          type: string
+          url: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          type?: string
+          url: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          type?: string
+          url?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      integrations: {
+        Row: {
+          access_token: string | null
+          api_key: string | null
+          client_id: string | null
+          created_at: string
+          credentials: string | null
+          id: string
+          last_test_at: string | null
+          platform: string
+          status: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          access_token?: string | null
+          api_key?: string | null
+          client_id?: string | null
+          created_at?: string
+          credentials?: string | null
+          id?: string
+          last_test_at?: string | null
+          platform: string
+          status?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          access_token?: string | null
+          api_key?: string | null
+          client_id?: string | null
+          created_at?: string
+          credentials?: string | null
+          id?: string
+          last_test_at?: string | null
+          platform?: string
+          status?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      produtos_gerados: {
+        Row: {
+          created_at: string
+          estrutura: Json
+          id: string
+          nicho: string
+          nome: string
+          status: string
+          tipo: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          estrutura?: Json
+          id?: string
+          nicho?: string
+          nome?: string
+          status?: string
+          tipo?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          estrutura?: Json
+          id?: string
+          nicho?: string
+          nome?: string
+          status?: string
+          tipo?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -68,6 +167,72 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      usuarios_planos: {
+        Row: {
+          created_at: string
+          id: string
+          limite_diario_json: Json
+          plano: string
+          reset_at: string | null
+          user_id: string
+          uso_hoje_json: Json
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          limite_diario_json?: Json
+          plano?: string
+          reset_at?: string | null
+          user_id: string
+          uso_hoje_json?: Json
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          limite_diario_json?: Json
+          plano?: string
+          reset_at?: string | null
+          user_id?: string
+          uso_hoje_json?: Json
+        }
+        Relationships: []
+      }
+      video_jobs: {
+        Row: {
+          audio_url: string | null
+          created_at: string
+          id: string
+          image_url: string | null
+          progress: number
+          prompt: string | null
+          status: string
+          user_id: string | null
+          video_url: string | null
+        }
+        Insert: {
+          audio_url?: string | null
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          progress?: number
+          prompt?: string | null
+          status?: string
+          user_id?: string | null
+          video_url?: string | null
+        }
+        Update: {
+          audio_url?: string | null
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          progress?: number
+          prompt?: string | null
+          status?: string
+          user_id?: string | null
+          video_url?: string | null
         }
         Relationships: []
       }

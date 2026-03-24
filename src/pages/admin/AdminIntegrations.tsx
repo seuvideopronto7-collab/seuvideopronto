@@ -23,7 +23,7 @@ const AdminIntegrations = () => {
     const fetch = async () => {
       if (!profile?.id) return;
       const { data } = await supabase
-        .from("integrations")
+        .from("integrations" as any)
         .select("platform, status")
         .eq("user_id", profile.id);
       const mapped = (data || []).map((row) => ({

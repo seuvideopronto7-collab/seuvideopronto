@@ -355,9 +355,8 @@ const VideoGeneratorUI = () => {
         .filter(Boolean);
 
       if (tema) setNiche(tema);
-      setScriptData({ hook, benefits, cta, roteiroCompleto });
+      setScriptData({ hook, benefits, cta, fullScript: roteiroCompleto, onScreenText: textosTela });
       if (roteiroCompleto) setNarrationText(roteiroCompleto);
-      if (textosTela.length) setOnScreenText(textosTela);
       toast.success("Roteiro e textos gerados.");
     } catch (error: any) {
       console.error("PDG DEBUG: erro detectado e tratado", error);
@@ -365,10 +364,10 @@ const VideoGeneratorUI = () => {
         hook: "Pare tudo e veja isso agora",
         benefits: ["Benefício 1", "Benefício 2", "Benefício 3"],
         cta: "Clique para saber mais",
-        roteiroCompleto: "Hook forte, benefícios diretos e CTA agressivo.",
+        fullScript: "Hook forte, benefícios diretos e CTA agressivo.",
+        onScreenText: ["HOOK FORTE", "3 BENEFÍCIOS", "CTA DIRETO"],
       });
       setNarrationText("Se você busca resultados, precisa ver isso agora.");
-      setOnScreenText(["HOOK FORTE", "3 BENEFÍCIOS", "CTA DIRETO"]);
       toast.warning("Falha ao gerar roteiro. Fallback aplicado.");
     } finally {
       setIsGeneratingScript(false);

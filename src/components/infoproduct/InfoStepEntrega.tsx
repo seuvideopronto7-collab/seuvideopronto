@@ -81,11 +81,11 @@ const InfoStepEntrega = ({ estruturaData, conteudoData, vslData, kitData, onNewP
   useEffect(() => {
     const loadIntegrations = async () => {
       if (!userId) return null;
-      const { data, error } = await supabase
-        .from("integrations")
+      const { data, error } = await (supabase
+        .from("integrations" as any)
         .select("platform, status")
         .eq("user_id", userId)
-        .in("platform", ["eduzz", "hotmart", "kiwify", "monetizze"]);
+        .in("platform", ["eduzz", "hotmart", "kiwify", "monetizze"]) as any);
       if (error || !data) {
         setIntegrationStatus({});
         setEduzzStatusLabel("Desconectado");
@@ -95,7 +95,7 @@ const InfoStepEntrega = ({ estruturaData, conteudoData, vslData, kitData, onNewP
         return null;
       }
 
-      const statusByPlatform = data.reduce<Record<string, "connected" | "error" | "expired" | "disconnected">>(
+      const statusByPlatform = (data as any[]).reduce<Record<string, "connected" | "error" | "expired" | "disconnected">>(
         (acc, item) => {
           if (item.status === "connected" || item.status === "error" || item.status === "expired") {
             acc[item.platform] = item.status;
@@ -191,7 +191,7 @@ const InfoStepEntrega = ({ estruturaData, conteudoData, vslData, kitData, onNewP
       "thumbnails/README.txt": strToU8("Inclua suas thumbnails aqui"),
     };
     const zip = zipSync(files, { level: 6 });
-    const blob = new Blob([zip], { type: "application/zip" });
+    const blob = new Blob([zip as unknown as BlobPart], { type: "application/zip" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;

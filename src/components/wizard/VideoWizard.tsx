@@ -172,11 +172,11 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
       status: override?.status || produtoStatus,
     };
 
-    const { data, error } = await supabase
-      .from("produtos_gerados")
-      .upsert(payload, { onConflict: "id" })
+    const { data, error } = await (supabase
+      .from("produtos_gerados" as any)
+      .upsert(payload as any, { onConflict: "id" })
       .select("id")
-      .single();
+      .single() as any);
     if (error) {
       console.error(error);
       return;

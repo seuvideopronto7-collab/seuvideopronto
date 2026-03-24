@@ -313,7 +313,7 @@ const DarkFlowEngine = () => {
     };
 
     const zipped = zipSync(files, { level: 6 });
-    const blob = new Blob([zipped], { type: "application/zip" });
+    const blob = new Blob([zipped as unknown as BlobPart], { type: "application/zip" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;

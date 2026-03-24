@@ -140,7 +140,7 @@ const StepFinal = ({ roteiroData, seoData, viralData, videoUrl, onNewVersion, on
     }
 
     const zip = zipSync(files);
-    const blob = new Blob([zip], { type: "application/zip" });
+    const blob = new Blob([zip as unknown as BlobPart], { type: "application/zip" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;

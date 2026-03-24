@@ -202,7 +202,7 @@ const SalesMachine = () => {
       "README.txt": strToU8("Pasta do afiliado: copies, roteiros e links de vendas."),
     };
     const zipped = zipSync(files, { level: 6 });
-    const blob = new Blob([zipped], { type: "application/zip" });
+    const blob = new Blob([zipped as unknown as BlobPart], { type: "application/zip" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;

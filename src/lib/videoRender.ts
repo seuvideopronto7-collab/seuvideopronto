@@ -79,7 +79,7 @@ export const renderVideoFromImage = async (imageUrl: string, options?: RenderOpt
     : null;
 
   if (progressHandler) {
-    ffmpeg.on("progress", progressHandler);
+    ffmpeg.on("progress", progressHandler as any);
   }
 
   const duration = options?.durationSec ?? 5;
@@ -175,9 +175,9 @@ export const renderVideoFromImage = async (imageUrl: string, options?: RenderOpt
   }
 
   if (progressHandler) {
-    ffmpeg.off("progress", progressHandler);
+    ffmpeg.off("progress", progressHandler as any);
   }
 
-  const blob = new Blob([data.buffer], { type: "video/mp4" });
+  const blob = new Blob([(data as any).buffer || data], { type: "video/mp4" });
   return URL.createObjectURL(blob);
 };

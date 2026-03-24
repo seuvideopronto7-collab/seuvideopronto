@@ -227,10 +227,10 @@ const Apis = () => {
   const refreshIntegrations = async () => {
     if (!profile?.id) return;
     setLoadingConnections(true);
-    const { data, error } = await supabase
-      .from("integrations")
+    const { data, error } = await (supabase
+      .from("integrations" as any)
       .select("id, platform, status, credentials, access_token, last_test_at, updated_at, created_at, client_id")
-      .eq("user_id", profile.id);
+      .eq("user_id", profile.id) as any);
     if (error) {
       toast.error("Falha ao carregar integracoes.");
       setConnections({});
@@ -358,7 +358,7 @@ const Apis = () => {
     if (!payload) {
       const now = new Date().toISOString();
       await supabase
-        .from("integrations")
+        .from("integrations" as any)
         .update({ status: "expired", last_test_at: now, updated_at: now })
         .eq("id", connection.id);
       updateConnectionState(connection.platformKey, { status: "expired", lastChecked: now });
@@ -370,7 +370,7 @@ const Apis = () => {
     const nextStatus: ConnectionStatusDb = ok ? "connected" : payload.token ? "error" : "expired";
     const encrypted = await encryptPayload(profile.id, nextPayload);
     const { error } = await supabase
-      .from("integrations")
+      .from("integrations" as any)
       .update({
         credentials: JSON.stringify(encrypted),
         status: nextStatus,
@@ -459,7 +459,7 @@ const Apis = () => {
 
     if (dialogMode === "create") {
       const { data, error } = await supabase
-        .from("integrations")
+        .from("integrations" as any)
         .insert({
           user_id: profile.id,
           platform: platformKey,
@@ -474,7 +474,7 @@ const Apis = () => {
         .maybeSingle();
       if (error || !data) {
         const { data: fallback, error: updateError } = await supabase
-          .from("integrations")
+          .from("integrations" as any)
           .update({
             credentials: JSON.stringify(encrypted),
             status: nextStatus,
@@ -519,7 +519,7 @@ const Apis = () => {
       }
     } else if (editTarget) {
       const { data, error } = await supabase
-        .from("integrations")
+        .from("integrations" as any)
         .update({
           credentials: JSON.stringify(encrypted),
           status: nextStatus,
@@ -563,7 +563,7 @@ const Apis = () => {
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
-    const { error } = await supabase.from("integrations").delete().eq("id", deleteTarget.id);
+    const { error } = await supabase.from("integrations" as any).delete().eq("id", deleteTarget.id);
     if (error) {
       toast.error("Falha ao excluir integracao.");
       return;
