@@ -32,6 +32,10 @@ class SafeRenderBoundary extends Component<SafeRenderProps, SafeRenderState> {
   render() {
     const { children, label, actionLabel, onAction, debug = true } = this.props;
 
+    if (!children) {
+      return <div className="p-10 text-white">Carregando sistema...</div>;
+    }
+
     if (this.state.hasError) {
       return (
         <section
