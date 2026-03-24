@@ -8,7 +8,6 @@ import DarkFlowEngine from "@/components/DarkFlowEngine";
 import SalesMachine from "@/components/SalesMachine";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import VideoGeneratorUI from "@/components/VideoGeneratorUI";
-import SafeRender from "@/components/SafeRender";
 
 const Index = () => {
   const { signOut, isAdmin, profile } = useAuth();
@@ -142,9 +141,9 @@ const Index = () => {
         </button>
 
         {showCalendar && (
-          <SafeRender label="Conteúdo 30 Dias">
+          <ErrorBoundary>
             <Content30Days />
-          </SafeRender>
+          </ErrorBoundary>
         )}
 
         {/* CTA Máquina de Vendas */}
@@ -167,9 +166,9 @@ const Index = () => {
         </button>
 
         {showSalesMachine && (
-          <SafeRender label="Sales Machine">
+          <ErrorBoundary>
             <SalesMachine />
-          </SafeRender>
+          </ErrorBoundary>
         )}
 
         {/* CTA Dark Flow */}
@@ -192,9 +191,9 @@ const Index = () => {
         </button>
 
         {showDarkFlow && (
-          <SafeRender label="Dark Flow">
+          <ErrorBoundary>
             <DarkFlowEngine />
-          </SafeRender>
+          </ErrorBoundary>
         )}
 
         <ErrorBoundary>
