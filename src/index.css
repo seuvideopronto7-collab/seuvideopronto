@@ -6,73 +6,54 @@
 
 @layer base {
   :root {
-    --background: 240 20% 5%;
-    --foreground: 210 20% 97%;
+    --background: 220 20% 6%;
+    --foreground: 210 20% 92%;
 
-    --card: 235 20% 11%;
-    --card-foreground: 210 20% 97%;
+    --card: 220 18% 10%;
+    --card-foreground: 210 20% 92%;
 
-    --popover: 235 20% 11%;
-    --popover-foreground: 210 20% 97%;
+    --popover: 220 18% 10%;
+    --popover-foreground: 210 20% 92%;
 
-    --primary: 44 90% 64%;
-    --primary-foreground: 240 10% 8%;
+    --primary: 340 85% 55%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 235 18% 12%;
-    --secondary-foreground: 215 18% 88%;
+    --secondary: 220 15% 16%;
+    --secondary-foreground: 210 20% 85%;
 
-    --muted: 230 16% 14%;
-    --muted-foreground: 220 10% 55%;
+    --muted: 220 15% 14%;
+    --muted-foreground: 215 12% 50%;
 
-    --accent: 217 91% 60%;
+    --accent: 170 75% 45%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84% 60%;
+    --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 235 18% 20%;
-    --input: 235 18% 20%;
-    --ring: 44 90% 64%;
+    --border: 220 15% 18%;
+    --input: 220 15% 18%;
+    --ring: 340 85% 55%;
 
-    --radius: 0.9rem;
+    --radius: 0.75rem;
 
-    --sidebar-background: 235 20% 8%;
-    --sidebar-foreground: 215 18% 88%;
-    --sidebar-primary: 44 90% 64%;
-    --sidebar-primary-foreground: 240 10% 8%;
-    --sidebar-accent: 230 16% 14%;
-    --sidebar-accent-foreground: 215 18% 88%;
-    --sidebar-border: 235 18% 20%;
-    --sidebar-ring: 44 90% 64%;
-
-    /* Official palette */
-    --bg-main: #0a0a0f;
-    --bg-secondary: #12121a;
-    --card-bg: #181824;
-    --border-soft: #2a2a3a;
-    --accent-gold: #f5c451;
-    --accent-red: #e53935;
-    --accent-blue: #3b82f6;
-    --accent-purple: #7c3aed;
-    --text-main: #f5f7fa;
-    --text-soft: #b8c0cc;
-    --text-muted: #7d8597;
-    --success: #22c55e;
-    --warning: #f59e0b;
-    --danger: #ef4444;
-    --processing: #06b6d4;
+    --sidebar-background: 220 20% 8%;
+    --sidebar-foreground: 210 20% 85%;
+    --sidebar-primary: 340 85% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 15% 14%;
+    --sidebar-accent-foreground: 210 20% 85%;
+    --sidebar-border: 220 15% 18%;
+    --sidebar-ring: 340 85% 55%;
 
     /* Custom tokens */
-    --neon-pink: 44 90% 64%;
-    --neon-cyan: 190 85% 45%;
-    --neon-yellow: 44 90% 64%;
-    --surface-glass: 235 20% 11%;
-    --gradient-viral: linear-gradient(135deg, #f5c451, #e53935, #3b82f6);
-    --gradient-dark: radial-gradient(circle at 10% 20%, rgba(245, 196, 81, 0.08), transparent 45%),
-      linear-gradient(180deg, #0a0a0f, #08080c 65%, #050507);
-    --gradient-darkflow: linear-gradient(135deg, rgba(124, 58, 237, 0.2), rgba(10, 10, 15, 0.95));
-    --shadow-neon: 0 0 26px -6px rgba(245, 196, 81, 0.45);
-    --shadow-card: 0 8px 30px -10px rgba(0, 0, 0, 0.65);
+    --neon-pink: 340 85% 55%;
+    --neon-cyan: 170 75% 45%;
+    --neon-yellow: 45 95% 60%;
+    --surface-glass: 220 18% 10%;
+    --gradient-viral: linear-gradient(135deg, hsl(340 85% 55%), hsl(280 70% 50%), hsl(170 75% 45%));
+    --gradient-dark: linear-gradient(180deg, hsl(220 20% 6%), hsl(220 20% 3%));
+    --shadow-neon: 0 0 30px -5px hsl(340 85% 55% / 0.3);
+    --shadow-card: 0 4px 24px -4px hsl(0 0% 0% / 0.5);
 
     --font-display: 'Space Grotesk', system-ui, sans-serif;
     --font-mono: 'JetBrains Mono', monospace;
@@ -87,13 +68,12 @@
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-display);
-    background: var(--gradient-dark);
   }
 }
 
 @layer utilities {
   .glass-card {
-    @apply bg-card/80 backdrop-blur-md border border-border/50 rounded-2xl;
+    @apply bg-card/80 backdrop-blur-md border border-border/50 rounded-xl;
     box-shadow: var(--shadow-card);
   }
 
@@ -121,46 +101,6 @@
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
-  }
-
-  .cinema-panel {
-    background: rgba(24, 24, 36, 0.7);
-    border: 1px solid rgba(42, 42, 58, 0.8);
-    border-radius: 18px;
-    box-shadow: 0 20px 50px -30px rgba(0, 0, 0, 0.8);
-  }
-
-  .status-pill {
-    border-radius: 999px;
-    padding: 0.25rem 0.75rem;
-    font-size: 0.7rem;
-    font-weight: 600;
-    letter-spacing: 0.02em;
-  }
-
-  .status-online {
-    background: rgba(34, 197, 94, 0.18);
-    color: #7ee2a8;
-  }
-
-  .status-processing {
-    background: rgba(6, 182, 212, 0.18);
-    color: #7dd3fc;
-  }
-
-  .status-complete {
-    background: rgba(59, 130, 246, 0.18);
-    color: #93c5fd;
-  }
-
-  .status-error {
-    background: rgba(239, 68, 68, 0.2);
-    color: #fca5a5;
-  }
-
-  .status-disconnected {
-    background: rgba(125, 133, 151, 0.2);
-    color: #b8c0cc;
   }
 
   .font-mono {

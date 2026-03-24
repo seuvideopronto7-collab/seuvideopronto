@@ -27,8 +27,8 @@ const Index = () => {
               F
             </div>
             <div>
-              <h1 className="text-lg font-bold gradient-text">PDG Cinema</h1>
-              <p className="text-xs text-muted-foreground">Plataforma cinematografica premium</p>
+              <h1 className="text-lg font-bold gradient-text">Fature</h1>
+              <p className="text-xs text-muted-foreground">Engine de Vídeos Virais</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -71,23 +71,22 @@ const Index = () => {
       {/* Main Content */}
       <main className="container max-w-5xl mx-auto px-4 py-8 space-y-6">
         {/* Hero */}
-        <div className="text-center space-y-3 pb-2">
-          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Modo cinema automatico</p>
-          <h2 className="text-3xl md:text-4xl font-semibold">
-            Transforme uma simples imagem de produto em um video cinematografico altamente comercial.
+        <div className="text-center space-y-2 pb-2">
+          <h2 className="text-3xl md:text-4xl font-bold gradient-text">
+            Seu Vídeo Pronto
           </h2>
-          <p className="text-muted-foreground text-sm max-w-2xl mx-auto">
-            Upload, roteiro, voz, trilha e renderizacao automatica em um unico fluxo.
+          <p className="text-muted-foreground text-sm max-w-xl mx-auto">
+            Siga o passo a passo e crie seu vídeo viral em minutos
           </p>
         </div>
 
         {/* CTA Infoproduto */}
         <button
           onClick={() => navigate("/infoproduto")}
-          className="w-full group relative overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-r from-[#f5c451]/10 via-[#e53935]/10 to-[#3b82f6]/10 p-6 text-left transition-all hover:border-primary/60 hover:shadow-[0_0_40px_-8px_rgba(245,196,81,0.35)]"
+          className="w-full group relative overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-r from-primary/10 via-purple-500/10 to-accent/10 p-6 text-left transition-all hover:border-primary/60 hover:shadow-[0_0_40px_-8px_hsl(var(--neon-pink)/0.4)]"
         >
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#f5c451] to-[#3b82f6] flex items-center justify-center text-2xl shrink-0">
+            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center text-2xl shrink-0">
               🚀
             </div>
             <div>
@@ -122,10 +121,10 @@ const Index = () => {
         {/* CTA Conteúdo 30 Dias */}
         <button
           onClick={() => setShowCalendar((prev) => !prev)}
-          className="w-full group relative overflow-hidden rounded-2xl border border-accent/30 bg-gradient-to-r from-[#3b82f6]/10 via-[#06b6d4]/10 to-[#f5c451]/10 p-6 text-left transition-all hover:border-accent/60 hover:shadow-[0_0_40px_-8px_rgba(59,130,246,0.35)]"
+          className="w-full group relative overflow-hidden rounded-2xl border border-accent/30 bg-gradient-to-r from-accent/10 via-cyan-500/10 to-primary/10 p-6 text-left transition-all hover:border-accent/60 hover:shadow-[0_0_40px_-8px_hsl(var(--neon-cyan)/0.4)]"
         >
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#3b82f6] to-[#f5c451] flex items-center justify-center text-2xl shrink-0">
+            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-accent to-primary flex items-center justify-center text-2xl shrink-0">
               📅
             </div>
             <div>
@@ -143,10 +142,10 @@ const Index = () => {
         {/* CTA Máquina de Vendas */}
         <button
           onClick={() => setShowSalesMachine((prev) => !prev)}
-          className="w-full group relative overflow-hidden rounded-2xl border border-primary/40 bg-gradient-to-r from-[#f5c451]/15 via-amber-500/10 to-[#3b82f6]/10 p-6 text-left transition-all hover:border-primary/70 hover:shadow-[0_0_40px_-8px_rgba(245,196,81,0.35)]"
+          className="w-full group relative overflow-hidden rounded-2xl border border-primary/40 bg-gradient-to-r from-primary/15 via-amber-500/10 to-accent/10 p-6 text-left transition-all hover:border-primary/70 hover:shadow-[0_0_40px_-8px_hsl(var(--neon-pink)/0.35)]"
         >
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#f5c451] to-[#f59e0b] flex items-center justify-center text-2xl shrink-0">
+            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary to-amber-400 flex items-center justify-center text-2xl shrink-0">
               ⚡
             </div>
             <div>
