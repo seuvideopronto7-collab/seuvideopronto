@@ -1,8 +1,7 @@
-import { Suspense, lazy, useState } from "react";
+import { useState } from "react";
 import AdminLayout from "@/components/admin/AdminLayout";
 import SafeRender from "@/components/SafeRender";
-
-const VideoGeneratorUI = lazy(() => import("@/components/VideoGeneratorUI"));
+import VideoGeneratorUI from "@/components/VideoGeneratorUI";
 
 const AdminVideoGenerator = () => {
   const [showGenerator, setShowGenerator] = useState(false);
@@ -15,11 +14,9 @@ const AdminVideoGenerator = () => {
       onAction={() => setShowGenerator(true)}
     >
       {showGenerator && (
-        <Suspense fallback={<div>Carregando gerador...</div>}>
-          <SafeRender label="Video Generator" onAction={() => setShowGenerator(false)}>
-            {VideoGeneratorUI ? <VideoGeneratorUI /> : <div>Erro ao carregar módulo</div>}
-          </SafeRender>
-        </Suspense>
+        <SafeRender label="Video Generator" onAction={() => setShowGenerator(false)}>
+          <VideoGeneratorUI />
+        </SafeRender>
       )}
     </AdminLayout>
   );
