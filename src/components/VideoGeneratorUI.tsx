@@ -355,9 +355,8 @@ const VideoGeneratorUI = () => {
         .filter(Boolean);
 
       if (tema) setNiche(tema);
-      setScriptData({ hook, benefits, cta, roteiroCompleto });
+      setScriptData({ hook, benefits, cta, fullScript: roteiroCompleto, onScreenText: textosTela });
       if (roteiroCompleto) setNarrationText(roteiroCompleto);
-      if (textosTela.length) setOnScreenText(textosTela);
       toast.success("Roteiro e textos gerados.");
     } catch (error: any) {
       console.error("PDG DEBUG: erro detectado e tratado", error);
