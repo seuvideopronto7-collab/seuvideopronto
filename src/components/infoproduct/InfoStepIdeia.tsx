@@ -262,7 +262,7 @@ const InfoStepIdeia = ({ data, onChange, onContinue }: Props) => {
       publico: idea.publico,
       problema: idea.problema,
       promessa: idea.promessa,
-      tipo: idea.tipo || data.tipo,
+      tipo: data.tipo,
     });
     setSearchTerm(idea.titulo);
     setShowSuggestions(false);
@@ -404,6 +404,11 @@ const InfoStepIdeia = ({ data, onChange, onContinue }: Props) => {
               <SelectItem value="combo">Combo</SelectItem>
             </SelectContent>
           </Select>
+          {data.tipo && (
+            <div className="mt-2 text-xs rounded-lg border border-border/40 bg-muted/30 px-3 py-2 text-muted-foreground">
+              Você está criando: <span className="font-semibold text-foreground">{data.tipo.toUpperCase()}</span>
+            </div>
+          )}
         </div>
       </div>
 

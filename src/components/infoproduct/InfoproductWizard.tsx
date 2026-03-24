@@ -39,7 +39,31 @@ const InfoproductWizard = () => {
     }
   };
 
+  const ensureTipoSelecionado = () => {
+    if (!ideiaData.tipo) {
+      toast.error("Selecione um tipo de produto para continuar.");
+      return false;
+    }
+    return true;
+  };
+
+  const getFlowConfig = (tipo: string) => {
+    switch (tipo) {
+      case "ebook":
+        return { afterConteudo: "kit", afterVideos: null, afterVsl: "kit", allowedSteps: [1, 2, 3, 6, 7] };
+      case "curso":
+        return { afterConteudo: "videos", afterVideos: "kit", afterVsl: "kit", allowedSteps: [1, 2, 3, 4, 6, 7] };
+      case "vsl":
+        return { afterConteudo: "vsl", afterVideos: null, afterVsl: "kit", allowedSteps: [1, 2, 3, 5, 6, 7] };
+      case "combo":
+        return { afterConteudo: "videos", afterVideos: "vsl", afterVsl: "kit", allowedSteps: [1, 2, 3, 4, 5, 6, 7] };
+      default:
+        return { afterConteudo: "videos", afterVideos: "vsl", afterVsl: "kit", allowedSteps: [1, 2, 3, 4, 5, 6, 7] };
+    }
+  };
+
   const handleGenerateEstrutura = async () => {
+    if (!ensureTipoSelecionado()) return;
     setStep(2);
     const data = await callAI("estrutura");
     if (data) setEstruturaData(data);
@@ -54,6 +78,7 @@ const InfoproductWizard = () => {
   };
 
   const handleGenerateConteudo = async () => {
+    if (!ensureTipoSelecionado()) return;
     setStep(3);
     const data = await callAI("conteudo", { estrutura: estruturaData });
     if (data) {
@@ -71,6 +96,7 @@ const InfoproductWizard = () => {
   };
 
   const handleGenerateVSL = async () => {
+    if (!ensureTipoSelecionado()) return;
     setStep(5);
     const data = await callAI("vsl", { estrutura: estruturaData });
     if (data) {
@@ -88,12 +114,58 @@ const InfoproductWizard = () => {
   };
 
   const handleGenerateKit = async () => {
+    if (!ensureTipoSelecionado()) return;
     setStep(6);
     const data = await callAI("kit_vendas", { estrutura: estruturaData });
     if (data) {
       setKitData(data);
       toast.success("Kit de vendas gerado! 🎨");
     }
+  };
+
+  const handleContinueFromConteudo = async () => {
+    if (!ensureTipoSelecionado()) return;
+    const flow = getFlowConfig(ideiaData.tipo);
+    if (flow.afterConteudo === "videos") {
+      setStep(4);
+      return;
+    }
+    if (flow.afterConteudo === "vsl") {
+      await handleGenerateVSL();
+      return;
+    }
+    if (flow.afterConteudo === "kit") {
+      await handleGenerateKit();
+    }
+  };
+
+  const handleContinueFromVideos = async () => {
+    if (!ensureTipoSelecionado()) return;
+    const flow = getFlowConfig(ideiaData.tipo);
+    if (flow.afterVideos === "vsl") {
+      await handleGenerateVSL();
+      return;
+    }
+    if (flow.afterVideos === "kit") {
+      await handleGenerateKit();
+    }
+  };
+
+  const handleStepClick = (nextStep: number) => {
+    if (!ideiaData.tipo) {
+      if (nextStep > 1) {
+        toast.error("Selecione o tipo de produto antes de avançar.");
+        return;
+      }
+      setStep(nextStep);
+      return;
+    }
+    const { allowedSteps } = getFlowConfig(ideiaData.tipo);
+    if (!allowedSteps.includes(nextStep)) {
+      toast.error("Este fluxo não inclui essa etapa para o tipo selecionado.");
+      return;
+    }
+    setStep(nextStep);
   };
 
   const handleRegenerateKit = async () => {
@@ -115,7 +187,7 @@ const InfoproductWizard = () => {
 
   return (
     <div className="space-y-6">
-      <InfoStepper currentStep={step} onStepClick={setStep} />
+      <InfoStepper currentStep={step} onStepClick={handleStepClick} />
 
       <div className="step-transition" key={step}>
         {step === 1 && (
@@ -134,10 +206,10 @@ const InfoproductWizard = () => {
             data={conteudoData}
             isLoading={isLoading}
             onRegenerate={handleRegenerateConteudo}
-            onContinue={() => setStep(4)}
+            onContinue={handleContinueFromConteudo}
           />
         )}
-        {step === 4 && <InfoStepVideos onContinue={handleGenerateVSL} />}
+        {step === 4 && <InfoStepVideos onContinue={handleContinueFromVideos} />}
         {step === 5 && (
           <InfoStepVSL
             data={vslData}
