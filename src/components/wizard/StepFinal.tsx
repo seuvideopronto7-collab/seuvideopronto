@@ -24,6 +24,8 @@ const StepFinal = ({ roteiroData, seoData, viralData, videoUrl, onNewVersion, on
   const viral = viralData?.copy ? viralData : viralData?.viral;
   const hasViral = Boolean(viral);
   const viralFallback = Boolean(viralData?._fallback || viral?._fallback);
+  const viralBlocked = Boolean(viralData?._blocked || viral?._blocked);
+  const viralBlockedReason = viralData?._reason || viral?._reason;
   const resolvedVideoUrl = videoUrl || seoData?.videoUrl || roteiroData?.videoUrl || "";
   const [videoFailed, setVideoFailed] = useState(false);
   const [selectedDays, setSelectedDays] = useState<string[]>(["Seg", "Qua", "Sex"]);
@@ -289,6 +291,11 @@ const StepFinal = ({ roteiroData, seoData, viralData, videoUrl, onNewVersion, on
         {viralFallback && (
           <div className="rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-xs text-accent">
             Fallback automatico aplicado
+          </div>
+        )}
+        {viralBlocked && (
+          <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+            Midia bloqueada. {viralBlockedReason || "Envie conteudo real e relacionado ao produto."}
           </div>
         )}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">

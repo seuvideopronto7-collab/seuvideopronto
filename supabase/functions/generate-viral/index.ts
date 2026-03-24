@@ -5,6 +5,96 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const buildContextoMestre = (payload: {
+  produto?: string;
+  nicho?: string;
+  publico?: string;
+  dor?: string;
+  objetivo?: string;
+  contextoMestre?: { tema?: string; publico?: string; problema?: string; objetivo?: string };
+}) => {
+  const tema = (payload.contextoMestre?.tema || payload.nicho || payload.produto || "").trim();
+  const publico = (payload.contextoMestre?.publico || payload.publico || "").trim();
+  const problema = (payload.contextoMestre?.problema || payload.dor || "").trim();
+  const objetivo = (payload.contextoMestre?.objetivo || payload.objetivo || "").trim();
+  return {
+    tema,
+    publico,
+    problema,
+    objetivo,
+    linguagem: "pt-BR",
+    tom: "especialista",
+  };
+};
+
+const requiresContext = (tipo: string) => !["dark_flow_niches"].includes(tipo);
+
+const resolveTom = (payload: { tipo?: string; modo?: string }, objetivo?: string) => {
+  const tipo = (payload.tipo || "").toLowerCase();
+  const modo = (payload.modo || "").toLowerCase();
+  if (modo === "viral") return "impacto";
+  if (modo === "autoridade") return "especialista";
+  if (modo === "vendas" || modo === "comercial") return "vendedor";
+  if (tipo.includes("curso")) return "didatico";
+  if (tipo.includes("vsl")) return "vendedor";
+  if ((objetivo || "").toLowerCase().includes("autoridade")) return "especialista";
+  return "especialista";
+};
+
+const buildNicheBank = (nicho?: string) => {
+  const key = (nicho || "").toLowerCase();
+  if (key.includes("fitness") || key.includes("emagrec")) {
+    return ["emagrecimento", "treino rapido", "dieta pratica"];
+  }
+  if (key.includes("renda") || key.includes("afiliad") || key.includes("dinheiro")) {
+    return ["ganhar dinheiro", "afiliados", "automacao"];
+  }
+  if (key.includes("saude") || key.includes("bem-estar") || key.includes("habito")) {
+    return ["bem-estar", "energia", "habitos"];
+  }
+  return [];
+};
+
+const isGenericText = (text: string) => {
+  const lowered = text.toLowerCase();
+  return /big buck bunny|conteudo generico|imagem generica|video padrao|stock/i.test(lowered);
+};
+
+const includesContextAnchor = (text: string, anchors: string[]) => {
+  const lowered = text.toLowerCase();
+  return anchors.filter(Boolean).some((anchor) => lowered.includes(anchor.toLowerCase()));
+};
+
+const validateResult = (tipo: string, result: any, contexto: ReturnType<typeof buildContextoMestre>) => {
+  const anchors = [contexto.tema, contexto.publico, contexto.problema, contexto.objetivo].filter(Boolean);
+  if (!anchors.length) return { ok: false, reason: "contexto_incompleto" };
+
+  if (tipo === "roteiro") {
+    const roteiro = result?.roteiro;
+    const full = roteiro?.roteiro_completo || "";
+    const combined = [roteiro?.hook, roteiro?.dor, roteiro?.identificacao, roteiro?.quebra_crenca, roteiro?.solucao, roteiro?.cta, full]
+      .filter(Boolean)
+      .join(" ");
+    if (!roteiro?.hook || !roteiro?.cta || !full) return { ok: false, reason: "roteiro_incompleto" };
+    if (isGenericText(combined)) return { ok: false, reason: "conteudo_generico" };
+    if (!includesContextAnchor(combined, anchors)) return { ok: false, reason: "roteiro_sem_contexto" };
+  }
+
+  if (tipo === "viral_video") {
+    const narracao = result?.narracao || "";
+    const imagens = result?.imagens || [];
+    const combined = [narracao, ...(result?.legendas || []), result?.copy?.gancho, result?.copy?.cta].filter(Boolean).join(" ");
+    if (!narracao || !result?.legendas?.length) return { ok: false, reason: "viral_incompleto" };
+    if (isGenericText(combined)) return { ok: false, reason: "conteudo_generico" };
+    if (!includesContextAnchor(combined, anchors)) return { ok: false, reason: "viral_sem_contexto" };
+    if (Array.isArray(imagens) && imagens.some((img) => isGenericText(JSON.stringify(img)))) {
+      return { ok: false, reason: "imagem_irrelevante" };
+    }
+  }
+
+  return { ok: true };
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -12,6 +102,25 @@ serve(async (req) => {
     const { produto, nicho, publico, dor, beneficio, link, checkout, landing, tipo, marca, objetivo, plataforma, modo, imageUrl, videoUrl } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+
+    const blockedMediaPatterns = [/big[_-]?buck[_-]?bunny/i, /\bdefault\b/i];
+    const isBlockedMedia = (value?: string) =>
+      Boolean(value && blockedMediaPatterns.some((pattern) => pattern.test(value)));
+
+    if (isBlockedMedia(imageUrl) || isBlockedMedia(videoUrl)) {
+      return new Response(JSON.stringify({ error: "Midia bloqueada. Envie conteudo real relacionado ao produto." }), {
+        status: 422,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const hasContext = Boolean(produto || nicho || publico || dor || beneficio);
+    if (!hasContext) {
+      return new Response(JSON.stringify({ error: "Contexto insuficiente. Informe dados reais do produto." }), {
+        status: 422,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     let systemPrompt = "";
     let userPrompt = "";
@@ -180,21 +289,45 @@ Retorne EXATAMENTE este formato JSON:
   }
 }`;
     } else if (tipo === "viral_video") {
-      systemPrompt = `Você é um diretor criativo de vídeos virais. Gere uma entrega completa pronta para publicação. Sempre responda em JSON válido.`;
-      userPrompt = `Transforme a imagem em um vídeo viral completo com narração, música, legendas e copy de alta conversão.
+      systemPrompt = `Você é um diretor criativo de vídeos virais. Gere uma entrega completa pronta para publicação. Use somente o contexto real do produto e NUNCA use mídia genérica, placeholders ou conteúdos desconectados. Narração em português brasileiro, tom feminino ou neutro, estilo natural. Sempre responda em JSON válido.`;
+      userPrompt = `Transforme a imagem em um vídeo viral completo com narração, música, legendas e copy de alta conversão, sempre alinhado ao contexto real do infoproduto.
 ${context}
 Imagem: ${imageUrl || ""}
 Video: ${videoUrl || ""}
 
 Retorne EXATAMENTE este formato JSON:
 {
-  "narracao": "texto narrado completo (30-60s, voz masculina suave e persuasiva)",
+  "contexto_real": {
+    "tema": "tema principal do produto",
+    "publico": "publico-alvo real",
+    "problema": "dor principal",
+    "beneficio": "beneficio principal"
+  },
+  "roteiro": {
+    "introducao": "dor da falta de tempo/urgencia contextual",
+    "explicacao": "contexto da rotina e problema",
+    "solucao": "metodo/solucao do produto",
+    "cta": "acao pratica"
+  },
+  "cenas": [
+    {"cena": 1, "descricao": "descricao visual realista", "duracao_seg": 5, "texto_tela": "texto curto", "prompt_imagem": "prompt de imagem realista e contextual"},
+    {"cena": 2, "descricao": "descricao visual realista", "duracao_seg": 5, "texto_tela": "texto curto", "prompt_imagem": "prompt de imagem realista e contextual"}
+  ],
+  "imagens": {
+    "fonte": "IA ou banco com busca inteligente",
+    "prompts": ["prompt 1", "prompt 2", "prompt 3"]
+  },
+  "narracao": "texto narrado completo (30-60s, voz feminina ou neutra, pt-BR, natural)",
   "musica": {
     "estilo": "motivacional + leve suspense",
     "volume": "baixo",
     "crescimento": "progressivo"
   },
   "legendas": ["🔥 ALIVIO RAPIDO", "💥 RESULTADO REAL", "⚡ TECNOLOGIA OZONIZADA"],
+  "legendas_sincronizadas": [
+    {"inicio_ms": 0, "fim_ms": 2500, "texto": "gancho inicial", "destaque": ["gancho"]},
+    {"inicio_ms": 2500, "fim_ms": 7000, "texto": "contexto do problema", "destaque": ["problema"]}
+  ],
   "copy": {
     "gancho": "gancho forte (0-3s)",
     "quebra_padrao": "quebra de padrão",
@@ -208,6 +341,10 @@ Retorne EXATAMENTE este formato JSON:
     "movimento": "Ken Burns + parallax leve",
     "iluminacao": "premium",
     "qualidade": "4K"
+  },
+  "validacao": {
+    "conteudoRelacionado": true,
+    "midia_referenciada": "imagem ou video enviados"
   }
 }`;
     }
@@ -271,6 +408,13 @@ Retorne EXATAMENTE este formato JSON:
       const content = data.choices?.[0]?.message?.content || "";
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       result = jsonMatch ? JSON.parse(jsonMatch[0]) : { error: "Failed to parse response" };
+    }
+
+    if (result?.validacao?.conteudoRelacionado === false) {
+      return new Response(JSON.stringify({ error: "Conteudo nao relacionado ao produto. Geracao bloqueada." }), {
+        status: 422,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     return new Response(JSON.stringify(result), {

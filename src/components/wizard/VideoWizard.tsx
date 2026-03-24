@@ -274,10 +274,24 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
       toast.success("Modo viral ativado ⚡");
     } catch (err: any) {
       console.error(err);
-      const fallback = buildViralFallback(err?.message);
-      setViralData(fallback);
-      await persistProduto({ formData: resolvedFormData });
-      toast.warning("Modo viral falhou. Fallback aplicado automaticamente.");
+      const message = String(err?.message || err?.error || "").toLowerCase();
+      const blocked =
+        message.includes("midia bloqueada") ||
+        message.includes("conteudo nao relacionado") ||
+        message.includes("conteúdo nao relacionado") ||
+        message.includes("contexto insuficiente") ||
+        message.includes("big_buck_bunny") ||
+        message.includes("default");
+      if (blocked) {
+        setViralData({ _blocked: true, _reason: err?.message || "Midia bloqueada." });
+        await persistProduto({ formData: resolvedFormData });
+        toast.error("Conteudo bloqueado. Envie midia real e relacionada ao produto.");
+      } else {
+        const fallback = buildViralFallback(err?.message);
+        setViralData(fallback);
+        await persistProduto({ formData: resolvedFormData });
+        toast.warning("Modo viral falhou. Fallback aplicado automaticamente.");
+      }
     } finally {
       setIsViralLoading(false);
     }

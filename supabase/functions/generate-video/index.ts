@@ -9,11 +9,27 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { imageUrl, image, estilo, movimento, duracao } = await req.json();
+    const { imageUrl, image, estilo, movimento, duracao, conteudoRelacionado } = await req.json();
     const resolvedImageUrl = imageUrl || image;
+    const blockedMediaPatterns = [/big[_-]?buck[_-]?bunny/i, /\bdefault\b/i];
+    const isBlockedMedia = (value?: string) =>
+      Boolean(value && blockedMediaPatterns.some((pattern) => pattern.test(value)));
+
+    if (conteudoRelacionado === false) {
+      return new Response(JSON.stringify({ error: "Conteudo nao relacionado. Geracao bloqueada." }), {
+        status: 422,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     if (!resolvedImageUrl) {
       return new Response(JSON.stringify({ error: "imageUrl requerido" }), {
         status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (isBlockedMedia(resolvedImageUrl)) {
+      return new Response(JSON.stringify({ error: "Midia bloqueada. Envie conteudo real relacionado ao produto." }), {
+        status: 422,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
