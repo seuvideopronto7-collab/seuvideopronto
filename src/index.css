@@ -87,7 +87,16 @@
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-display);
-    background: var(--gradient-dark);
+    background: #0a0a0f;
+    color: #f5f7fa;
+  }
+
+  button {
+    transition: all 0.2s ease;
+  }
+
+  button:hover {
+    transform: scale(1.05);
   }
 }
 
