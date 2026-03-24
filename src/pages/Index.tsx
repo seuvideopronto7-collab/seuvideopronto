@@ -6,6 +6,7 @@ import VideoWizard from "@/components/wizard/VideoWizard";
 import Content30Days from "@/components/Content30Days";
 import DarkFlowEngine from "@/components/DarkFlowEngine";
 import SalesMachine from "@/components/SalesMachine";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import VideoGeneratorUI from "@/components/VideoGeneratorUI";
 import SafeRender from "@/components/SafeRender";
 
@@ -196,14 +197,19 @@ const Index = () => {
           </SafeRender>
         )}
 
-        <SafeRender label="Video Generator">
+        <ErrorBoundary>
+          <div className="bg-[#12121A] p-6 rounded-xl border border-[#2A2A3A]">
+            <h2 className="text-white text-xl font-bold">🎬 Gerador de Vídeo Cinematográfico</h2>
+            <p className="text-gray-400">Sistema carregado com proteção ativa</p>
+          </div>
+
           <VideoGeneratorUI />
-        </SafeRender>
+        </ErrorBoundary>
 
         {/* Wizard */}
-        <SafeRender label="Video Wizard">
+        <ErrorBoundary>
           <VideoWizard initialProduto={initialProduto} autoStart={autoStart} />
-        </SafeRender>
+        </ErrorBoundary>
       </main>
     </div>
   );
