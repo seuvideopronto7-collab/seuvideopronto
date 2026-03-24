@@ -4,12 +4,14 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import VideoWizard from "@/components/wizard/VideoWizard";
 import Content30Days from "@/components/Content30Days";
+import DarkFlowEngine from "@/components/DarkFlowEngine";
 
 const Index = () => {
   const { signOut, isAdmin, profile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [showCalendar, setShowCalendar] = useState(false);
+  const [showDarkFlow, setShowDarkFlow] = useState(false);
   const initialProduto = (location.state as any)?.produto || null;
   const autoStart = Boolean((location.state as any)?.autoStart);
 
@@ -112,6 +114,27 @@ const Index = () => {
         </button>
 
         {showCalendar && <Content30Days />}
+
+        {/* CTA Dark Flow */}
+        <button
+          onClick={() => setShowDarkFlow((prev) => !prev)}
+          className="w-full group relative overflow-hidden rounded-2xl border border-red-500/40 bg-gradient-to-r from-red-500/15 via-black/40 to-red-500/10 p-6 text-left transition-all hover:border-red-500/70 hover:shadow-[0_0_40px_-8px_rgba(255,0,0,0.35)]"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-xl bg-black/80 border border-red-500/40 flex items-center justify-center text-2xl shrink-0">
+              🔥
+            </div>
+            <div>
+              <h3 className="text-lg font-bold">GERAR CONTEUDO DARK</h3>
+              <p className="text-sm text-muted-foreground">
+                Hook agressivo + design dark + video + voz
+              </p>
+            </div>
+          </div>
+          <div className="absolute inset-0 bg-gradient-to-r from-red-500/5 to-black/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+        </button>
+
+        {showDarkFlow && <DarkFlowEngine />}
 
         {/* Wizard */}
         <VideoWizard initialProduto={initialProduto} autoStart={autoStart} />

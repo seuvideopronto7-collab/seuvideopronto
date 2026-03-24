@@ -9,7 +9,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { produto, nicho, publico, dor, beneficio, link, tipo, marca, objetivo, plataforma, modo, imageUrl, videoUrl } = await req.json();
+    const { produto, nicho, publico, dor, beneficio, link, checkout, landing, tipo, marca, objetivo, plataforma, modo, imageUrl, videoUrl } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
@@ -22,7 +22,9 @@ Nicho: ${nicho}
 Público-alvo: ${publico}
 Dor principal: ${dor}
 Benefício principal: ${beneficio}
-Link: ${link}
+ Link: ${link}
+ Checkout: ${checkout}
+ Landing: ${landing}
  Marca: ${marca}
  Objetivo: ${objetivo}
  Plataforma principal: ${plataforma}
@@ -96,6 +98,87 @@ Retorne EXATAMENTE este formato JSON:
   ]
 }
 Gere exatamente 30 itens.`;
+    } else if (tipo === "dark_flow_niches") {
+      systemPrompt = `Você é um analista de tendências para marketing digital. Identifique nichos quentes e temas com alto potencial viral. Sempre responda em JSON válido.`;
+      userPrompt = `Detecte nichos quentes e temas sugeridos para conteúdo estilo Dark Flow.
+${context}
+
+Retorne EXATAMENTE este formato JSON:
+{
+  "nichos_quentes": ["nicho 1", "nicho 2", "nicho 3", "nicho 4", "nicho 5"],
+  "temas_sugeridos": ["tema 1", "tema 2", "tema 3", "tema 4", "tema 5"]
+}`;
+    } else if (tipo === "dark_flow_engine") {
+      systemPrompt = `Você é um especialista em copywriting agressivo, design de posts dark e roteiros virais. Crie conteúdo no estilo Dark Flow. Sempre responda em JSON válido.`;
+      userPrompt = `Crie um pacote completo de conteúdo estilo Dark Flow seguindo esta estrutura:
+1) HOOK agressivo e direto
+2) CONTEXTO em 1 frase
+3) LISTA com 3 a 5 erros/verdades
+4) SOLUCAO apresentando o sistema/produto
+5) CTA direto (link na bio, acesse agora, comece hoje)
+
+Inclua:
+- Design automatico: fundo #000, texto #FFF, destaque #FF0000, check #00FF7F, tipografia bold caixa alta, glow vermelho leve, sombra leve, centralizado
+- Video: texto animado, narracao IA (voz masculina brasileira, tom confiante, ritmo medio, natural), fundo dinamico, musica leve, formatos 9:16 e 1:1
+- Voz: perfil dark flow
+- Avatar opcional: HeyGen/Runway ML, persona homem 30-40 profissional
+- Links: checkout e landing page
+- Pasta do afiliado: copies, scripts, prompts e specs
+
+${context}
+
+Retorne EXATAMENTE este formato JSON:
+{
+  "hook": "frase agressiva",
+  "contexto": "explicacao curta em 1 frase",
+  "lista": ["erro 1", "erro 2", "erro 3"],
+  "solucao": "apresenta o sistema/produto",
+  "cta": "LINK NA BIO",
+  "legenda": "legenda curta e direta",
+  "hashtags": ["#hash1", "#hash2", "#hash3", "#hash4", "#hash5"],
+  "texto_falado": "texto falado do video",
+  "design": {
+    "fundo": "#000000",
+    "texto": "#FFFFFF",
+    "destaque": "#FF0000",
+    "check": "#00FF7F",
+    "tipografia": "BOLD, CAIXA ALTA, ALTA LEGIBILIDADE",
+    "efeitos": ["glow vermelho leve", "sombra leve", "centralizado"]
+  },
+  "imagem": {
+    "prompt": "prompt para imagem dark",
+    "elementos": ["texto central", "destaque vermelho", "check verde"],
+    "formato": "9:16"
+  },
+  "video": {
+    "narracao": "narracao IA completa",
+    "texto_animado": ["HOOK", "PROVA", "CTA"],
+    "fundo_dinamico": "texturas dark + motion blur",
+    "musica": "leve e tensa",
+    "formatos": ["9:16", "1:1"]
+  },
+  "voz": {
+    "estilo": "Masculina brasileira",
+    "tom": "confiante",
+    "ritmo": "medio",
+    "naturalidade": "natural"
+  },
+  "avatar": {
+    "opcional": true,
+    "servicos": ["HeyGen", "Runway ML"],
+    "persona": "Homem 30-40 anos, aparencia profissional, comunicacao direta"
+  },
+  "links": {
+    "checkout": "${checkout || link || ""}",
+    "landing": "${landing || link || ""}"
+  },
+  "assets": {
+    "copies": ["hook + contexto + lista + solucao + cta"],
+    "scripts": ["roteiro completo"],
+    "imagens": ["prompt de imagem"],
+    "videos": ["spec de video"]
+  }
+}`;
     } else if (tipo === "viral_video") {
       systemPrompt = `Você é um diretor criativo de vídeos virais. Gere uma entrega completa pronta para publicação. Sempre responda em JSON válido.`;
       userPrompt = `Transforme a imagem em um vídeo viral completo com narração, música, legendas e copy de alta conversão.
