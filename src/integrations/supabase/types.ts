@@ -14,52 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      integrations: {
-        Row: {
-          access_token: string | null
-          client_id: string | null
-          credentials: string | null
-          created_at: string
-          id: string
-          last_test_at: string | null
-          platform: string
-          status: string
-          updated_at: string | null
-          user_id: string | null
-        }
-        Insert: {
-          access_token?: string | null
-          client_id?: string | null
-          credentials?: string | null
-          created_at?: string
-          id?: string
-          last_test_at?: string | null
-          platform: string
-          status?: string
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          access_token?: string | null
-          client_id?: string | null
-          credentials?: string | null
-          created_at?: string
-          id?: string
-          last_test_at?: string | null
-          platform?: string
-          status?: string
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "integrations_user_id_fkey"
-            columns: ["user_id"]
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       profiles: {
         Row: {
           created_at: string
@@ -99,90 +53,6 @@ export type Database = {
         }
         Relationships: []
       }
-      produtos_gerados: {
-        Row: {
-          id: string
-          user_id: string
-          nome: string
-          tipo: string
-          nicho: string
-          estrutura: Json
-          status: string
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          nome?: string
-          tipo?: string
-          nicho?: string
-          estrutura?: Json
-          status?: string
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          nome?: string
-          tipo?: string
-          nicho?: string
-          estrutura?: Json
-          status?: string
-          created_at?: string
-        }
-        Relationships: []
-      }
-      video_jobs: {
-        Row: {
-          id: string
-          status: string | null
-          progress: number | null
-          video_url: string | null
-          created_at: string | null
-        }
-        Insert: {
-          id?: string
-          status?: string | null
-          progress?: number | null
-          video_url?: string | null
-          created_at?: string | null
-        }
-        Update: {
-          id?: string
-          status?: string | null
-          progress?: number | null
-          video_url?: string | null
-          created_at?: string | null
-        }
-        Relationships: []
-      }
-      usuarios_planos: {
-        Row: {
-          id: string
-          limite_diario_json: Json
-          plano: string
-          reset_at: string | null
-          uso_hoje_json: Json
-          user_id: string
-        }
-        Insert: {
-          id?: string
-          limite_diario_json?: Json
-          plano?: string
-          reset_at?: string | null
-          uso_hoje_json?: Json
-          user_id: string
-        }
-        Update: {
-          id?: string
-          limite_diario_json?: Json
-          plano?: string
-          reset_at?: string | null
-          uso_hoje_json?: Json
-          user_id?: string
-        }
-        Relationships: []
-      }
       user_roles: {
         Row: {
           id: string
@@ -198,60 +68,6 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
-        }
-        Relationships: []
-      }
-      user_sessions: {
-        Row: {
-          created_at: string
-          id: string
-          role: string
-          token: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          role: string
-          token: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          role?: string
-          token?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      users: {
-        Row: {
-          created_at: string
-          email: string
-          id: string
-          is_active: boolean
-          password_hash: string
-          role: string
-          username: string
-        }
-        Insert: {
-          created_at?: string
-          email: string
-          id: string
-          is_active?: boolean
-          password_hash: string
-          role?: string
-          username: string
-        }
-        Update: {
-          created_at?: string
-          email?: string
-          id?: string
-          is_active?: boolean
-          password_hash?: string
-          role?: string
-          username?: string
         }
         Relationships: []
       }

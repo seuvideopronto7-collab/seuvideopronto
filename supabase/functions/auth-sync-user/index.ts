@@ -20,11 +20,26 @@ serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-    if (!supabaseUrl || !supabaseServiceKey) {
+    if (!supabaseUrl || !supabaseServiceKey || !supabaseAnonKey) {
       return new Response(JSON.stringify({ error: "Supabase env not configured." }), {
         status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Authenticate the caller via JWT
+    const authHeader = req.headers.get("Authorization") || "";
+    const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: { user: caller }, error: authError } = await authClient.auth.getUser();
+
+    if (authError || !caller) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -33,6 +48,14 @@ serve(async (req) => {
     const normalizedEmail = (email || "").trim().toLowerCase();
     const normalizedUsername = (username || "").trim();
     const normalizedPassword = (password || "").trim();
+
+    // Enforce that users can only sync their own account
+    if (userId !== caller.id) {
+      return new Response(JSON.stringify({ error: "Forbidden: can only sync own account." }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     if (!userId || !normalizedEmail || !normalizedUsername || !normalizedPassword) {
       return new Response(JSON.stringify({ error: "Dados de usuário incompletos." }), {
@@ -102,7 +125,7 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
-    return new Response(JSON.stringify({ error: (error as Error).message }), {
+    return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
