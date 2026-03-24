@@ -14,6 +14,7 @@ import ProdutosProntos from "./pages/ProdutosProntos";
 import Planos from "./pages/Planos";
 import NotFound from "./pages/NotFound";
 import Apis from "./pages/Apis";
+import EditorProReal from "./pages/EditorProReal";
 
 const queryClient = new QueryClient();
 
@@ -79,6 +80,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Apis />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/editor-pro-real"
+              element={
+                <ProtectedRoute>
+                  <EditorProReal />
                 </ProtectedRoute>
               }
             />

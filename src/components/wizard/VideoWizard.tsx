@@ -350,16 +350,16 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
               analyzeUrl = generatedUrl || fileUrl;
               setVideoUrl(generatedUrl);
               void handleGenerateViralPack({ imageUrl: fileUrl, videoUrl: generatedUrl || undefined, formData: resolvedFormData });
-              if (error) {
-                toast.warning("Motor de video indisponivel. Seguimos com a imagem.");
+                if (error) {
+                  toast.warning("Render local aplicado para gerar MP4 real.");
+                }
+              } catch (err) {
+                console.error(err);
+                analyzeUrl = fileUrl;
+                setVideoUrl(null);
+                void handleGenerateViralPack({ imageUrl: fileUrl, formData: resolvedFormData });
+                toast.error("Falha ao renderizar MP4 real. Tente novamente.");
               }
-            } catch (err) {
-              console.error(err);
-              analyzeUrl = fileUrl;
-              setVideoUrl(null);
-              void handleGenerateViralPack({ imageUrl: fileUrl, formData: resolvedFormData });
-              toast.warning("Motor de video indisponivel. Seguimos com a imagem.");
-            }
           } else {
             analyzeUrl = fileUrl;
             if (file.type.startsWith("video/")) {

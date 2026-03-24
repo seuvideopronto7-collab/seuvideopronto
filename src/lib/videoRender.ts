@@ -19,6 +19,7 @@ type RenderOptions = {
   narrationVolume?: number;
   musicVolume?: number;
   enableDucking?: boolean;
+  onProgress?: (ratio: number) => void;
 };
 
 let ffmpegPromise: Promise<import("@ffmpeg/ffmpeg").FFmpeg> | null = null;
@@ -70,6 +71,16 @@ const getFFmpeg = async () => {
 export const renderVideoFromImage = async (imageUrl: string, options?: RenderOptions) => {
   const ffmpeg = await getFFmpeg();
   const { fetchFile } = await import("@ffmpeg/util");
+  const onProgress = options?.onProgress;
+  const progressHandler = onProgress
+    ? ({ ratio }: { ratio: number }) => {
+        onProgress(Math.min(1, Math.max(0, ratio)));
+      }
+    : null;
+
+  if (progressHandler) {
+    ffmpeg.on("progress", progressHandler);
+  }
 
   const duration = options?.durationSec ?? 5;
   const fps = options?.fps ?? 30;
@@ -161,6 +172,10 @@ export const renderVideoFromImage = async (imageUrl: string, options?: RenderOpt
     }
   } catch {
     // ignore cleanup errors
+  }
+
+  if (progressHandler) {
+    ffmpeg.off("progress", progressHandler);
   }
 
   const blob = new Blob([data.buffer], { type: "video/mp4" });

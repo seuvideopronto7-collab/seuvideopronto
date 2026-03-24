@@ -44,6 +44,9 @@ const Index = () => {
                 Admin
               </Button>
             )}
+            <Button variant="ghost" size="sm" onClick={() => navigate("/editor-pro-real")}>
+              Editor Pro Real
+            </Button>
             <Button variant="ghost" size="sm" onClick={() => navigate("/apis")}>
               APIs
             </Button>
@@ -92,6 +95,25 @@ const Index = () => {
             </div>
           </div>
           <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-accent/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+        </button>
+
+        {/* CTA Editor Pro Real */}
+        <button
+          onClick={() => navigate("/editor-pro-real")}
+          className="w-full group relative overflow-hidden rounded-2xl border border-red-500/40 bg-gradient-to-r from-black via-red-500/10 to-black p-6 text-left transition-all hover:border-red-500/70 hover:shadow-[0_0_40px_-8px_rgba(255,0,0,0.35)]"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-xl bg-black/80 border border-red-500/40 flex items-center justify-center text-2xl shrink-0">
+              🎬
+            </div>
+            <div>
+              <h3 className="text-lg font-bold">EDITOR PRO REAL</h3>
+              <p className="text-sm text-muted-foreground">
+                Renderizacao MP4 real com Dark Flow, voz e trilha
+              </p>
+            </div>
+          </div>
+          <div className="absolute inset-0 bg-gradient-to-r from-red-500/10 to-black/10 opacity-0 group-hover:opacity-100 transition-opacity" />
         </button>
 
         {/* CTA Conteúdo 30 Dias */}
