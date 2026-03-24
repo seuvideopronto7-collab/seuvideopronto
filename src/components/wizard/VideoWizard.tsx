@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { usePlan } from "@/hooks/usePlan";
 import { getVideoDailyKey } from "@/lib/plans";
+import { renderVideoFromImage } from "@/lib/videoRender";
 import PlanBlockedDialog from "@/components/PlanBlockedDialog";
 import Stepper from "./Stepper";
 import StepEntrada, { type EntryType } from "./StepEntrada";
@@ -50,7 +51,7 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
   const [videoLink, setVideoLink] = useState("");
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [videoFallback, setVideoFallback] = useState<{ type: "video-fake"; url: string; animation: string } | null>(null);
+  const lastVideoUrlRef = useRef<string | null>(null);
   const [analysisData, setAnalysisData] = useState<any>(null);
   const [generationMode, setGenerationMode] = useState<string | null>(null);
   const [roteiroData, setRoteiroData] = useState<any>(null);
@@ -99,7 +100,6 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
     videoLink,
     videoUrl,
     imageUrl,
-    videoFallback,
     variacoesCount,
   });
 
@@ -110,25 +110,23 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
   };
 
   const generateVideoFromImage = async (imageUrl: string) => {
-    const { data, error } = await supabase.functions.invoke("generate-video", {
-      body: {
-        imageUrl,
-        estilo: "cinematografico",
-        movimento: "leve zoom + parallax",
-        duracao: 5,
-      },
-    });
-    if (error) throw error;
-    if (data?.provider === "fallback") throw new Error("Provedor de video indisponivel");
-    if (!data?.videoUrl) throw new Error("Falha ao gerar video");
-    return data.videoUrl as string;
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-video", {
+        body: {
+          imageUrl,
+          estilo: "cinematografico",
+          movimento: "leve zoom + parallax",
+          duracao: 5,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      if (data?.videoUrl) return data.videoUrl as string;
+    } catch (err) {
+      console.warn("Provedor externo indisponivel, usando motor local.", err);
+    }
+    return renderVideoFromImage(imageUrl, { durationSec: 5, fps: 30 });
   };
-
-  const createVideoFallback = (fallbackImageUrl: string) => ({
-    type: "video-fake" as const,
-    url: fallbackImageUrl,
-    animation: "zoom + fade",
-  });
 
   const generateVideoObrigatorio = async (fallbackImageUrl: string) => {
     let attempts = 0;
@@ -137,7 +135,7 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
     while (attempts < 3) {
       try {
         const generatedUrl = await generateVideoFromImage(fallbackImageUrl);
-        return { videoUrl: generatedUrl, fallback: null };
+        return { videoUrl: generatedUrl, error: null };
       } catch (err) {
         lastError = err;
         attempts += 1;
@@ -145,7 +143,7 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
     }
 
     console.warn("Falha ao gerar video apos 3 tentativas", lastError);
-    return { videoUrl: null, fallback: createVideoFallback(fallbackImageUrl) };
+    return { videoUrl: null, error: lastError };
   };
 
   const persistProduto = async (override?: { status?: "rascunho" | "finalizado" | "publicado"; formData?: Partial<typeof formData> }) => {
@@ -348,28 +346,24 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
           if (isImageUpload) {
             setImageUrl(fileUrl);
             try {
-              const { videoUrl: generatedUrl, fallback } = await generateVideoObrigatorio(fileUrl);
+              const { videoUrl: generatedUrl, error } = await generateVideoObrigatorio(fileUrl);
               analyzeUrl = generatedUrl || fileUrl;
               setVideoUrl(generatedUrl);
-              setVideoFallback(fallback);
               void handleGenerateViralPack({ imageUrl: fileUrl, videoUrl: generatedUrl || undefined, formData: resolvedFormData });
-              if (fallback) {
-                toast.warning("IA de video falhou. Fallback animado aplicado.");
+              if (error) {
+                toast.warning("Motor de video indisponivel. Seguimos com a imagem.");
               }
             } catch (err) {
               console.error(err);
-              const fallback = createVideoFallback(fileUrl);
               analyzeUrl = fileUrl;
               setVideoUrl(null);
-              setVideoFallback(fallback);
               void handleGenerateViralPack({ imageUrl: fileUrl, formData: resolvedFormData });
-              toast.warning("IA de video falhou. Fallback animado aplicado.");
+              toast.warning("Motor de video indisponivel. Seguimos com a imagem.");
             }
           } else {
             analyzeUrl = fileUrl;
             if (file.type.startsWith("video/")) {
               setVideoUrl(fileUrl);
-              setVideoFallback(null);
             }
           }
         }
@@ -579,7 +573,6 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
     setVideoLink("");
     setVideoUrl(null);
     setImageUrl(null);
-    setVideoFallback(null);
     setViralRequested(false);
     setFormData({
       produto: "",
@@ -606,9 +599,21 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
   useEffect(() => {
     if (isPlayableVideoUrl(videoLink)) {
       setVideoUrl(videoLink);
-      setVideoFallback(null);
     }
   }, [videoLink]);
+
+  useEffect(() => {
+    const previous = lastVideoUrlRef.current;
+    if (previous && previous.startsWith("blob:") && previous !== videoUrl) {
+      URL.revokeObjectURL(previous);
+    }
+    lastVideoUrlRef.current = videoUrl;
+    return () => {
+      if (videoUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(videoUrl);
+      }
+    };
+  }, [videoUrl]);
 
   useEffect(() => {
     if (step < 8) return;
@@ -629,7 +634,6 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
     setVideoLink(estrutura.videoLink || "");
     setVideoUrl(estrutura.videoUrl || null);
     setImageUrl(estrutura.imageUrl || null);
-    setVideoFallback(estrutura.videoFallback || null);
     setAnalysisData(estrutura.analysisData || null);
     setRoteiroData(estrutura.roteiroData || null);
     setSeoData(estrutura.seoData || null);
@@ -723,15 +727,13 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
         )}
         {step === 8 && <StepMontagem onContinue={() => goTo(9)} />}
         {step === 9 && (
-          <StepFinal
-            roteiroData={roteiroData}
-            seoData={seoData}
-            viralData={viralData}
-            videoUrl={videoUrl}
-            imageUrl={imageUrl}
-            videoFallback={videoFallback}
-            onNewVersion={handleNewVersion}
-            onEdit={() => goTo(8)}
+            <StepFinal
+              roteiroData={roteiroData}
+              seoData={seoData}
+              viralData={viralData}
+              videoUrl={videoUrl}
+              onNewVersion={handleNewVersion}
+              onEdit={() => goTo(8)}
             onActivateViral={() =>
               handleGenerateViralPack({
                 imageUrl: imageUrl || undefined,

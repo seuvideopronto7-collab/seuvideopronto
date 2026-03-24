@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Upload, Link2, ShoppingCart, Flame, Award, Loader2, FileVideo, FileAudio, ImageIcon, X } from "lucide-react";
+import { renderVideoFromImage } from "@/lib/videoRender";
 
 interface ImportContentProps {
   produto: string;
@@ -25,18 +26,22 @@ const ImportContent = ({ produto, nicho, publico, dor, beneficio, link, onResult
   const fileRef = useRef<HTMLInputElement>(null);
 
   const generateVideoFromImage = async (imageUrl: string) => {
-    const { data, error } = await supabase.functions.invoke("generate-video", {
-      body: {
-        imageUrl,
-        estilo: "cinematografico",
-        movimento: "leve zoom + parallax",
-        duracao: 5,
-      },
-    });
-    if (error) throw error;
-    if (data?.provider === "fallback") throw new Error("Provedor de video indisponivel");
-    if (!data?.videoUrl) throw new Error("Falha ao gerar video");
-    return data.videoUrl as string;
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-video", {
+        body: {
+          imageUrl,
+          estilo: "cinematografico",
+          movimento: "leve zoom + parallax",
+          duracao: 5,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      if (data?.videoUrl) return data.videoUrl as string;
+    } catch (err) {
+      console.warn("Provedor externo indisponivel, usando motor local.", err);
+    }
+    return renderVideoFromImage(imageUrl, { durationSec: 5, fps: 30 });
   };
 
   const generateVideoObrigatorio = async (imageUrl: string) => {
@@ -111,12 +116,12 @@ const ImportContent = ({ produto, nicho, publico, dor, beneficio, link, onResult
             const { videoUrl, fallback } = await generateVideoObrigatorio(fileUrl);
             analyzeUrl = videoUrl || fileUrl;
             if (fallback) {
-              toast.warning("IA de video falhou. Fallback animado aplicado.");
+              toast.warning("Motor de video indisponivel. Seguimos com a imagem.");
             }
           } catch (err) {
             console.error(err);
             analyzeUrl = fileUrl;
-            toast.warning("IA de video falhou. Fallback animado aplicado.");
+            toast.warning("Motor de video indisponivel. Seguimos com a imagem.");
           }
         } else {
           analyzeUrl = fileUrl;

@@ -5,8 +5,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const FALLBACK_VIDEO_URL = "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4";
-
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -84,13 +82,17 @@ serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify({ videoUrl: FALLBACK_VIDEO_URL, provider: "fallback" }), {
+    const fallbackReason = provider
+      ? "Falha ao gerar video com o provedor configurado"
+      : "Nenhum provedor de video configurado";
+    return new Response(JSON.stringify({ error: fallbackReason }), {
+      status: 503,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
     console.error("Error:", e);
-    return new Response(JSON.stringify({ videoUrl: FALLBACK_VIDEO_URL, error: e instanceof Error ? e.message : "Unknown error" }), {
-      status: 200,
+    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
+      status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

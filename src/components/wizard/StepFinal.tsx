@@ -11,8 +11,6 @@ interface StepFinalProps {
   seoData: any;
   viralData?: any;
   videoUrl?: string;
-  imageUrl?: string | null;
-  videoFallback?: { type: "video-fake"; url: string; animation: string } | null;
   onNewVersion: () => void;
   onEdit: () => void;
   onActivateViral: () => void;
@@ -20,14 +18,13 @@ interface StepFinalProps {
   onContinue: () => void;
 }
 
-const StepFinal = ({ roteiroData, seoData, viralData, videoUrl, imageUrl, videoFallback, onNewVersion, onEdit, onActivateViral, isViralLoading, onContinue }: StepFinalProps) => {
+const StepFinal = ({ roteiroData, seoData, viralData, videoUrl, onNewVersion, onEdit, onActivateViral, isViralLoading, onContinue }: StepFinalProps) => {
   const roteiro = roteiroData?.roteiro || roteiroData?.novo_roteiro;
   const seo = seoData?.titulos ? seoData : seoData?.seo;
   const viral = viralData?.copy ? viralData : viralData?.viral;
   const hasViral = Boolean(viral);
   const viralFallback = Boolean(viralData?._fallback || viral?._fallback);
   const resolvedVideoUrl = videoUrl || seoData?.videoUrl || roteiroData?.videoUrl || "";
-  const resolvedFallback = videoFallback?.type === "video-fake" ? videoFallback : imageUrl ? { type: "video-fake", url: imageUrl, animation: "zoom + fade" } : null;
   const [videoFailed, setVideoFailed] = useState(false);
   const [selectedDays, setSelectedDays] = useState<string[]>(["Seg", "Qua", "Sex"]);
   const [selectedTimes, setSelectedTimes] = useState<string[]>(["10:00", "19:00"]);
@@ -110,10 +107,6 @@ const StepFinal = ({ roteiroData, seoData, viralData, videoUrl, imageUrl, videoF
   };
 
   const downloadVideo = () => {
-    if (!resolvedVideoUrl && resolvedFallback) {
-      toast.warning("Fallback animado ativo. Nenhum arquivo de video disponivel.");
-      return;
-    }
     if (!resolvedVideoUrl) {
       toast.error("Video indisponivel para download.");
       return;
@@ -327,22 +320,14 @@ const StepFinal = ({ roteiroData, seoData, viralData, videoUrl, imageUrl, videoF
               onClick={forcePlay}
               onError={() => setVideoFailed(true)}
             />
-          ) : resolvedFallback ? (
-            <div className="video-fake rounded-xl overflow-hidden">
-              <img src={resolvedFallback.url} alt="Preview animado" className="zoom-animation" />
-              <div className="absolute inset-0 flex items-end justify-between p-4 text-xs text-white/80">
-                <span className="rounded-full bg-black/50 px-2 py-1">Fallback animado</span>
-                <span className="rounded-full bg-black/50 px-2 py-1">Zoom + fade</span>
-              </div>
-            </div>
           ) : (
             <div className="relative bg-gradient-to-br from-primary/20 via-muted to-accent/20 rounded-xl aspect-video flex items-center justify-center">
               <div className="text-center space-y-2">
                 <div className="w-14 h-14 rounded-full bg-primary/20 flex items-center justify-center mx-auto">
                   <span className="text-2xl">▶️</span>
                 </div>
-                <p className="text-sm text-muted-foreground">Thumbnail do video</p>
-                <p className="text-xs text-muted-foreground">Sem preview disponivel, mas o download segue ativo.</p>
+                <p className="text-sm text-muted-foreground">Video indisponivel</p>
+                <p className="text-xs text-muted-foreground">Se o arquivo for imagem, a renderizacao real pode levar alguns segundos.</p>
                 {resolvedVideoUrl && (
                   <Button variant="glass" size="sm" onClick={forcePlay}>
                     Tentar reproduzir
