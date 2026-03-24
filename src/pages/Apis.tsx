@@ -491,17 +491,18 @@ const Apis = () => {
           setSaving(false);
           return;
         }
+        const fb = fallback as any;
         updated = {
-          id: fallback.id,
-          platformKey: fallback.platform,
+          id: fb.id,
+          platformKey: fb.platform,
           platformName: platformName,
-          status: mapDbStatus(fallback.status),
-          credentials: parseEncryptedBlob(fallback.credentials),
-          accessToken: fallback.access_token,
-          lastChecked: fallback.last_test_at,
-          createdAt: fallback.created_at,
-          updatedAt: fallback.updated_at,
-          clientId: fallback.client_id,
+          status: mapDbStatus(fb.status),
+          credentials: parseEncryptedBlob(fb.credentials),
+          accessToken: fb.access_token,
+          lastChecked: fb.last_test_at,
+          createdAt: fb.created_at,
+          updatedAt: fb.updated_at,
+          clientId: fb.client_id,
         };
       } else {
         updated = {
