@@ -266,6 +266,16 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
     };
   };
 
+  const withTimeout = async <T,>(promise: Promise<T>, ms: number, message: string) => {
+    const timeout = new Promise<never>((_, reject) => {
+      const id = setTimeout(() => {
+        clearTimeout(id);
+        reject(new Error(message));
+      }, ms);
+    });
+    return Promise.race([promise, timeout]);
+  };
+
   const handleGenerateViralPack = async (override?: { imageUrl?: string; videoUrl?: string; formData?: Partial<typeof formData> }) => {
     const resolvedFormData = { ...formData, ...(override?.formData || {}) };
     try {
@@ -505,9 +515,13 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
           return;
         }
       }
-      const { data, error } = await supabase.functions.invoke("generate-viral", {
-        body: { ...formData, tipo: "seo", modo: generationMode || formData.objetivo?.toLowerCase(), contextoMestre: buildContextoMestre() },
-      });
+      const { data, error } = await withTimeout(
+        supabase.functions.invoke("generate-viral", {
+          body: { ...formData, tipo: "seo", modo: generationMode || formData.objetivo?.toLowerCase(), contextoMestre: buildContextoMestre() },
+        }),
+        5000,
+        "Timeout SEO",
+      );
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       setSeoData(data);
@@ -521,6 +535,7 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
       toast.warning("SEO falhou. Fallback aplicado automaticamente.");
     } finally {
       setIsLoading(false);
+      setStep(7);
     }
   };
 

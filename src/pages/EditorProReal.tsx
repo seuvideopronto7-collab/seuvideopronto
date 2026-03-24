@@ -306,7 +306,7 @@ const EditorProReal = () => {
       { id: "voice", label: "Narracao", color: "bg-emerald-400/50" },
       { id: "music", label: "Musica", color: "bg-blue-400/50" },
       { id: "captions", label: "Legenda", color: "bg-yellow-400/40" },
-      { id: "fx", label: "Efeitos", color: "bg-purple-400/40" },
+      { id: "fx", label: "Efeitos", color: "bg-amber-400/40" },
     ],
     [],
   );

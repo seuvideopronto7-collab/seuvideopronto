@@ -83,6 +83,8 @@ const Content30Days = () => {
     const anyConnected = Object.values(connected).some(Boolean);
     if (!anyConnected) {
       toast.warning("Conecte ao menos uma rede para ativar o autopost.");
+      setLogs((prev) => [`${new Date().toLocaleTimeString()} • Autopost aguardando conexao`, ...prev]);
+      return;
     }
     setAutopost(true);
     setLogs((prev) => [`${new Date().toLocaleTimeString()} • Autopost ativado (30 dias)`, ...prev]);
