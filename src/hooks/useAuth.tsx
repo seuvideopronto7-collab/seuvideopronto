@@ -25,7 +25,7 @@ interface AuthContextType {
   refreshProfile: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType>({
+const defaultAuthContext: AuthContextType = {
   user: null,
   session: null,
   profile: null,
@@ -35,9 +35,11 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   signOut: async () => {},
   refreshProfile: async () => {},
-});
+};
 
-export const useAuth = () => useContext(AuthContext);
+const AuthContext = createContext<AuthContextType>(defaultAuthContext);
+
+export const useAuth = () => useContext(AuthContext) || defaultAuthContext;
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -48,27 +50,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   const fetchProfile = async (userId: string, userEmail?: string | null) => {
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .single();
-    if (data) setProfile(data as Profile);
+    try {
+      const { data } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .single();
+      if (data) setProfile(data as Profile);
 
-    const { data: roles } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId);
-    const admin = roles?.some((r: any) => r.role === "admin") || false;
-    setIsAdmin(admin);
+      const { data: roles } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userId);
+      const admin = roles?.some((r: any) => r.role === "admin") || false;
+      setIsAdmin(admin);
 
-    const founderEmails = (import.meta.env.VITE_FOUNDER_EMAILS || "")
-      .split(",")
-      .map((email: string) => email.trim().toLowerCase())
-      .filter(Boolean);
-    const email = (data?.email || userEmail || "").toLowerCase();
-    const founder = founderEmails.length > 0 ? founderEmails.includes(email) : admin;
-    setIsFounder(founder);
+      const founderEmails = (import.meta.env.VITE_FOUNDER_EMAILS || "")
+        .split(",")
+        .map((email: string) => email.trim().toLowerCase())
+        .filter(Boolean);
+      const email = (data?.email || userEmail || "").toLowerCase();
+      const founder = founderEmails.length > 0 ? founderEmails.includes(email) : admin;
+      setIsFounder(founder);
+    } catch (error) {
+      console.error("PDG DEBUG: erro detectado e tratado", error);
+      setProfile(null);
+      setIsAdmin(false);
+      setIsFounder(false);
+    }
   };
 
   const refreshProfile = async () => {

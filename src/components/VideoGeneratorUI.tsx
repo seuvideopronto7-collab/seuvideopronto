@@ -40,6 +40,13 @@ const VideoGeneratorUI = () => {
   useEffect(() => {
     if (!jobId) return;
     let active = true;
+    const watchdog = window.setTimeout(() => {
+      if (!active) return;
+      console.error("PDG DEBUG: erro detectado e tratado", new Error("Timeout de monitoramento do job"));
+      setJobStatus("fallback");
+      setProgress((prev) => (prev < 100 ? 100 : prev));
+      active = false;
+    }, 60000);
 
     const poll = async () => {
       try {
@@ -52,7 +59,7 @@ const VideoGeneratorUI = () => {
           active = false;
         }
       } catch (error) {
-        console.error(error);
+        console.error("PDG DEBUG: erro detectado e tratado", error);
       }
     };
 
@@ -61,6 +68,7 @@ const VideoGeneratorUI = () => {
     return () => {
       active = false;
       window.clearInterval(interval);
+      window.clearTimeout(watchdog);
     };
   }, [jobId]);
 
@@ -119,6 +127,7 @@ const VideoGeneratorUI = () => {
       toast.success("Job criado. Processando...");
       await processVideoJob({ jobId: id, ...payload });
     } catch (error: any) {
+      console.error("PDG DEBUG: erro detectado e tratado", error);
       toast.error(error?.message || "Falha ao iniciar o job.");
       setJobStatus("failed");
     } finally {

@@ -7,6 +7,7 @@ import Content30Days from "@/components/Content30Days";
 import DarkFlowEngine from "@/components/DarkFlowEngine";
 import SalesMachine from "@/components/SalesMachine";
 import VideoGeneratorUI from "@/components/VideoGeneratorUI";
+import SafeRender from "@/components/SafeRender";
 
 const Index = () => {
   const { signOut, isAdmin, profile } = useAuth();
@@ -139,7 +140,11 @@ const Index = () => {
           <div className="absolute inset-0 bg-gradient-to-r from-accent/5 to-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
         </button>
 
-        {showCalendar && <Content30Days />}
+        {showCalendar && (
+          <SafeRender label="Conteúdo 30 Dias">
+            <Content30Days />
+          </SafeRender>
+        )}
 
         {/* CTA Máquina de Vendas */}
         <button
@@ -160,7 +165,11 @@ const Index = () => {
           <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-amber-400/10 opacity-0 group-hover:opacity-100 transition-opacity" />
         </button>
 
-        {showSalesMachine && <SalesMachine />}
+        {showSalesMachine && (
+          <SafeRender label="Sales Machine">
+            <SalesMachine />
+          </SafeRender>
+        )}
 
         {/* CTA Dark Flow */}
         <button
@@ -181,12 +190,20 @@ const Index = () => {
           <div className="absolute inset-0 bg-gradient-to-r from-red-500/5 to-black/10 opacity-0 group-hover:opacity-100 transition-opacity" />
         </button>
 
-        {showDarkFlow && <DarkFlowEngine />}
+        {showDarkFlow && (
+          <SafeRender label="Dark Flow">
+            <DarkFlowEngine />
+          </SafeRender>
+        )}
 
-        <VideoGeneratorUI />
+        <SafeRender label="Video Generator">
+          <VideoGeneratorUI />
+        </SafeRender>
 
         {/* Wizard */}
-        <VideoWizard initialProduto={initialProduto} autoStart={autoStart} />
+        <SafeRender label="Video Wizard">
+          <VideoWizard initialProduto={initialProduto} autoStart={autoStart} />
+        </SafeRender>
       </main>
     </div>
   );

@@ -185,6 +185,13 @@
     animation: stepIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
+  .pdg-safe-debug {
+    background-color: #12121a;
+    border: 1px dashed rgba(45, 212, 191, 0.35);
+    border-radius: 18px;
+    padding: 1rem;
+  }
+
 
   @keyframes stepIn {
     0% {
