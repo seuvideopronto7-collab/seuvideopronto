@@ -6,6 +6,7 @@ import { usePlan } from "@/hooks/usePlan";
 import { getVideoDailyKey } from "@/lib/plans";
 import { renderVideoFromImage } from "@/lib/videoRender";
 import PlanBlockedDialog from "@/components/PlanBlockedDialog";
+import { addSystemLog } from "@/lib/systemLog";
 import Stepper from "./Stepper";
 import StepEntrada, { type EntryType } from "./StepEntrada";
 import StepConteudo from "./StepConteudo";
@@ -312,12 +313,24 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
         setViralData({ _blocked: true, _reason: err?.message || "Conteudo bloqueado." });
         await persistProduto({ formData: resolvedFormData });
         toast.error("Conteudo bloqueado por baixa coerencia ou midia invalida.");
+        addSystemLog({
+          level: "warning",
+          etapa: "viral",
+          status: "bloqueado",
+          motivo: err?.message || "Conteudo bloqueado",
+        });
       } else {
         console.error(err);
         const fallback = buildViralFallback(err?.message);
         setViralData(fallback);
         await persistProduto({ formData: resolvedFormData });
         toast.warning("Modo viral falhou. Fallback aplicado automaticamente.");
+        addSystemLog({
+          level: "warning",
+          etapa: "viral",
+          status: "fallback",
+          motivo: err?.message || "Falha no modo viral",
+        });
       }
     } finally {
       setIsViralLoading(false);
@@ -440,6 +453,12 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
       }
       await persistProduto({ formData: resolvedFormData });
       toast.warning("Analise falhou. Fallback aplicado automaticamente.");
+      addSystemLog({
+        level: "warning",
+        etapa: "analise",
+        status: "fallback",
+        motivo: err?.message || "Falha na analise",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -478,6 +497,12 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
       const message = String(err?.message || err?.error || "").toLowerCase();
       if (message.includes("quality_blocked") || message.includes("contexto_obrigatorio")) {
         toast.error("Roteiro bloqueado por baixa coerencia com o contexto.");
+        addSystemLog({
+          level: "warning",
+          etapa: "roteiro",
+          status: "bloqueado",
+          motivo: err?.message || "Roteiro bloqueado",
+        });
         setStep(4);
         return;
       }
@@ -496,6 +521,12 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
       setRoteiroData(fallback);
       await persistProduto();
       toast.warning("Roteiro falhou. Fallback aplicado automaticamente.");
+      addSystemLog({
+        level: "warning",
+        etapa: "roteiro",
+        status: "fallback",
+        motivo: err?.message || "Falha no roteiro",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -512,7 +543,18 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
             title: "Limite de thumbnails",
             description: gate.reason || "Você atingiu o limite diário de thumbnails.",
           });
+          const fallback = buildSeoFallback(gate.reason || "Limite de thumbnails");
+          setSeoData(fallback);
+          await persistProduto();
+          toast.warning("SEO limitado pelo plano. Fallback aplicado automaticamente.");
+          addSystemLog({
+            level: "warning",
+            etapa: "seo",
+            status: "fallback",
+            motivo: gate.reason || "Limite de thumbnails",
+          });
           setIsLoading(false);
+          setStep(7);
           return;
         }
       }
@@ -534,6 +576,12 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
       setSeoData(fallback);
       await persistProduto();
       toast.warning("SEO falhou. Fallback aplicado automaticamente.");
+      addSystemLog({
+        level: "warning",
+        etapa: "seo",
+        status: "fallback",
+        motivo: err?.message || "Falha no SEO",
+      });
     } finally {
       setIsLoading(false);
       setStep(7);
@@ -565,6 +613,12 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
       setVariacoesData(fallback);
       await persistProduto();
       toast.warning("Variações falharam. Fallback aplicado automaticamente.");
+      addSystemLog({
+        level: "warning",
+        etapa: "variacoes",
+        status: "fallback",
+        motivo: err?.message || "Falha nas variacoes",
+      });
     } finally {
       setIsLoading(false);
     }

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -43,7 +42,10 @@ const Content30Days = () => {
   const [autopost, setAutopost] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
   const [showConnectHint, setShowConnectHint] = useState(false);
-  const cacheKey = useMemo(() => `svz_30dias_${btoa(JSON.stringify({ ...form, modoViral }))}`, [form, modoViral]);
+  const cacheKey = useMemo(() => {
+    const raw = JSON.stringify({ ...form, modoViral });
+    return `svz_30dias_${btoa(encodeURIComponent(raw))}`;
+  }, [form, modoViral]);
 
   const update = (key: string, value: string) => setForm((p) => ({ ...p, [key]: value }));
 
