@@ -3,7 +3,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version, x-kiwify-secret, x-webhook-token",
+  "Access-Control-Allow-Headers": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 };
 
 type KiwifyPayload = {
@@ -65,7 +66,7 @@ serve(async (req) => {
 
   try {
     if (req.method !== "POST") {
-      return new Response(JSON.stringify({ ok: false, error: "Method not allowed" }), {
+      return new Response(JSON.stringify({ success: false, ok: false, error: "Method not allowed" }), {
         status: 200,
         headers,
       });
@@ -75,7 +76,7 @@ serve(async (req) => {
     const secret = Deno.env.get("KIWIFY_WEBHOOK_SECRET") || "";
     if (secret && getWebhookToken(req) !== secret) {
       console.warn("Kiwify webhook token mismatch");
-      return new Response(JSON.stringify({ ok: false, error: "unauthorized" }), {
+      return new Response(JSON.stringify({ success: false, ok: false, error: "unauthorized" }), {
         status: 200,
         headers,
       });
@@ -85,7 +86,7 @@ serve(async (req) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
     if (!supabaseUrl || !serviceKey) {
       console.error("Supabase env vars not configured");
-      return new Response(JSON.stringify({ ok: false, error: "server_not_configured" }), {
+      return new Response(JSON.stringify({ success: false, ok: false, error: "server_not_configured" }), {
         status: 200,
         headers,
       });
@@ -121,16 +122,16 @@ serve(async (req) => {
     const { error } = await insertQuery;
     if (error) {
       console.error("Erro ao salvar venda:", error.message);
-      return new Response(JSON.stringify({ ok: false, error: "db_error" }), {
+      return new Response(JSON.stringify({ success: false, ok: false, error: "db_error" }), {
         status: 200,
         headers,
       });
     }
 
-    return new Response(JSON.stringify({ ok: true }), { status: 200, headers });
+    return new Response(JSON.stringify({ success: true, ok: true }), { status: 200, headers });
   } catch (err) {
     console.error("Erro webhook:", err);
-    return new Response(JSON.stringify({ ok: false, error: "unexpected" }), {
+    return new Response(JSON.stringify({ success: false, ok: false, error: "unexpected" }), {
       status: 200,
       headers,
     });

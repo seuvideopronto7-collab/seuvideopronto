@@ -2,7 +2,8 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Allow-Headers": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 };
 
 serve(async (req) => {
@@ -11,12 +12,18 @@ serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({}));
     const basicAuth = body?.basicAuth || Deno.env.get("HOTMART_BASIC_AUTH");
+    const responseHeaders = { ...corsHeaders, "Content-Type": "application/json" };
+
+    console.log("Hotmart basic auth recebido:", { hasBasicAuth: !!basicAuth });
 
     if (!basicAuth) {
-      return new Response(JSON.stringify({ status: "erro", erro: "HOTMART_BASIC_AUTH not configured" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({ success: false, status: "erro", erro: "HOTMART_BASIC_AUTH not configured" }),
+        {
+          status: 200,
+          headers: responseHeaders,
+        },
+      );
     }
 
     const response = await fetch("https://api-sec-vlc.hotmart.com/security/oauth/token", {
@@ -31,19 +38,27 @@ serve(async (req) => {
     const data = await response.json();
 
     if (data?.access_token) {
-      return new Response(JSON.stringify({ status: "conectado", token: data.access_token }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return new Response(JSON.stringify({ success: true, status: "conectado", token: data.access_token }), {
+        status: 200,
+        headers: responseHeaders,
       });
     }
 
-    return new Response(JSON.stringify({ status: "erro", detalhe: data }), {
-      status: 401,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    return new Response(JSON.stringify({ success: false, status: "erro", detalhe: data }), {
+      status: 200,
+      headers: responseHeaders,
     });
   } catch (e) {
-    return new Response(JSON.stringify({ status: "erro", erro: e instanceof Error ? e.message : "Unknown error" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({
+        success: false,
+        status: "erro",
+        erro: e instanceof Error ? e.message : "Unknown error",
+      }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
   }
 });
