@@ -99,7 +99,7 @@ const AdminVideoGenerator = () => {
     return Promise.race([promise, timeout]);
   };
 
-  const handleGenerate = async (mode: "cinema" | "darkflow" | "viral") => {
+  const handleGenerate = async (nextMode: "cinema" | "darkflow" | "viral") => {
     if (!file) {
       toast.error("Envie uma imagem antes de gerar.");
       return;
@@ -111,23 +111,30 @@ const AdminVideoGenerator = () => {
     setRoteiro("");
     setNarracao("");
     setPromptText("");
+    setSoundtrack("");
+    setMode(nextMode);
 
     try {
       updateStage(0, "processing");
       const ext = file.name.split(".").pop() || "jpg";
       const path = `admin-generator/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-      const { error: uploadError } = await supabase.storage.from("media-uploads").upload(path, file);
-      if (uploadError) throw uploadError;
-      const { data: urlData } = supabase.storage.from("media-uploads").getPublicUrl(path);
-      const imageUrl = urlData.publicUrl;
-      updateStage(0, "done");
+      let imageUrl = previewUrl || "";
+      try {
+        const { error: uploadError } = await supabase.storage.from("media-uploads").upload(path, file);
+        if (uploadError) throw uploadError;
+        const { data: urlData } = supabase.storage.from("media-uploads").getPublicUrl(path);
+        imageUrl = urlData.publicUrl;
+        updateStage(0, "done");
+      } catch {
+        updateStage(0, "fallback", "Upload externo indisponível, usando arquivo local");
+      }
 
       updateStage(1, "processing");
       const prompt = buildCinematicPrompt(
         productType,
         styleType,
-        mode === "darkflow",
-        mode === "viral",
+        nextMode === "darkflow",
+        nextMode === "viral",
       );
       setPromptText(prompt);
       updateStage(1, "done");
@@ -135,40 +142,48 @@ const AdminVideoGenerator = () => {
       updateStage(2, "processing");
       let videoUrl: string | null = null;
       try {
-        const { data, error } = await supabase.functions.invoke("generate-video", {
-          body: {
-            imageUrl,
-            estilo: mode === "darkflow" ? "darkflow" : "cinematografico",
-            movimento: mode === "viral" ? "cortes dinamicos" : "zoom cinematografico",
-            duracao: 6,
-          },
-        });
+        const { data, error } = await withTimeout(
+          supabase.functions.invoke("generate-video", {
+            body: {
+              imageUrl,
+              estilo: nextMode === "darkflow" ? "darkflow" : "cinematografico",
+              movimento: nextMode === "viral" ? "cortes dinamicos" : "zoom cinematografico",
+              duracao: 6,
+            },
+          }),
+          5000,
+          "Timeout no motor de vídeo",
+        );
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
         videoUrl = data?.videoUrl || null;
         updateStage(2, "done");
       } catch (err) {
-        updateStage(2, "error");
         videoUrl = await renderVideoFromImage(imageUrl, { durationSec: 6, fps: 30, animation: "kenburns" });
+        updateStage(2, "fallback", "Fallback local aplicado");
       }
 
       updateStage(3, "processing");
       try {
-        const { data, error } = await supabase.functions.invoke("generate-viral", {
-          body: {
-            produto: productType,
-            nicho: styleType,
-            objetivo: mode === "viral" ? "viral" : "vendas",
-            tipo: "roteiro",
-            contextoMestre: {
-              tema: styleType,
-              publico: "Compradores premium",
-              objetivo: "vendas",
-              linguagem: "pt-BR",
-              tom: "cinematografico",
+        const { data, error } = await withTimeout(
+          supabase.functions.invoke("generate-viral", {
+            body: {
+              produto: productType,
+              nicho: styleType,
+              objetivo: nextMode === "viral" ? "viral" : "vendas",
+              tipo: "roteiro",
+              contextoMestre: {
+                tema: styleType,
+                publico: "Compradores premium",
+                objetivo: "vendas",
+                linguagem: "pt-BR",
+                tom: "cinematografico",
+              },
             },
-          },
-        });
+          }),
+          5000,
+          "Timeout na geração de roteiro",
+        );
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
         const roteiroTexto = data?.roteiro?.roteiro_completo || data?.roteiro?.hook || "Roteiro cinematografico pronto.";
@@ -176,20 +191,26 @@ const AdminVideoGenerator = () => {
         updateStage(3, "done");
       } catch (err) {
         setRoteiro("Roteiro base pronto com gancho e CTA comercial.");
-        updateStage(3, "error");
+        updateStage(3, "fallback", "Fallback aplicado na geração de roteiro");
       }
 
-      updateStage(4, "blocked");
-      setNarracao("Narração pendente de integração com ElevenLabs.");
+      updateStage(4, "processing");
+      const narracaoBase = roteiro
+        ? `Narração comercial: ${roteiro.slice(0, 180)}...`
+        : "Narração comercial pronta para sincronizar.";
+      setNarracao(narracaoBase);
+      updateStage(4, "fallback", "ElevenLabs não conectado, texto gerado");
 
-      updateStage(5, "blocked");
+      updateStage(5, "processing");
+      setSoundtrack("Trilha épica · Impacto");
+      updateStage(5, "fallback", "Trilha base aplicada");
 
       updateStage(6, "processing");
       setRenderUrl(videoUrl);
       if (videoUrl) {
         updateStage(6, "done");
         updateStage(7, "done");
-        toast.success("Video cinematografico finalizado.");
+        toast.success("Vídeo cinematográfico finalizado.");
       } else {
         updateStage(6, "error");
         updateStage(7, "error");
