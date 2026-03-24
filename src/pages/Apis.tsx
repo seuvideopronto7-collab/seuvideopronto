@@ -505,17 +505,18 @@ const Apis = () => {
           clientId: fb.client_id,
         };
       } else {
+        const d = data as any;
         updated = {
-          id: data.id,
-          platformKey: data.platform,
+          id: d.id,
+          platformKey: d.platform,
           platformName: platformName,
-          status: mapDbStatus(data.status),
-          credentials: parseEncryptedBlob(data.credentials),
-          accessToken: data.access_token,
-          lastChecked: data.last_test_at,
-          createdAt: data.created_at,
-          updatedAt: data.updated_at,
-          clientId: data.client_id,
+          status: mapDbStatus(d.status),
+          credentials: parseEncryptedBlob(d.credentials),
+          accessToken: d.access_token,
+          lastChecked: d.last_test_at,
+          createdAt: d.created_at,
+          updatedAt: d.updated_at,
+          clientId: d.client_id,
         };
       }
     } else if (editTarget) {
