@@ -424,6 +424,8 @@ const VideoGeneratorUI = () => {
     try {
       setIsLocalRendering(true);
       setLocalProgress(0);
+      setJobStatus("render_local");
+      setProgress(0);
       const resolvedImageUrl = await uploadToStorage();
       if (!resolvedImageUrl) {
         toast.error("Informe uma URL ou envie uma imagem.");

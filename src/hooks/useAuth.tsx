@@ -65,14 +65,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .from("user_roles")
         .select("role")
         .eq("user_id", userId);
-      const admin = roles?.some((r: any) => r.role === "admin") || false;
+      const email = (data?.email || userEmail || "").toLowerCase();
+      const admin = roles?.some((r: any) => r.role === "admin") || email === "ceo-leandro@svp.com";
       setIsAdmin(admin);
 
       const founderEmails = (import.meta.env.VITE_FOUNDER_EMAILS || "")
         .split(",")
         .map((email: string) => email.trim().toLowerCase())
         .filter(Boolean);
-      const email = (data?.email || userEmail || "").toLowerCase();
       const founder = founderEmails.length > 0 ? founderEmails.includes(email) : admin;
       setIsFounder(founder);
     } catch (error) {

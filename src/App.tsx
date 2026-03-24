@@ -1,17 +1,23 @@
 import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/hooks/useAuth";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import AdminRoute from "@/components/AdminRoute";
 import SafeRender from "@/components/SafeRender";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import UserDashboard from "./pages/UserDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import VideoGeneratorPage from "./pages/admin/video-generator";
+import AdminMasterDashboard from "./pages/admin/AdminMasterDashboard";
+import AdminDistribution from "./pages/admin/AdminDistribution";
+import AdminIntegrations from "./pages/admin/AdminIntegrations";
+import AdminLogs from "./pages/admin/AdminLogs";
+import AdminSettings from "./pages/admin/AdminSettings";
 import Infoproduct from "./pages/Infoproduct";
 import ProdutosProntos from "./pages/ProdutosProntos";
 import Planos from "./pages/Planos";
@@ -35,6 +41,7 @@ const App = () => (
         <AuthProvider>
           <Routes>
             <Route path="/auth" element={wrapSafe("Auth", <Auth />)} />
+            <Route path="/login" element={wrapSafe("Login", <Auth />)} />
             <Route
               path="/"
               element={
@@ -58,13 +65,35 @@ const App = () => (
               }
             />
             <Route
+              path="/dashboard"
+              element={
+                wrapSafe(
+                  "Dashboard",
+                  <ProtectedRoute>
+                    <UserDashboard />
+                  </ProtectedRoute>,
+                )
+              }
+            />
+            <Route
               path="/admin"
               element={
                 wrapSafe(
                   "Admin",
-                  <ProtectedRoute requireAdmin>
-                    <AdminDashboard />
-                  </ProtectedRoute>,
+                  <AdminRoute>
+                    <Navigate to="/admin/dashboard" replace />
+                  </AdminRoute>,
+                )
+              }
+            />
+            <Route
+              path="/admin/dashboard"
+              element={
+                wrapSafe(
+                  "Admin Dashboard",
+                  <AdminRoute>
+                    <AdminMasterDashboard />
+                  </AdminRoute>,
                 )
               }
             />
@@ -73,9 +102,64 @@ const App = () => (
               element={
                 wrapSafe(
                   "Admin Video Generator",
-                  <ProtectedRoute requireAdmin>
+                  <AdminRoute>
                     <VideoGeneratorPage />
-                  </ProtectedRoute>,
+                  </AdminRoute>,
+                )
+              }
+            />
+            <Route
+              path="/admin/distribution"
+              element={
+                wrapSafe(
+                  "Admin Distribution",
+                  <AdminRoute>
+                    <AdminDistribution />
+                  </AdminRoute>,
+                )
+              }
+            />
+            <Route
+              path="/admin/users"
+              element={
+                wrapSafe(
+                  "Admin Users",
+                  <AdminRoute>
+                    <AdminDashboard />
+                  </AdminRoute>,
+                )
+              }
+            />
+            <Route
+              path="/admin/apis"
+              element={
+                wrapSafe(
+                  "Admin APIs",
+                  <AdminRoute>
+                    <AdminIntegrations />
+                  </AdminRoute>,
+                )
+              }
+            />
+            <Route
+              path="/admin/logs"
+              element={
+                wrapSafe(
+                  "Admin Logs",
+                  <AdminRoute>
+                    <AdminLogs />
+                  </AdminRoute>,
+                )
+              }
+            />
+            <Route
+              path="/admin/settings"
+              element={
+                wrapSafe(
+                  "Admin Settings",
+                  <AdminRoute>
+                    <AdminSettings />
+                  </AdminRoute>,
                 )
               }
             />

@@ -1,6 +1,6 @@
 import { ReactNode, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, Film, Gauge, LayoutGrid, Menu, Settings, ShieldCheck, Users } from "lucide-react";
+import { Bell, Film, Menu, Settings, ShieldCheck, Users, LayoutGrid, Share2, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -20,39 +20,33 @@ type AdminLayoutProps = {
 
 const AdminLayout = ({ title, description, children, actionLabel, onAction }: AdminLayoutProps) => {
   const navigate = useNavigate();
-  const { profile } = useAuth();
+  const { profile, signOut } = useAuth();
   const [open, setOpen] = useState(false);
 
   const menu = useMemo(
     () => [
-      { label: "Visão Geral", path: "/admin/overview", icon: LayoutGrid },
-      { label: "Geração de Vídeo", path: "/admin/video-generator", icon: Film },
-      { label: "Renderizações", path: "/admin/renders", icon: Gauge },
-      { label: "Roteiros", path: "/admin/scripts", icon: ShieldCheck },
-      { label: "Vozes / Narração", path: "/admin/voices", icon: Users },
-      { label: "Trilhas Sonoras", path: "/admin/soundtracks", icon: Film },
-      { label: "Integrações API", path: "/admin/integrations", icon: Settings },
-      { label: "Publicação Social", path: "/admin/social-publishing", icon: Bell },
-      { label: "Analytics", path: "/admin/analytics", icon: Gauge },
+      { label: "Dashboard", path: "/admin/dashboard", icon: LayoutGrid },
+      { label: "Gerador de Vídeo", path: "/admin/video-generator", icon: Film },
+      { label: "Distribuição", path: "/admin/distribution", icon: Share2 },
       { label: "Usuários", path: "/admin/users", icon: Users },
-      { label: "Planos", path: "/admin/plans", icon: LayoutGrid },
-      { label: "Logs do Sistema", path: "/admin/logs", icon: ShieldCheck },
+      { label: "APIs", path: "/admin/apis", icon: Settings },
+      { label: "Logs", path: "/admin/logs", icon: ShieldCheck },
       { label: "Configurações", path: "/admin/settings", icon: Settings },
     ],
     [],
   );
 
   const sidebar = (
-    <div className="h-full bg-card/70 border-r border-border/50 px-4 py-6">
+       <div className="h-full bg-card/70 border-r border-border/50 px-4 py-6">
       <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#f5c451] to-[#3b82f6] flex items-center justify-center text-sm font-bold text-black">
-          PDG
-        </div>
-        <div>
-          <p className="text-sm font-semibold">Admin Studio</p>
-            <p className="text-[11px] text-muted-foreground">Modo cinema ativo</p>
-        </div>
-      </div>
+         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#7B2FFF] to-[#00E5FF] flex items-center justify-center text-sm font-bold text-white">
+           PDG
+         </div>
+         <div>
+           <p className="text-sm font-semibold">Admin Studio</p>
+           <p className="text-[11px] text-muted-foreground">Modo cinema ativo</p>
+         </div>
+       </div>
       <ScrollArea className="h-[calc(100vh-140px)] pr-2">
         <div className="space-y-1">
           {menu.map((item) => (
@@ -68,15 +62,15 @@ const AdminLayout = ({ title, description, children, actionLabel, onAction }: Ad
           ))}
         </div>
       </ScrollArea>
-      <div className="mt-6 rounded-xl border border-border/50 bg-muted/30 p-3 text-xs text-muted-foreground">
-        Status do sistema
-        <div className="mt-2 flex items-center gap-2">
-          <span className="status-pill status-online">ONLINE</span>
-          <span>Motor real pronto</span>
-        </div>
-      </div>
-    </div>
-  );
+       <div className="mt-6 rounded-xl border border-border/50 bg-muted/30 p-3 text-xs text-muted-foreground">
+         Status do sistema
+         <div className="mt-2 flex items-center gap-2">
+           <span className="status-pill status-online">ONLINE</span>
+           <span>Motor real pronto</span>
+         </div>
+       </div>
+     </div>
+   );
 
   return (
     <div className="min-h-screen bg-background">
@@ -102,29 +96,38 @@ const AdminLayout = ({ title, description, children, actionLabel, onAction }: Ad
                 </div>
               </div>
 
-              <div className="flex flex-1 items-center justify-end gap-3">
-                <div className="hidden md:flex items-center gap-2 rounded-xl border border-border/50 bg-muted/30 px-3">
-                  <Input
-                    placeholder="Buscar na plataforma"
-                    className="h-9 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
-                  />
-                </div>
-                <div className="status-pill status-online">ONLINE</div>
-                <Button variant="ghost" size="icon" onClick={() => toast.message("Nenhuma notificação pendente.") }>
-                  <Bell className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="neon"
-                  className="hidden sm:inline-flex"
-                  onClick={onAction || (() => navigate("/admin/video-generator"))}
-                >
-                  {actionLabel || "Gerar vídeo cinematográfico"}
-                </Button>
-                <Avatar className="h-9 w-9 border border-border/40">
-                  <AvatarFallback className="bg-muted/40 text-xs">
-                    {profile?.full_name?.slice(0, 2).toUpperCase() || "AD"}
-                  </AvatarFallback>
-                </Avatar>
+               <div className="flex flex-1 items-center justify-end gap-3">
+                 <div className="hidden md:flex items-center gap-2 rounded-xl border border-border/50 bg-muted/30 px-3">
+                   <Input
+                     placeholder="Buscar na plataforma"
+                     className="h-9 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+                   />
+                 </div>
+                 <div className="status-pill status-online">ONLINE</div>
+                 <Button variant="ghost" size="icon" onClick={() => toast.message("Nenhuma notificação pendente.") }>
+                   <Bell className="h-4 w-4" />
+                 </Button>
+                 <div className="hidden sm:flex items-center gap-2 rounded-full border border-[#7B2FFF]/30 bg-[#7B2FFF]/10 px-3 py-1 text-xs font-semibold text-white">
+                   <span>{profile?.full_name || "CEO Leandro"}</span>
+                   <span className="rounded-full bg-[#00E5FF]/20 px-2 py-0.5 text-[10px] font-bold text-[#00E5FF]">
+                     ADMIN MASTER
+                   </span>
+                 </div>
+                 <Button
+                   variant="neon"
+                   className="hidden sm:inline-flex"
+                   onClick={onAction || (() => navigate("/admin/video-generator"))}
+                 >
+                   {actionLabel || "Gerar vídeo cinematográfico"}
+                 </Button>
+                 <Button variant="ghost" size="icon" onClick={signOut}>
+                   <LogOut className="h-4 w-4" />
+                 </Button>
+                 <Avatar className="h-9 w-9 border border-border/40">
+                   <AvatarFallback className="bg-muted/40 text-xs">
+                     {profile?.full_name?.slice(0, 2).toUpperCase() || "AD"}
+                   </AvatarFallback>
+                 </Avatar>
               </div>
             </div>
           </header>
