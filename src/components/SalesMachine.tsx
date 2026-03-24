@@ -11,6 +11,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { zipSync, strToU8 } from "fflate";
+import { gerarConteudoIA, type AiConteudoTipo } from "@/lib/aiEngine";
 import {
   Sparkles,
   Zap,
@@ -145,6 +146,28 @@ const SalesMachine = () => {
     setLogs((prev) => [`${new Date().toLocaleTimeString()} • ${message}`, ...prev]);
   };
 
+  const buildAiInput = () => ({
+    ...form,
+    contextoMestre: {
+      tema: form.nicho || form.produto,
+      publico: form.publico,
+      problema: "",
+      objetivo: form.objetivo,
+      linguagem: "pt-BR",
+      tom: "especialista",
+    },
+  });
+
+  const runAiStep = async (tipo: AiConteudoTipo) => {
+    const response = await gerarConteudoIA(tipo, buildAiInput(), {
+      modo: modoViral ? "viral" : "autoridade",
+      timeoutMs: 5000,
+    });
+    if (response._fallback) {
+      throw new Error("fallback");
+    }
+  };
+
   const buildCalendario = (status: "Agendado" | "Pronto") => {
     const baseTema = form.nicho || form.produto || "conteúdo";
     return Array.from({ length: 30 }).map((_, index) => {
@@ -258,23 +281,23 @@ const SalesMachine = () => {
     const localResult = buildResult("Agendado");
     setResult(localResult);
 
-    await runStep("gerarRoteiro", "Gerar roteiro", async () => Promise.resolve());
-    await runStep("gerarImagens", "Gerar imagens", async () => Promise.resolve());
-    await runStep("gerarNarracao", "Gerar narração", async () => Promise.resolve());
-    await runStep("gerarVideo", "Gerar vídeo", async () => Promise.resolve());
-    await runStep("gerarLegenda", "Gerar legenda", async () => Promise.resolve());
-    await runStep("gerarCopy", "Gerar copy", async () => Promise.resolve());
-    await runStep("gerarCTA", "Gerar CTA", async () => Promise.resolve());
-    await runStep("vincularLinksVenda", "Vincular links de venda", async () => Promise.resolve());
-    await runStep("salvarNaPastaAfiliado", "Salvar na pasta do afiliado", async () => Promise.resolve());
-    await runStep("funil", "Funil automático", async () => Promise.resolve());
-    await runStep("formatos", "Formatos de vídeo", async () => Promise.resolve());
-    await runStep("calendario", "Programação 30 dias", async () => Promise.resolve());
-    await runStep("afiliados", "Afiliados automáticos", async () => Promise.resolve());
-    await runStep("pastaAfiliado", "Pasta do afiliado", async () => Promise.resolve());
-    await runStep("nichos", "IA de nicho quente", async () => Promise.resolve());
-    await runStep("copyAutomatica", "Copy automática", async () => Promise.resolve());
-    await runStep("publicacao", "Publicação automática", async () => Promise.resolve());
+    await runStep("gerarRoteiro", "Gerar roteiro", async () => runAiStep("roteiro"));
+    await runStep("gerarImagens", "Gerar imagens", async () => runAiStep("descricao"));
+    await runStep("gerarNarracao", "Gerar narração", async () => runAiStep("narracao"));
+    await runStep("gerarVideo", "Gerar vídeo", async () => runAiStep("variacoes"));
+    await runStep("gerarLegenda", "Gerar legenda", async () => runAiStep("legenda"));
+    await runStep("gerarCopy", "Gerar copy", async () => runAiStep("copy"));
+    await runStep("gerarCTA", "Gerar CTA", async () => runAiStep("copy"));
+    await runStep("vincularLinksVenda", "Vincular links de venda", async () => runAiStep("seo"));
+    await runStep("salvarNaPastaAfiliado", "Salvar na pasta do afiliado", async () => runAiStep("variacoes"));
+    await runStep("funil", "Funil automático", async () => runAiStep("descricao"));
+    await runStep("formatos", "Formatos de vídeo", async () => runAiStep("variacoes"));
+    await runStep("calendario", "Programação 30 dias", async () => runAiStep("calendario_30_dias"));
+    await runStep("afiliados", "Afiliados automáticos", async () => runAiStep("descricao"));
+    await runStep("pastaAfiliado", "Pasta do afiliado", async () => runAiStep("variacoes"));
+    await runStep("nichos", "IA de nicho quente", async () => runAiStep("seo"));
+    await runStep("copyAutomatica", "Copy automática", async () => runAiStep("copy"));
+    await runStep("publicacao", "Publicação automática", async () => runAiStep("descricao"));
 
     setAutopost(true);
     setResult(buildResult("Agendado"));
@@ -289,15 +312,15 @@ const SalesMachine = () => {
     setLogs([]);
     const localResult = buildResult("Pronto");
     setResult(localResult);
-    await runStep("gerarRoteiro", "Gerar roteiro", async () => Promise.resolve());
-    await runStep("gerarImagens", "Gerar imagens", async () => Promise.resolve());
-    await runStep("gerarNarracao", "Gerar narração", async () => Promise.resolve());
-    await runStep("gerarVideo", "Gerar vídeo", async () => Promise.resolve());
-    await runStep("gerarLegenda", "Gerar legenda", async () => Promise.resolve());
-    await runStep("gerarCopy", "Gerar copy", async () => Promise.resolve());
-    await runStep("gerarCTA", "Gerar CTA", async () => Promise.resolve());
-    await runStep("vincularLinksVenda", "Vincular links de venda", async () => Promise.resolve());
-    await runStep("salvarNaPastaAfiliado", "Salvar na pasta do afiliado", async () => Promise.resolve());
+    await runStep("gerarRoteiro", "Gerar roteiro", async () => runAiStep("roteiro"));
+    await runStep("gerarImagens", "Gerar imagens", async () => runAiStep("descricao"));
+    await runStep("gerarNarracao", "Gerar narração", async () => runAiStep("narracao"));
+    await runStep("gerarVideo", "Gerar vídeo", async () => runAiStep("variacoes"));
+    await runStep("gerarLegenda", "Gerar legenda", async () => runAiStep("legenda"));
+    await runStep("gerarCopy", "Gerar copy", async () => runAiStep("copy"));
+    await runStep("gerarCTA", "Gerar CTA", async () => runAiStep("copy"));
+    await runStep("vincularLinksVenda", "Vincular links de venda", async () => runAiStep("seo"));
+    await runStep("salvarNaPastaAfiliado", "Salvar na pasta do afiliado", async () => runAiStep("variacoes"));
     toast.success("Conteúdo dark gerado com fallback ativo");
     setIsRunning(false);
   };

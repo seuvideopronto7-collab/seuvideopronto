@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Upload, Wand2, Copy, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { createVideoJob, fetchVideoJob, processVideoJob } from "@/services/api";
+import { buscarAPI } from "@/lib/apiRegistry";
 
 const productTypes = ["Natural", "Suplemento", "Cosmetico", "Tecnologia", "Outro"];
 const styleTypes = ["Luxo", "Fitness", "Saude", "Tecnologia"];
@@ -28,6 +29,8 @@ const VideoGeneratorUI = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [resolution, setResolution] = useState<string | null>(null);
   const [fileSize, setFileSize] = useState<string | null>(null);
+  const [apiChecks, setApiChecks] = useState<Array<{ name: string; status: "ok" | "error"; message?: string }>>([]);
+  const [isCheckingApis, setIsCheckingApis] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -71,6 +74,43 @@ const VideoGeneratorUI = () => {
       window.clearTimeout(watchdog);
     };
   }, [jobId]);
+
+  useEffect(() => {
+    const runChecks = async () => {
+      setIsCheckingApis(true);
+      const results: Array<{ name: string; status: "ok" | "error"; message?: string }> = [];
+      const apis = [
+        { key: "elevenlabs", label: "ElevenLabs (voz)" },
+        { key: "runway", label: "Runway (vídeo)" },
+        { key: "pika", label: "Pika (vídeo)" },
+      ];
+
+      apis.forEach((api) => {
+        const entry = buscarAPI(api.key);
+        if (!entry?.conectado) {
+          results.push({ name: api.label, status: "error", message: "API desconectada" });
+        } else {
+          results.push({ name: api.label, status: "ok" });
+        }
+      });
+
+      try {
+        const controller = new AbortController();
+        const timer = window.setTimeout(() => controller.abort(), 5000);
+        const res = await fetch("/api/webhook/health", { signal: controller.signal });
+        window.clearTimeout(timer);
+        if (!res.ok) throw new Error(`Webhook indisponível (${res.status})`);
+        results.push({ name: "Backend webhook", status: "ok" });
+      } catch (error: any) {
+        results.push({ name: "Backend webhook", status: "error", message: error?.message || "Sem resposta" });
+      }
+
+      setApiChecks(results);
+      setIsCheckingApis(false);
+    };
+
+    runChecks();
+  }, []);
 
   const handleFile = (next?: File | null) => {
     if (!next) return;
@@ -135,6 +175,15 @@ const VideoGeneratorUI = () => {
     }
   };
 
+  const gerarVideoReal = () => {
+    console.log("Gerar vídeo agora");
+    try {
+      void startJob();
+    } catch (e) {
+      console.error("Erro gerar video:", e);
+    }
+  };
+
   const progressLabel = useMemo(() => {
     if (!jobStatus) return "Aguardando";
     if (jobStatus === "completed") return "Concluído";
@@ -142,6 +191,8 @@ const VideoGeneratorUI = () => {
     if (jobStatus === "fallback") return "Fallback";
     return jobStatus.replace(/_/g, " ");
   }, [jobStatus]);
+
+  const apiErrors = useMemo(() => apiChecks.filter((item) => item.status === "error"), [apiChecks]);
 
   const downloadVideo = () => {
     if (!videoUrl) return;
@@ -159,6 +210,22 @@ const VideoGeneratorUI = () => {
   return (
     <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_0.9fr] gap-6">
       <section className="space-y-6">
+        {(isCheckingApis || apiErrors.length > 0) && (
+          <div className="rounded-2xl border border-red-500/40 bg-red-500/10 p-4 text-xs text-red-100">
+            <div className="font-semibold">Status de APIs e webhook</div>
+            {isCheckingApis && <div className="mt-1 text-red-200">Validando conexões...</div>}
+            {apiErrors.length > 0 && (
+              <div className="mt-2 space-y-1">
+                {apiErrors.map((item) => (
+                  <div key={item.name} className="flex items-center justify-between">
+                    <span>{item.name}</span>
+                    <span className="text-red-200">{item.message || "Sem resposta"}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         <div className="cinema-panel p-6 space-y-4">
           <div className="flex items-center justify-between">
             <div>
@@ -311,6 +378,9 @@ const VideoGeneratorUI = () => {
           </div>
           <Button variant="neon" onClick={startJob} disabled={isProcessing}>
             <Wand2 className="h-4 w-4" /> {isProcessing ? "Processando..." : "Gerar vídeo"}
+          </Button>
+          <Button variant="glass" onClick={gerarVideoReal} disabled={isProcessing}>
+            Gerar vídeo agora
           </Button>
         </div>
       </section>

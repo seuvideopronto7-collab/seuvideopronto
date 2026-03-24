@@ -290,6 +290,10 @@ app.post("/api/video-jobs", async (req, res) => {
   res.json({ id: job.id });
 });
 
+app.get("/api/webhook/health", async (_req, res) => {
+  res.json({ ok: true, webhook: "active" });
+});
+
 app.get("/api/video-jobs/:id", async (req, res) => {
   const job = await getJob(req.params.id);
   if (!job) {

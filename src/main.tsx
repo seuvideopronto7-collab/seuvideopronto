@@ -6,6 +6,10 @@ import "./index.css";
 const attachGlobalErrorHandlers = () => {
   if (typeof window === "undefined") return;
 
+  window.onerror = function (msg) {
+    console.log("ERRO GLOBAL:", msg);
+  };
+
   window.addEventListener("error", (event) => {
     console.error("PDG ERROR: window", event.error || event.message);
   });

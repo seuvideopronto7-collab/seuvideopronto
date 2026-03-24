@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,33 @@ const Index = () => {
   const [showSalesMachine, setShowSalesMachine] = useState(false);
   const initialProduto = (location.state as any)?.produto || null;
   const autoStart = Boolean((location.state as any)?.autoStart);
+
+  const handleShowCalendar = () => {
+    console.log("Conteudo 30 dias ativado");
+    try {
+      setShowCalendar(true);
+    } catch (e) {
+      console.error("Erro Conteudo 30 dias:", e);
+    }
+  };
+
+  const handleShowSalesMachine = () => {
+    console.log("Sales Machine ativada");
+    try {
+      setShowSalesMachine(true);
+    } catch (e) {
+      console.error("Erro Sales Machine:", e);
+    }
+  };
+
+  const handleShowDarkFlow = () => {
+    console.log("DarkFlow ativado");
+    try {
+      setShowDarkFlow(true);
+    } catch (e) {
+      console.error("Erro DarkFlow:", e);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -123,7 +150,7 @@ const Index = () => {
 
         {/* CTA Conteúdo 30 Dias */}
         <button
-          onClick={() => setShowCalendar((prev) => !prev)}
+          onClick={handleShowCalendar}
           className="w-full group relative overflow-hidden rounded-2xl border border-accent/30 bg-gradient-to-r from-[#3b82f6]/10 via-[#06b6d4]/10 to-[#f5c451]/10 p-6 text-left transition-all hover:border-accent/60 hover:shadow-[0_0_40px_-8px_rgba(59,130,246,0.35)]"
         >
           <div className="flex items-center gap-4">
@@ -142,13 +169,13 @@ const Index = () => {
 
         {showCalendar && (
           <SafeRender label="Conteudo 30 Dias" onAction={() => setShowCalendar(false)}>
-            <Content30Days />
+            {Content30Days ? <Content30Days /> : <div>Erro ao carregar módulo</div>}
           </SafeRender>
         )}
 
         {/* CTA Máquina de Vendas */}
         <button
-          onClick={() => setShowSalesMachine((prev) => !prev)}
+          onClick={handleShowSalesMachine}
           className="w-full group relative overflow-hidden rounded-2xl border border-primary/40 bg-gradient-to-r from-[#f5c451]/15 via-amber-500/10 to-[#3b82f6]/10 p-6 text-left transition-all hover:border-primary/70 hover:shadow-[0_0_40px_-8px_rgba(245,196,81,0.35)]"
         >
           <div className="flex items-center gap-4">
@@ -167,13 +194,13 @@ const Index = () => {
 
         {showSalesMachine && (
           <SafeRender label="Sales Machine" onAction={() => setShowSalesMachine(false)}>
-            <SalesMachine />
+            {SalesMachine ? <SalesMachine /> : <div>Erro ao carregar módulo</div>}
           </SafeRender>
         )}
 
         {/* CTA Dark Flow */}
         <button
-          onClick={() => setShowDarkFlow((prev) => !prev)}
+          onClick={handleShowDarkFlow}
           className="w-full group relative overflow-hidden rounded-2xl border border-[#7c3aed]/40 bg-gradient-to-r from-[#7c3aed]/15 via-black/40 to-[#7c3aed]/10 p-6 text-left transition-all hover:border-[#7c3aed]/70 hover:shadow-[0_0_40px_-8px_rgba(124,58,237,0.35)]"
         >
           <div className="flex items-center gap-4">
@@ -191,18 +218,26 @@ const Index = () => {
         </button>
 
         {showDarkFlow && (
-          <SafeRender label="Dark Flow" onAction={() => setShowDarkFlow(false)}>
-            <DarkFlowEngine />
-          </SafeRender>
+          <Suspense fallback={<div>Carregando motor IA...</div>}>
+            <SafeRender label="Dark Flow" onAction={() => setShowDarkFlow(false)}>
+              {DarkFlowEngine ? <DarkFlowEngine /> : <div>Erro ao carregar módulo</div>}
+            </SafeRender>
+          </Suspense>
         )}
 
         <SafeRender label="Gerador Cinematografico">
-          <div className="bg-[#12121A] p-6 rounded-xl border border-[#2A2A3A]">
-            <h2 className="text-white text-xl font-bold">🎬 Gerador de Vídeo Cinematográfico</h2>
-            <p className="text-gray-400">Sistema carregado com proteção ativa</p>
-          </div>
+          {VideoGeneratorUI ? (
+            <>
+              <div className="bg-[#12121A] p-6 rounded-xl border border-[#2A2A3A]">
+                <h2 className="text-white text-xl font-bold">🎬 Gerador de Vídeo Cinematográfico</h2>
+                <p className="text-gray-400">Sistema carregado com proteção ativa</p>
+              </div>
 
-          <VideoGeneratorUI />
+              <VideoGeneratorUI />
+            </>
+          ) : (
+            <div>Erro ao carregar módulo</div>
+          )}
         </SafeRender>
 
         {/* Wizard */}

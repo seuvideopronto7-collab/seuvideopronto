@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -262,6 +262,19 @@ const DarkFlowEngine = () => {
       setIsLoading(false);
     }
   };
+
+  const iniciarGeracao = () => {
+    console.log("DarkFlow ativado");
+    try {
+      void handleGenerate();
+    } catch (e) {
+      console.error("Erro DarkFlow:", e);
+    }
+  };
+
+  useEffect(() => {
+    iniciarGeracao();
+  }, []);
 
   const designPreview = useMemo(() => {
     const design = result?.design;
