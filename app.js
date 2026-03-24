@@ -28,10 +28,20 @@ const produtosVazio = document.getElementById("produtosVazio");
 const produtosStatus = document.getElementById("produtosStatus");
 const produtoNome = document.getElementById("produtoNome");
 const produtoTipo = document.getElementById("produtoTipo");
+const viewFlow = document.getElementById("viewFlow");
+const viewDistribuidor = document.getElementById("viewDistribuidor");
+const btnGoFlow = document.getElementById("btnGoFlow");
+const btnGoDistribuidor = document.getElementById("btnGoDistribuidor");
+const btnSalvarDistribuir = document.getElementById("btnSalvarDistribuir");
+const flowInfo = document.getElementById("flowInfo");
+const resumeTitulo = document.getElementById("resumeTitulo");
+const resumeCta = document.getElementById("resumeCta");
+const resumeHashtags = document.getElementById("resumeHashtags");
 
 const STORAGE_KEY = "material_salvo";
 const QUEUE_KEY = "fila_publicacao";
 const PRODUTOS_KEY = "produtos_prontos";
+const ROUTE_STATE_KEY = "route_state_material";
 
 const setStatus = (message, tone) => {
   saveStatus.textContent = message;
@@ -75,10 +85,46 @@ const getMaterial = () => {
   };
 };
 
+const getFallbackMaterial = () => ({
+  video: null,
+  videoUrl: null,
+  roteiro: ["Abertura rapida", "Mensagem central", "Fechamento com CTA"],
+  copy: "Legenda pronta para publicar.",
+  hashtags: ["#conteudo", "#fature"],
+  titulo: "Video pronto para publicar",
+  descricao: "Resumo automatico do conteudo.",
+  cta: "Acesse o link principal",
+  links: {
+    checkout: "",
+    landing: ""
+  }
+});
+
+const applyMaterialToFields = (data) => {
+  if (!data) return;
+  fields.titulo.value = data.titulo || "";
+  fields.descricao.value = data.descricao || "";
+  fields.cta.value = data.cta || "";
+  fields.roteiro.value = (data.roteiro || []).join("\n");
+  fields.copy.value = data.copy || "";
+  fields.hashtags.value = (data.hashtags || []).join(" ");
+  fields.checkout.value = data.links?.checkout || "";
+  fields.landing.value = data.links?.landing || "";
+  fields.videoUrl.value = data.videoUrl || "";
+};
+
+const updateResumo = (material) => {
+  const data = material || getFallbackMaterial();
+  resumeTitulo.textContent = data.titulo || "Video pronto para publicar";
+  resumeCta.textContent = data.cta || "Acesse o link principal";
+  resumeHashtags.textContent = (data.hashtags || []).join(" ") || "#conteudo #fature";
+};
+
 const persistMaterial = (material) => {
   const payload = { ...material, video: null };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   setStatus("Material salvo com sucesso.", "success");
+  updateResumo(payload);
 };
 
 const loadMaterial = () => {
@@ -86,19 +132,57 @@ const loadMaterial = () => {
   if (!raw) return;
   try {
     const data = JSON.parse(raw);
-    fields.titulo.value = data.titulo || "";
-    fields.descricao.value = data.descricao || "";
-    fields.cta.value = data.cta || "";
-    fields.roteiro.value = (data.roteiro || []).join("\n");
-    fields.copy.value = data.copy || "";
-    fields.hashtags.value = (data.hashtags || []).join(" ");
-    fields.checkout.value = data.links?.checkout || "";
-    fields.landing.value = data.links?.landing || "";
-    fields.videoUrl.value = data.videoUrl || "";
+    applyMaterialToFields(data);
     setStatus("Material carregado do salvamento local.", "success");
+    updateResumo(data);
   } catch (error) {
     setStatus("Falha ao carregar material salvo.", "warning");
   }
+};
+
+const getMaterialGerado = () => {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (!raw) return getFallbackMaterial();
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    return getFallbackMaterial();
+  }
+};
+
+const hydrateFromRouteState = () => {
+  const raw = sessionStorage.getItem(ROUTE_STATE_KEY);
+  if (!raw) return false;
+  try {
+    const data = JSON.parse(raw);
+    applyMaterialToFields(data);
+    setStatus("Material recebido do fluxo principal.", "success");
+    updateResumo(data);
+    sessionStorage.removeItem(ROUTE_STATE_KEY);
+    return true;
+  } catch (error) {
+    return false;
+  }
+};
+
+const setRoute = (path) => {
+  const isDistribuidor = path === "/distribuidor";
+  viewFlow.classList.toggle("active", !isDistribuidor);
+  viewDistribuidor.classList.toggle("active", isDistribuidor);
+  document.title = isDistribuidor ? "Central de Distribuicao" : "Seu Video Pronto";
+  if (isDistribuidor) {
+    hydrateFromRouteState();
+  } else {
+    updateResumo(getMaterialGerado());
+  }
+};
+
+const navigateTo = (path, state) => {
+  if (state) {
+    sessionStorage.setItem(ROUTE_STATE_KEY, JSON.stringify(state));
+  }
+  window.history.pushState({ path }, "", path);
+  setRoute(path);
 };
 
 const addToQueue = (material) => {
@@ -280,6 +364,7 @@ const resetarConteudo = () => {
     field.value = "";
   });
   setStatus("Material limpo. Pronto para gerar novamente.", "success");
+  updateResumo(getFallbackMaterial());
 };
 
 const atualizarYoutubeStatus = () => {
@@ -326,6 +411,25 @@ btnProdutosAtualizar.addEventListener("click", () => {
 });
 btnProdutoCriar.addEventListener("click", criarProduto);
 
+btnGoFlow.addEventListener("click", () => navigateTo("/infoproduto"));
+btnGoDistribuidor.addEventListener("click", () => navigateTo("/distribuidor"));
+btnSalvarDistribuir.addEventListener("click", () => {
+  const material = getMaterialGerado();
+  flowInfo.textContent = "Enviando material para a Central de Distribuicao.";
+  navigateTo("/distribuidor", material);
+});
+
+window.addEventListener("popstate", (event) => {
+  const nextPath = event.state?.path || window.location.pathname;
+  setRoute(nextPath);
+});
+
 loadMaterial();
 atualizarYoutubeStatus();
 carregarProdutos().then(renderProdutos);
+
+const initialPath = window.location.pathname === "/distribuidor" ? "/distribuidor" : "/infoproduto";
+if (window.location.pathname !== initialPath) {
+  window.history.replaceState({ path: initialPath }, "", initialPath);
+}
+setRoute(initialPath);
