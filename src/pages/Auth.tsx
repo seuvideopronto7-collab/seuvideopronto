@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,29 +30,6 @@ const Auth = () => {
     setLoading(true);
     const identifier = form.identifier.trim();
     const password = form.password.trim();
-    const isMaster =
-      ["ceo-leandro@svp.com", "ceo-leandro", "ceo leandro", "ceo-leandro@svp.com.br", "ceo-leandro@svp.com"].includes(
-        identifier.toLowerCase(),
-      ) || identifier.toLowerCase() === "ceo-leandro";
-
-    const createLocalSession = (role: "admin" | "user", email?: string) => {
-      const displayName = role === "admin" ? "CEO Leandro" : identifier || "Usuário";
-      const userEmail = email || (role === "admin" ? "ceo-leandro@svp.com" : identifier || "user@local");
-      const payload = {
-        user_id: role === "admin" ? "ceo-master" : `local-${Date.now()}`,
-        role,
-        token: "local",
-        user: {
-          name: displayName,
-          role,
-          access: role === "admin" ? "full" : "standard",
-          email: userEmail,
-        },
-      };
-      localStorage.setItem("svpa.session", JSON.stringify(payload));
-      sessionStorage.setItem("svpa.session", JSON.stringify(payload));
-      window.dispatchEvent(new Event("svpa-local-session"));
-    };
 
     try {
       const response = await fetch("/api/auth/login", {
@@ -71,30 +48,16 @@ const Auth = () => {
           toast.error(error.message);
         } else {
           const role = payload.user.role === "admin" ? "admin" : "user";
-          createLocalSession(role, payload.user.email);
           toast.success(role === "admin" ? "Acesso liberado. Controle total ativado." : "Login realizado!");
           navigate(role === "admin" ? "/admin/dashboard" : "/dashboard");
         }
         return;
       }
+      setLoading(false);
+      toast.error(payload?.error || "Falha ao autenticar.");
+      return;
     } catch (error) {
       console.error("PDG AUTH ERROR: login", error);
-    }
-
-    if (isMaster && password === "123456") {
-      createLocalSession("admin", "ceo-leandro@svp.com");
-      setLoading(false);
-      toast.success("Acesso liberado. Controle total ativado.");
-      navigate("/admin/dashboard");
-      return;
-    }
-
-    if (identifier && password) {
-      createLocalSession("user", identifier.includes("@") ? identifier : undefined);
-      setLoading(false);
-      toast.success("Login realizado!");
-      navigate("/dashboard");
-      return;
     }
 
     setLoading(false);
@@ -137,7 +100,7 @@ const Auth = () => {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     isLogin ? handleLogin() : handleSignup();
   };

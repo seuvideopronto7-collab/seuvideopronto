@@ -21,7 +21,6 @@ interface AuthContextType {
   isFounder: boolean;
   isActive: boolean;
   loading: boolean;
-  isLocalSession: boolean;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -34,7 +33,6 @@ const defaultAuthContext: AuthContextType = {
   isFounder: false,
   isActive: false,
   loading: true,
-  isLocalSession: false,
   signOut: async () => {},
   refreshProfile: async () => {},
 };
@@ -50,7 +48,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isFounder, setIsFounder] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [isLocalSession, setIsLocalSession] = useState(false);
 
   const fetchProfile = async (userId: string, userEmail?: string | null) => {
     try {
@@ -66,7 +63,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .select("role")
         .eq("user_id", userId);
       const email = (data?.email || userEmail || "").toLowerCase();
-      const admin = roles?.some((r: any) => r.role === "admin") || email === "ceo-leandro@svp.com";
+      const admin = roles?.some((r: any) => r.role === "admin");
       setIsAdmin(admin);
 
       const founderEmails = (import.meta.env.VITE_FOUNDER_EMAILS || "")
@@ -83,39 +80,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const applyLocalSession = () => {
-    try {
-      const raw = localStorage.getItem("svpa.session");
-      if (!raw) return false;
-      const parsed = JSON.parse(raw);
-      if (!parsed?.user) return false;
-      const role = parsed.user.role || parsed.role || "user";
-      const email = parsed.user.email || "ceo-leandro@svp.com";
-      const id = parsed.user_id || "local-admin";
-      const localUser = { id, email } as User;
-      setUser(localUser);
-      setSession(null);
-      setIsAdmin(role === "admin");
-      setIsFounder(role === "admin");
-      setIsLocalSession(true);
-      setProfile({
-        id,
-        full_name: parsed.user.name || "CEO Leandro",
-        whatsapp: "",
-        email,
-        youtube_channel: "",
-        instagram: "",
-        tiktok: "",
-        is_active: true,
-      });
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
   const refreshProfile = async () => {
-    if (user && !isLocalSession) await fetchProfile(user.id);
+    if (user) await fetchProfile(user.id);
   };
 
   useEffect(() => {
@@ -131,14 +97,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setSession(session);
           setUser(session?.user ?? null);
           if (session?.user) {
-            setIsLocalSession(false);
             setTimeout(() => fetchProfile(session.user.id, session.user.email), 0);
           } else {
             setProfile(null);
             setIsAdmin(false);
             setIsFounder(false);
-            setIsLocalSession(false);
-            applyLocalSession();
           }
           setLoading(false);
         } catch (error) {
@@ -155,21 +118,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setSession(session);
           setUser(session?.user ?? null);
           if (session?.user) {
-            setIsLocalSession(false);
             fetchProfile(session.user.id, session.user.email);
-          } else {
-            applyLocalSession();
           }
           setLoading(false);
         })
         .catch((error) => {
           console.error("PDG AUTH ERROR: getSession", error);
-          applyLocalSession();
           setLoading(false);
         });
     } catch (error) {
       console.error("PDG AUTH ERROR: bootstrap", error);
-      applyLocalSession();
       setLoading(false);
     }
 
@@ -180,19 +138,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.error("PDG AUTH ERROR: unsubscribe", error);
       }
     };
-    const handleLocal = () => applyLocalSession();
-    window.addEventListener("storage", handleLocal);
-    window.addEventListener("svpa-local-session", handleLocal as EventListener);
-
-    return () => {
-      try {
-        subscription?.unsubscribe();
-      } catch (error) {
-        console.error("PDG AUTH ERROR: unsubscribe", error);
-      }
-      window.removeEventListener("storage", handleLocal);
-      window.removeEventListener("svpa-local-session", handleLocal as EventListener);
-    };
   }, []);
 
   const signOut = async () => {
@@ -201,14 +146,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       console.error("PDG AUTH ERROR: signOut", error);
     } finally {
-      localStorage.removeItem("svpa.session");
-      sessionStorage.removeItem("svpa.session");
       setUser(null);
       setSession(null);
       setProfile(null);
       setIsAdmin(false);
       setIsFounder(false);
-      setIsLocalSession(false);
     }
   };
 
@@ -222,7 +164,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         isFounder,
         isActive: profile?.is_active ?? false,
         loading,
-        isLocalSession,
         signOut,
         refreshProfile,
       }}

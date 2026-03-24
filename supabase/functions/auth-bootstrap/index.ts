@@ -17,13 +17,17 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const masterPassword =
-      Deno.env.get("MASTER_ADMIN_PASSWORD") ||
-      Deno.env.get("VITE_MASTER_ADMIN_PASSWORD") ||
-      "CEO-Leandro@2026";
+    const masterPassword = Deno.env.get("MASTER_ADMIN_PASSWORD");
 
     if (!supabaseUrl || !supabaseServiceKey) {
       return new Response(JSON.stringify({ error: "Supabase env not configured." }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!masterPassword) {
+      return new Response(JSON.stringify({ error: "MASTER_ADMIN_PASSWORD nao configurada." }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

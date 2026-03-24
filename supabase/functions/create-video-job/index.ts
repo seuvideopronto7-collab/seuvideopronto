@@ -9,8 +9,9 @@ const corsHeaders = {
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
 
-const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
+const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
   auth: { persistSession: false },
 });
 
@@ -25,6 +26,34 @@ serve(async (req) => {
   }
 
   try {
+    if (!supabaseUrl || !supabaseServiceRoleKey || !supabaseAnonKey) {
+      return new Response(JSON.stringify({ error: "Supabase env not configured." }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const authHeader = req.headers.get("Authorization") || "";
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { persistSession: false },
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const { data: authData, error: authError } = await userClient.auth.getUser();
+    if (authError || !authData?.user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { imageUrl } = await req.json();
     if (!imageUrl) {
       return new Response(JSON.stringify({ error: "imageUrl requerido" }), {
@@ -33,9 +62,9 @@ serve(async (req) => {
       });
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await adminClient
       .from("video_jobs")
-      .insert({ status: "queued", progress: 0, video_url: null })
+      .insert({ user_id: authData.user.id, status: "queued", progress: 0, video_url: null })
       .select("id")
       .single();
 

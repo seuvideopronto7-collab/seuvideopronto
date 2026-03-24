@@ -1,5 +1,5 @@
 import { ReactNode, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Bell, Film, Menu, Settings, ShieldCheck, Users, LayoutGrid, Share2, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import AdminLiveLayer from "@/components/admin/AdminLiveLayer";
 
 type AdminLayoutProps = {
   title: string;
@@ -22,6 +23,7 @@ const AdminLayout = ({ title, description, children, actionLabel, onAction }: Ad
   const navigate = useNavigate();
   const { profile, signOut } = useAuth();
   const [open, setOpen] = useState(false);
+  const location = useLocation();
 
   const menu = useMemo(
     () => [
@@ -132,7 +134,11 @@ const AdminLayout = ({ title, description, children, actionLabel, onAction }: Ad
             </div>
           </header>
 
-          <main className="px-4 lg:px-8 py-6 space-y-6">{children}</main>
+          <main className="px-4 lg:px-8 py-6 space-y-6">
+            {location.pathname === "/admin" && <AdminLiveLayer />}
+            {location.pathname === "/admin/dashboard" && <AdminLiveLayer />}
+            {children}
+          </main>
         </div>
       </div>
     </div>

@@ -9,15 +9,16 @@ const corsHeaders = {
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
 
-const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
+const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
   auth: { persistSession: false },
 });
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const updateJob = async (jobId: string, updates: Record<string, unknown>) => {
-  const { error } = await supabase.from("video_jobs").update(updates).eq("id", jobId);
+  const { error } = await adminClient.from("video_jobs").update(updates).eq("id", jobId);
   if (error) throw error;
 };
 
@@ -32,6 +33,34 @@ serve(async (req) => {
   }
 
   try {
+    if (!supabaseUrl || !supabaseServiceRoleKey || !supabaseAnonKey) {
+      return new Response(JSON.stringify({ error: "Supabase env not configured." }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const authHeader = req.headers.get("Authorization") || "";
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { persistSession: false },
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const { data: authData, error: authError } = await userClient.auth.getUser();
+    if (authError || !authData?.user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { jobId, imageUrl, productType, style, useDarkflow, useViral, prompt, textoNaTela, narracao, modePro } = await req.json();
 
     if (!jobId || !imageUrl) {
@@ -39,6 +68,35 @@ serve(async (req) => {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    const { data: job, error: jobError } = await adminClient
+      .from("video_jobs")
+      .select("id, user_id")
+      .eq("id", jobId)
+      .maybeSingle();
+
+    if (jobError || !job?.id) {
+      return new Response(JSON.stringify({ error: "Job nao encontrado" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (job.user_id !== authData.user.id) {
+      const { data: adminRole } = await adminClient
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", authData.user.id)
+        .eq("role", "admin")
+        .maybeSingle();
+
+      if (!adminRole) {
+        return new Response(JSON.stringify({ error: "Forbidden" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     await updateJob(jobId, { status: "processing", progress: 5 });
