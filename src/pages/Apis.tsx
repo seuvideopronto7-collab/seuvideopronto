@@ -227,10 +227,10 @@ const Apis = () => {
   const refreshIntegrations = async () => {
     if (!profile?.id) return;
     setLoadingConnections(true);
-    const { data, error } = await supabase
-      .from("integrations")
+    const { data, error } = await (supabase
+      .from("integrations" as any)
       .select("id, platform, status, credentials, access_token, last_test_at, updated_at, created_at, client_id")
-      .eq("user_id", profile.id);
+      .eq("user_id", profile.id) as any);
     if (error) {
       toast.error("Falha ao carregar integracoes.");
       setConnections({});

@@ -81,11 +81,11 @@ const InfoStepEntrega = ({ estruturaData, conteudoData, vslData, kitData, onNewP
   useEffect(() => {
     const loadIntegrations = async () => {
       if (!userId) return null;
-      const { data, error } = await supabase
-        .from("integrations")
+      const { data, error } = await (supabase
+        .from("integrations" as any)
         .select("platform, status")
         .eq("user_id", userId)
-        .in("platform", ["eduzz", "hotmart", "kiwify", "monetizze"]);
+        .in("platform", ["eduzz", "hotmart", "kiwify", "monetizze"]) as any);
       if (error || !data) {
         setIntegrationStatus({});
         setEduzzStatusLabel("Desconectado");

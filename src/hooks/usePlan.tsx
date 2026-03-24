@@ -180,12 +180,12 @@ export const usePlan = () => {
     async (plan: PlanId) => {
       try {
         if (!user) return;
-        const { data, error } = await supabase
-          .from("usuarios_planos")
-          .update({ plano: plan, limite_diario_json: getPlanLimits(plan) })
+        const { data, error } = await (supabase
+          .from("usuarios_planos" as any)
+          .update({ plano: plan, limite_diario_json: getPlanLimits(plan) } as any)
           .eq("user_id", user.id)
           .select("*")
-          .single();
+          .single() as any);
         if (error) {
           console.error("PDG PLAN ERROR: updatePlan", error);
           return;
