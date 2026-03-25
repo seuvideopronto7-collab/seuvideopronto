@@ -7,81 +7,200 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const blockedMediaPatterns = [/big[_-]?buck[_-]?bunny/i, /\bdefault\b/i];
-const isBlockedMedia = (value?: string) => Boolean(value && blockedMediaPatterns.some((pattern) => pattern.test(value)));
-
-const runwayRequest = async (payload: Record<string, unknown>) => {
-  const runwayUrl = Deno.env.get("RUNWAY_API_URL");
-  const runwayKey = Deno.env.get("RUNWAY_API_KEY");
-  if (!runwayUrl || !runwayKey) return null;
-  const response = await fetch(runwayUrl, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${runwayKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Runway error ${response.status}: ${text}`);
-  }
-  const data = await response.json();
-  return data?.videoUrl || data?.video_url || data?.output?.url || null;
+
+// ── helpers ──────────────────────────────────────────────────────────────────
+
+const updateJob = async (
+  admin: ReturnType<typeof createClient>,
+  jobId: string,
+  fields: Record<string, unknown>,
+) => {
+  await admin.from("video_jobs").update(fields).eq("id", jobId);
 };
 
-const pikaRequest = async (payload: Record<string, unknown>) => {
-  const pikaUrl = Deno.env.get("PIKA_API_URL");
-  const pikaKey = Deno.env.get("PIKA_API_KEY");
-  if (!pikaUrl || !pikaKey) return null;
-  const response = await fetch(pikaUrl, {
+// ── Step 1: Generate script via Lovable AI ──────────────────────────────────
+
+const generateScript = async (prompt: string, productInfo: string): Promise<string> => {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+
+  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${pikaKey}`,
+      Authorization: `Bearer ${LOVABLE_API_KEY}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      model: "google/gemini-3-flash-preview",
+      messages: [
+        {
+          role: "system",
+          content:
+            "Você é um roteirista publicitário premium. Crie roteiros curtos (máx 60 palavras) para vídeos comerciais cinematográficos de produtos. O roteiro deve ter: gancho forte na primeira frase, 2-3 benefícios impactantes e CTA final. Tom: premium, confiante, direto. Responda APENAS com o texto do roteiro, sem formatação.",
+        },
+        {
+          role: "user",
+          content: `Crie um roteiro cinematográfico de venda para: ${productInfo}. Contexto adicional: ${prompt}`,
+        },
+      ],
+    }),
   });
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Pika error ${response.status}: ${text}`);
+
+  if (!res.ok) {
+    const t = await res.text();
+    console.error("Lovable AI error:", res.status, t);
+    throw new Error(`AI script generation failed: ${res.status}`);
   }
-  const data = await response.json();
-  return data?.videoUrl || data?.video_url || data?.output?.url || null;
+
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content || "Descubra o produto que vai transformar sua rotina.";
 };
+
+// ── Step 2: Generate voiceover via ElevenLabs ───────────────────────────────
+
+const generateVoiceover = async (script: string): Promise<ArrayBuffer | null> => {
+  const apiKey = Deno.env.get("ELEVENLABS_API_KEY");
+  if (!apiKey) {
+    console.warn("ELEVENLABS_API_KEY not set, skipping voiceover");
+    return null;
+  }
+
+  const voiceId = "onwK4e9ZLuTAKqWW03F9"; // Daniel - commercial male voice
+  const res = await fetch(
+    `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`,
+    {
+      method: "POST",
+      headers: {
+        "xi-api-key": apiKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        text: script,
+        model_id: "eleven_multilingual_v2",
+        voice_settings: {
+          stability: 0.6,
+          similarity_boost: 0.8,
+          style: 0.4,
+          use_speaker_boost: true,
+        },
+      }),
+    },
+  );
+
+  if (!res.ok) {
+    const t = await res.text();
+    console.error("ElevenLabs error:", res.status, t);
+    return null;
+  }
+
+  return await res.arrayBuffer();
+};
+
+// ── Step 3: Generate video via Runway ───────────────────────────────────────
+
+const generateRunwayVideo = async (imageUrl: string, prompt: string): Promise<string | null> => {
+  const apiKey = Deno.env.get("RUNWAY_API_KEY");
+  const apiUrl = Deno.env.get("RUNWAY_API_URL") || "https://api.dev.runwayml.com/v1/image_to_video";
+  if (!apiKey) {
+    console.warn("RUNWAY_API_KEY not set, skipping video generation");
+    return null;
+  }
+
+  // Create task
+  const createRes = await fetch(apiUrl, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      "X-Runway-Version": "2024-11-06",
+    },
+    body: JSON.stringify({
+      promptImage: imageUrl,
+      promptText: `Ultra cinematic commercial, premium lighting, rich contrast, ${prompt}`,
+      duration: 5,
+      ratio: "16:9",
+    }),
+  });
+
+  if (!createRes.ok) {
+    const t = await createRes.text();
+    console.error("Runway create error:", createRes.status, t);
+    return null;
+  }
+
+  const task = await createRes.json();
+  const taskId = task.id;
+  if (!taskId) {
+    console.error("Runway: no task ID returned", task);
+    return null;
+  }
+
+  // Poll for completion (max 120s)
+  const pollUrl = Deno.env.get("RUNWAY_API_URL")
+    ? `${Deno.env.get("RUNWAY_API_URL")}/${taskId}`
+    : `https://api.dev.runwayml.com/v1/tasks/${taskId}`;
+
+  for (let i = 0; i < 40; i++) {
+    await new Promise((r) => setTimeout(r, 3000));
+
+    const pollRes = await fetch(pollUrl, {
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "X-Runway-Version": "2024-11-06",
+      },
+    });
+
+    if (!pollRes.ok) continue;
+
+    const status = await pollRes.json();
+    if (status.status === "SUCCEEDED") {
+      return status.output?.[0] || status.output?.url || null;
+    }
+    if (status.status === "FAILED") {
+      console.error("Runway task failed:", status.failure);
+      return null;
+    }
+  }
+
+  console.error("Runway: polling timeout");
+  return null;
+};
+
+// ── Main handler ────────────────────────────────────────────────────────────
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-
-  if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Metodo nao permitido" }), {
-      status: 405,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   try {
     const body = await req.json();
-    const { imageUrl, image, estilo, movimento, duracao, conteudoRelacionado, prompt, textoNaTela, narracao, createJob } = body;
+    const {
+      imageUrl,
+      image,
+      prompt,
+      estilo,
+      movimento,
+      duracao,
+      conteudoRelacionado,
+      textoNaTela,
+      narracao,
+      createJob,
+      productType,
+      style,
+    } = body;
+
     const resolvedImageUrl = imageUrl || image;
 
     if (conteudoRelacionado === false) {
-      return new Response(JSON.stringify({ error: "Conteudo nao relacionado. Geracao bloqueada." }), {
-        status: 422,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return json({ error: "Conteudo nao relacionado. Geracao bloqueada." }, 422);
     }
     if (!resolvedImageUrl) {
-      return new Response(JSON.stringify({ error: "imageUrl requerido" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    if (isBlockedMedia(resolvedImageUrl)) {
-      return new Response(JSON.stringify({ error: "Midia bloqueada. Envie conteudo real relacionado ao produto." }), {
-        status: 422,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return json({ error: "imageUrl requerido" }, 400);
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
@@ -92,33 +211,21 @@ serve(async (req) => {
     let jobId: string | null = null;
     let adminClient: ReturnType<typeof createClient> | null = null;
 
+    // ── Auth & create job ─────────────────────────────────────────────────
     if (wantsJob) {
-      if (!supabaseUrl || !serviceRoleKey || !anonKey) {
-        return new Response(JSON.stringify({ error: "Supabase env not configured." }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+      if (!supabaseUrl || !serviceRoleKey) {
+        return json({ error: "Supabase env not configured" }, 500);
       }
 
       const authHeader = req.headers.get("Authorization") || "";
-      if (!authHeader) {
-        return new Response(JSON.stringify({ error: "Unauthorized" }), {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+      if (!authHeader) return json({ error: "Unauthorized" }, 401);
 
       const userClient = createClient(supabaseUrl, anonKey, {
         auth: { persistSession: false },
         global: { headers: { Authorization: authHeader } },
       });
       const { data: authData, error: authError } = await userClient.auth.getUser();
-      if (authError || !authData?.user) {
-        return new Response(JSON.stringify({ error: "Unauthorized" }), {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+      if (authError || !authData?.user) return json({ error: "Unauthorized" }, 401);
 
       adminClient = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
       const { data: job, error: jobError } = await adminClient
@@ -128,7 +235,7 @@ serve(async (req) => {
           status: "processing",
           prompt: prompt || null,
           image_url: resolvedImageUrl,
-          progress: 10,
+          progress: 5,
         })
         .select("id")
         .single();
@@ -137,71 +244,112 @@ serve(async (req) => {
       jobId = job.id;
     }
 
-    const payload = {
-      image_url: resolvedImageUrl,
-      style: estilo || "cinematografico",
-      motion: movimento || "leve zoom + parallax",
-      duration: duracao || 5,
-      prompt,
-      text_overlay: textoNaTela,
-      narration: narracao,
-    };
+    const productInfo = productType || estilo || "produto premium";
+    const promptText = prompt || `Vídeo cinematográfico para ${productInfo}`;
 
-    const provider = (Deno.env.get("VIDEO_PROVIDER") || "").toLowerCase();
-    const providers = provider ? [provider] : ["runway", "pika"];
-    let providerUsed: string | null = null;
-    let videoUrl: string | null = null;
-    let providerError: string | null = null;
+    // ── Pipeline: Script → Voice → Video ──────────────────────────────────
 
-    for (const current of providers) {
-      try {
-        if (current === "runway") {
-          videoUrl = await runwayRequest(payload);
-        } else if (current === "pika") {
-          videoUrl = await pikaRequest(payload);
-        }
-        if (videoUrl) {
-          providerUsed = current;
-          break;
-        }
-      } catch (err) {
-        providerError = err instanceof Error ? err.message : "Falha no provedor";
-      }
+    // Step 1: Generate script
+    if (wantsJob && adminClient && jobId) {
+      await updateJob(adminClient, jobId, { progress: 15, status: "generating_script" });
     }
 
+    let script: string;
+    try {
+      script = await generateScript(promptText, productInfo);
+    } catch (e) {
+      console.error("Script generation failed, using fallback:", e);
+      script = narracao || "Descubra o produto que vai revolucionar sua rotina. Qualidade premium, resultado imediato. Garanta o seu agora.";
+    }
+
+    // Step 2: Generate voiceover
+    if (wantsJob && adminClient && jobId) {
+      await updateJob(adminClient, jobId, {
+        progress: 35,
+        status: "generating_voice",
+        caption_text: script,
+      });
+    }
+
+    let audioUrl: string | null = null;
+    try {
+      const audioBuffer = await generateVoiceover(script);
+      if (audioBuffer && adminClient) {
+        // Upload audio to storage
+        const audioPath = `voiceovers/${jobId || Date.now()}.mp3`;
+        const { error: uploadErr } = await adminClient.storage
+          .from("audio")
+          .upload(audioPath, audioBuffer, { contentType: "audio/mpeg", upsert: true });
+
+        if (!uploadErr) {
+          const { data: urlData } = adminClient.storage.from("audio").getPublicUrl(audioPath);
+          audioUrl = urlData.publicUrl;
+        }
+      }
+    } catch (e) {
+      console.error("Voiceover generation failed:", e);
+    }
+
+    // Step 3: Generate video
+    if (wantsJob && adminClient && jobId) {
+      await updateJob(adminClient, jobId, {
+        progress: 55,
+        status: "generating_video",
+        audio_url: audioUrl,
+      });
+    }
+
+    let videoUrl: string | null = null;
+    try {
+      videoUrl = await generateRunwayVideo(resolvedImageUrl, promptText);
+    } catch (e) {
+      console.error("Video generation failed:", e);
+    }
+
+    // ── Fallback if no video ──────────────────────────────────────────────
     if (!videoUrl) {
       const fallbackUrl = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4";
-      const errorMessage =
-        providerError || (provider ? "Falha ao gerar video com o provedor configurado" : "Nenhum provedor de video configurado");
       if (wantsJob && adminClient && jobId) {
-        await adminClient
-          .from("video_jobs")
-          .update({ status: "fallback", progress: 100, video_url: fallbackUrl, error: errorMessage })
-          .eq("id", jobId);
+        await updateJob(adminClient, jobId, {
+          status: "fallback",
+          progress: 100,
+          video_url: fallbackUrl,
+          audio_url: audioUrl,
+          caption_text: script,
+          error: "Video provider unavailable, fallback applied",
+        });
       }
-      return new Response(
-        JSON.stringify({ videoUrl: fallbackUrl, provider: "fallback", error: errorMessage, jobId }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
+      return json({
+        videoUrl: fallbackUrl,
+        audioUrl,
+        script,
+        provider: "fallback",
+        error: "Video provider unavailable",
+        jobId,
+      });
     }
 
+    // ── Success ───────────────────────────────────────────────────────────
     if (wantsJob && adminClient && jobId) {
-      await adminClient
-        .from("video_jobs")
-        .update({ status: "completed", progress: 100, video_url: videoUrl, error: null })
-        .eq("id", jobId);
+      await updateJob(adminClient, jobId, {
+        status: "completed",
+        progress: 100,
+        video_url: videoUrl,
+        audio_url: audioUrl,
+        caption_text: script,
+        error: null,
+      });
     }
 
-    return new Response(JSON.stringify({ videoUrl, provider: providerUsed, jobId }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    return json({
+      videoUrl,
+      audioUrl,
+      script,
+      provider: "runway",
+      jobId,
     });
   } catch (e) {
     console.error("Error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
   }
 });
