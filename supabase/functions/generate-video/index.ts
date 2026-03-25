@@ -138,7 +138,7 @@ const generateRunwayVideo = async (imageUrl: string, prompt: string): Promise<st
     },
     body: JSON.stringify({
       promptImage: imageUrl,
-      promptText: `Ultra cinematic commercial, premium lighting, rich contrast, ${prompt}`,
+      promptText: `ultra cinematic commercial, premium lighting, product focus, depth of field, ${prompt}`,
       duration: 5,
       ratio: "16:9",
     }),
@@ -301,10 +301,10 @@ serve(async (req) => {
         .from("video_jobs")
         .insert({
           user_id: authData.user.id,
-          status: "queued",
+          status: "started",
           prompt: prompt || null,
           image_url: resolvedImageUrl,
-          progress: 0,
+          progress: 5,
           priority: resolvePlanConfig(subscription?.plan || "free").priority,
         })
         .select("id")

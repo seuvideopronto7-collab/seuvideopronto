@@ -14,13 +14,20 @@ import SalesMachine from "@/components/SalesMachine";
 import VideoWizard from "@/components/wizard/VideoWizard";
 
 const Index = () => {
-  const { signOut, isAdmin, profile, user } = useAuth();
+  const auth = useAuth();
+  if (!auth) {
+    return <div className="min-h-screen bg-background p-6">Carregando autenticação...</div>;
+  }
+  if (auth.loading) {
+    return <div className="min-h-screen bg-background p-6">Carregando autenticação...</div>;
+  }
+  const { signOut, isAdmin, profile, user } = auth;
   const navigate = useNavigate();
   const location = useLocation();
 
   const [activeTab, setActiveTab] = useState<
-    "generator" | "darkflow" | "sales" | "calendar" | "wizard" | null
-  >(null);
+    "generator" | "darkflow" | "sales" | "calendar" | "wizard"
+  >("generator");
   const [testLoading, setTestLoading] = useState(false);
 
   const initialProduto = (location.state as any)?.produto || null;
@@ -61,13 +68,12 @@ const Index = () => {
 
   // 🚀 AUTO START DO SISTEMA (TELA NUNCA MAIS MORTA)
   useEffect(() => {
-    console.log("🔥 PDG SAFE ENGINE ATIVO");
-    const timer = setTimeout(() => {
-      setActiveTab("generator");
-    }, 300);
+    console.log("ACTIVE TAB:", activeTab);
+  }, [activeTab]);
 
-    return () => clearTimeout(timer);
-  }, []);
+  if (!activeTab) {
+    return <div className="min-h-screen bg-background p-6">⚠️ Sistema não carregado</div>;
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -159,12 +165,16 @@ const Index = () => {
         {/* 🔥 MOTOR PRINCIPAL (SEMPRE ATIVO) */}
         {activeTab === "generator" && (
           <SafeRender label="PDG Safe Mode">
-            <div className="bg-black p-6 rounded-xl border border-green-500">
-              <h2 className="text-white text-xl font-bold mb-2">
-                🎬 Sistema de Vídeo Ativo
-              </h2>
-              <VideoGeneratorUI />
-            </div>
+            {VideoGeneratorUI ? (
+              <div className="bg-black p-6 rounded-xl border border-green-500">
+                <h2 className="text-white text-xl font-bold mb-2">
+                  🎬 Sistema de Vídeo Ativo
+                </h2>
+                <VideoGeneratorUI />
+              </div>
+            ) : (
+              <div className="p-6">Carregando...</div>
+            )}
           </SafeRender>
         )}
 

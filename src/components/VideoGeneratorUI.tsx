@@ -113,7 +113,7 @@ const VideoGeneratorUI = () => {
     syncJob();
 
     const channel = supabase
-      .channel(`video-jobs-${jobId}`)
+      .channel("video_jobs")
       .on(
         "postgres_changes",
         {
@@ -130,14 +130,14 @@ const VideoGeneratorUI = () => {
           setProgress(job.progress ?? 0);
           setVideoUrl(job.video_url || null);
           if (nextStatus && nextStatus !== lastRealtimeStatusRef.current) {
-          if (job.status === "completed") toast.success("\ud83c\udfac V\u00eddeo pronto!");
-          if (nextStatus === "error" || nextStatus === "failed") {
-            toast.error(job.error || "Erro no processamento");
-          }
-          if (nextStatus === "fallback") {
-            toast.warning("Fallback aplicado no processamento");
-          }
-          lastRealtimeStatusRef.current = nextStatus;
+            if (job.status === "completed") toast.success("\ud83c\udfac V\u00eddeo pronto!");
+            if (nextStatus === "error" || nextStatus === "failed") {
+              toast.error(job.error || "Erro no processamento");
+            }
+            if (nextStatus === "fallback") {
+              toast.warning("Fallback aplicado no processamento");
+            }
+            lastRealtimeStatusRef.current = nextStatus;
           }
           if (nextStatus && finalStatuses.has(nextStatus)) {
             active = false;
