@@ -80,48 +80,6 @@ export type Database = {
         }
         Relationships: []
       }
-      video_jobs: {
-        Row: {
-          caption_text: string | null
-          created_at: string | null
-          error: string | null
-          id: string
-          image_url: string | null
-          progress: number | null
-          prompt: string | null
-          status: string | null
-          updated_at: string | null
-          user_id: string | null
-          video_url: string | null
-        }
-        Insert: {
-          caption_text?: string | null
-          created_at?: string | null
-          error?: string | null
-          id?: string
-          image_url?: string | null
-          progress?: number | null
-          prompt?: string | null
-          status?: string | null
-          updated_at?: string | null
-          user_id?: string | null
-          video_url?: string | null
-        }
-        Update: {
-          caption_text?: string | null
-          created_at?: string | null
-          error?: string | null
-          id?: string
-          image_url?: string | null
-          progress?: number | null
-          prompt?: string | null
-          status?: string | null
-          updated_at?: string | null
-          user_id?: string | null
-          video_url?: string | null
-        }
-        Relationships: []
-      }
       produtos_gerados: {
         Row: {
           created_at: string
