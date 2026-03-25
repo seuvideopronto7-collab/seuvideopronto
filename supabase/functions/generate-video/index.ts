@@ -13,6 +13,23 @@ const json = (body: unknown, status = 200) =>
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
+const getNextResetDate = () => {
+  const now = new Date();
+  const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0));
+  return next.toISOString();
+};
+
+const resolvePlanConfig = (plan?: string) => {
+  const normalized = (plan || "free").toLowerCase();
+  if (normalized === "premium") {
+    return { plan: "premium", limit: null, priority: 3 };
+  }
+  if (normalized === "pro") {
+    return { plan: "pro", limit: 20, priority: 2 };
+  }
+  return { plan: "free", limit: 2, priority: 1 };
+};
+
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 const updateJob = async (
@@ -228,14 +245,67 @@ serve(async (req) => {
       if (authError || !authData?.user) return json({ error: "Unauthorized" }, 401);
 
       adminClient = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
+
+      const { data: existingSub, error: subError } = await adminClient
+        .from("subscriptions")
+        .select("id, plan, videos_limit, videos_used, reset_date, status")
+        .eq("user_id", authData.user.id)
+        .maybeSingle();
+
+      if (subError) throw subError;
+
+      const planConfig = resolvePlanConfig(existingSub?.plan || "free");
+      let subscription = existingSub;
+
+      if (!subscription) {
+        const { data: created, error: createSubError } = await adminClient
+          .from("subscriptions")
+          .insert({
+            user_id: authData.user.id,
+            plan: planConfig.plan,
+            videos_limit: planConfig.limit,
+            videos_used: 0,
+            reset_date: getNextResetDate(),
+            status: "active",
+          })
+          .select("id, plan, videos_limit, videos_used, reset_date, status")
+          .single();
+        if (createSubError) throw createSubError;
+        subscription = created;
+      }
+
+      if (subscription?.reset_date && new Date(subscription.reset_date).getTime() <= Date.now()) {
+        const { data: resetSub, error: resetError } = await adminClient
+          .from("subscriptions")
+          .update({ videos_used: 0, reset_date: getNextResetDate() })
+          .eq("user_id", authData.user.id)
+          .select("id, plan, videos_limit, videos_used, reset_date, status")
+          .single();
+        if (resetError) throw resetError;
+        subscription = resetSub;
+      }
+
+      const resolvedLimit = subscription?.videos_limit ?? planConfig.limit;
+      if (resolvedLimit !== null && subscription && subscription.videos_used >= resolvedLimit) {
+        return json({ error: "Limite diário de vídeos atingido.", code: "PLAN_LIMIT" }, 429);
+      }
+
+      if (subscription) {
+        const { error: consumeError } = await adminClient
+          .from("subscriptions")
+          .update({ videos_used: (subscription.videos_used || 0) + 1 })
+          .eq("user_id", authData.user.id);
+        if (consumeError) throw consumeError;
+      }
       const { data: job, error: jobError } = await adminClient
         .from("video_jobs")
         .insert({
           user_id: authData.user.id,
-          status: "processing",
+          status: "queued",
           prompt: prompt || null,
           image_url: resolvedImageUrl,
-          progress: 5,
+          progress: 0,
+          priority: resolvePlanConfig(subscription?.plan || "free").priority,
         })
         .select("id")
         .single();

@@ -1,4 +1,4 @@
-export type PlanId = "start" | "basic" | "pro";
+export type PlanId = "free" | "pro" | "premium";
 
 export type PlanLimits = Record<string, number | boolean>;
 
@@ -12,79 +12,61 @@ export interface PlanDefinition {
 }
 
 export const PLAN_DEFS: Record<PlanId, PlanDefinition> = {
-  start: {
-    id: "start",
-    label: "START",
-    price: "R$97/mês",
+  free: {
+    id: "free",
+    label: "FREE",
+    price: "R$0",
     limits: {
-      videos_curto_dia: 10,
-      duracao_curto: 3,
-      vozes_ia: true,
-      estilos: 1000,
-      legendas_premium: true,
-      editor: true,
+      videos_dia: 2,
+      watermark: true,
+      fila_prioritaria: false,
     },
-    features: ["Vídeos curtos", "IA básica", "Editor liberado", "Legendas premium"],
-  },
-  basic: {
-    id: "basic",
-    label: "BASIC",
-    price: "R$197/mês",
-    highlight: true,
-    limits: {
-      videos_curto_dia: 20,
-      videos_5min_dia: 20,
-      videos_12min_dia: 5,
-      imagens_por_video: 90,
-      thumbnails_dia: 15,
-      videos_animados_dia: 30,
-      editor: true,
-    },
-    features: ["Vídeos médios", "Thumbnails", "Volume maior", "Editor liberado"],
+    features: ["2 vídeos/dia", "Marca d'água", "Fila padrão"],
   },
   pro: {
     id: "pro",
     label: "PRO",
-    price: "R$397/mês",
+    price: "R$97/mês",
+    highlight: true,
     limits: {
-      videos_curto_dia: 30,
-      videos_5min_dia: 30,
-      videos_30min_dia: 15,
-      imagens_por_video: 270,
-      thumbnails_dia: 30,
-      videos_animados_dia: 60,
-      editor: true,
+      videos_dia: 20,
+      watermark: false,
+      fila_prioritaria: true,
     },
-    features: ["Vídeos longos", "Geração massiva", "Limites altos", "Editor liberado"],
+    features: ["20 vídeos/dia", "Sem marca d'água", "Prioridade na fila"],
+  },
+  premium: {
+    id: "premium",
+    label: "PREMIUM",
+    price: "R$197/mês",
+    limits: {
+      videos_dia: Number.POSITIVE_INFINITY,
+      watermark: false,
+      fila_prioritaria: true,
+      render_rapido: true,
+      acesso_antecipado: true,
+    },
+    features: ["Ilimitado", "Render mais rápido", "Acesso antecipado"],
   },
 };
 
-export const planOrder: PlanId[] = ["start", "basic", "pro"];
+export const planOrder: PlanId[] = ["free", "pro", "premium"];
 
 export const getPlanLimits = (planId: PlanId) => PLAN_DEFS[planId].limits;
 
 export const getPlanLabel = (planId: PlanId) => PLAN_DEFS[planId].label;
 
 export const getVideoDailyKey = (planId: PlanId) => {
-  if (planId === "basic") return "videos_5min_dia";
-  if (planId === "pro") return "videos_30min_dia";
-  return "videos_curto_dia";
+  return "videos_dia";
 };
 
 export const formatLimitLabel = (key: string) => {
   const labels: Record<string, string> = {
-    videos_curto_dia: "Vídeos curtos/dia",
-    videos_5min_dia: "Vídeos 5min/dia",
-    videos_12min_dia: "Vídeos 12min/dia",
-    videos_30min_dia: "Vídeos 30min/dia",
-    imagens_por_video: "Imagens por vídeo",
-    thumbnails_dia: "Thumbnails/dia",
-    videos_animados_dia: "Vídeos animados/dia",
-    duracao_curto: "Duração curta (min)",
-    vozes_ia: "Voz IA",
-    estilos: "Estilos",
-    legendas_premium: "Legendas premium",
-    editor: "Editor",
+    videos_dia: "Vídeos/dia",
+    watermark: "Marca d'água",
+    fila_prioritaria: "Prioridade na fila",
+    render_rapido: "Render rápido",
+    acesso_antecipado: "Acesso antecipado",
   };
   return labels[key] || key;
 };

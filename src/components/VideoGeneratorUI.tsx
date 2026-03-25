@@ -13,6 +13,7 @@ import { renderVideoFromImage } from "@/lib/videoRender";
 import { generateEpicSoundtrack } from "@/lib/audioSynth";
 import { buildCinematicPrompt } from "@/lib/buildCinematicPrompt";
 import { buildScript } from "@/lib/buildScript";
+import { usePlan } from "@/hooks/usePlan";
 
 const productTypes = ["Natural", "Suplemento", "Cosmetico", "Tecnologia", "Outro"];
 const styleTypes = ["Luxo", "Fitness", "Saude", "Tecnologia"];
@@ -62,6 +63,7 @@ const VideoGeneratorUI = () => {
   const [isLocalRendering, setIsLocalRendering] = useState(false);
   const [localProgress, setLocalProgress] = useState(0);
   const lastRealtimeStatusRef = useRef<string | null>(null);
+  const { planId } = usePlan();
 
   useEffect(() => {
     return () => {
@@ -951,12 +953,19 @@ const VideoGeneratorUI = () => {
             </div>
             <Badge variant="secondary">{videoUrl ? "Pronto" : "Aguardando"}</Badge>
           </div>
-          <div className="rounded-2xl border border-border/50 bg-black/60 p-2">
+          <div className="rounded-2xl border border-border/50 bg-black/60 p-2 relative overflow-hidden">
             {videoUrl ? (
               <video src={videoUrl} controls className="w-full rounded-xl" poster={previewUrl || undefined} />
             ) : (
               <div className="rounded-xl h-52 flex items-center justify-center text-xs text-muted-foreground">
                 Nenhum vídeo renderizado
+              </div>
+            )}
+            {planId === "free" && (
+              <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                <div className="text-white/40 text-2xl font-semibold tracking-[0.4em] rotate-[-20deg]">
+                  PDG
+                </div>
               </div>
             )}
           </div>

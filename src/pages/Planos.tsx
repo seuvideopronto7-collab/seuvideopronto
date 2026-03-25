@@ -88,7 +88,9 @@ const Planos = () => {
                     .map(([key, value]) => (
                       <div key={key} className="flex items-center justify-between text-[11px] text-muted-foreground">
                         <span>{formatLimitLabel(key)}</span>
-                        <span className="font-mono text-primary">{value as number}</span>
+                        <span className="font-mono text-primary">
+                          {Number.isFinite(value as number) ? (value as number) : "∞"}
+                        </span>
                       </div>
                     ))}
                 </div>

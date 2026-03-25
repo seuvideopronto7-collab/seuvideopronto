@@ -6,10 +6,11 @@ import { getNextResetAt, getPlanLimits, isResetDue, type PlanId, type PlanLimits
 interface PlanRecord {
   id: string;
   user_id: string;
-  plano: PlanId;
-  limite_diario_json: PlanLimits;
-  uso_hoje_json: Record<string, number>;
-  reset_at: string | null;
+  plan: PlanId;
+  videos_limit: number | null;
+  videos_used: number;
+  reset_date: string | null;
+  status: string;
 }
 
 interface LimitCheckResult {
@@ -31,7 +32,7 @@ export const usePlan = () => {
       }
 
       const { data, error } = await (supabase
-        .from("usuarios_planos" as any)
+        .from("subscriptions" as any)
         .select("*")
         .eq("user_id", user.id)
         .maybeSingle() as any);
@@ -41,15 +42,15 @@ export const usePlan = () => {
       }
 
       if (!data) {
-        const defaults = getPlanLimits("start");
         const { data: created, error: createError } = await (supabase
-          .from("usuarios_planos" as any)
+          .from("subscriptions" as any)
           .insert({
             user_id: user.id,
-            plano: "start",
-            limite_diario_json: defaults,
-            uso_hoje_json: {},
-            reset_at: getNextResetAt(),
+            plan: "free",
+            videos_limit: 2,
+            videos_used: 0,
+            reset_date: getNextResetAt(),
+            status: "active",
           } as any)
           .select("*")
           .single() as any);
@@ -74,11 +75,11 @@ export const usePlan = () => {
     async (current: PlanRecord | null) => {
       try {
         if (!current || !user) return current;
-        if (!isResetDue(current.reset_at)) return current;
+        if (!isResetDue(current.reset_date)) return current;
         const nextReset = getNextResetAt();
         const { data, error } = await (supabase
-          .from("usuarios_planos" as any)
-          .update({ uso_hoje_json: {}, reset_at: nextReset } as any)
+          .from("subscriptions" as any)
+          .update({ videos_used: 0, reset_date: nextReset } as any)
           .eq("user_id", user.id)
           .select("*")
           .single() as any);
@@ -106,18 +107,29 @@ export const usePlan = () => {
 
   const limits = useMemo(() => {
     const baseLimits = isFounder
-      ? getPlanLimits("pro")
-      : record?.limite_diario_json || getPlanLimits(record?.plano || "start");
-    if (!isFounder) return baseLimits;
-    return Object.fromEntries(
-      Object.entries(baseLimits).map(([key, value]) => [
-        key,
-        typeof value === "number" ? Number.POSITIVE_INFINITY : true,
-      ]),
-    ) as PlanLimits;
+      ? getPlanLimits("premium")
+      : getPlanLimits(record?.plan || "free");
+    if (isFounder) {
+      return Object.fromEntries(
+        Object.entries(baseLimits).map(([key, value]) => [
+          key,
+          typeof value === "number" ? Number.POSITIVE_INFINITY : true,
+        ]),
+      ) as PlanLimits;
+    }
+
+    if (record?.videos_limit !== undefined) {
+      return {
+        ...baseLimits,
+        videos_dia:
+          record.videos_limit === null ? Number.POSITIVE_INFINITY : record.videos_limit,
+      } as PlanLimits;
+    }
+
+    return baseLimits;
   }, [record, isFounder]);
 
-  const usage = useMemo(() => record?.uso_hoje_json || {}, [record]);
+  const usage = useMemo(() => ({ videos_dia: record?.videos_used || 0 }), [record]);
 
   const checkLimit = useCallback(
     (key: string, amount = 1): LimitCheckResult => {
@@ -148,15 +160,10 @@ export const usePlan = () => {
         const check = checkLimit(key, amount);
         if (!check.allowed) return check;
 
-        const currentUsage = record.uso_hoje_json || {};
-        const nextUsage = {
-          ...currentUsage,
-          [key]: (currentUsage[key] || 0) + amount,
-        };
-
+        const nextUsage = Math.max(0, (record.videos_used || 0) + amount);
         const { data, error } = await (supabase
-          .from("usuarios_planos" as any)
-          .update({ uso_hoje_json: nextUsage } as any)
+          .from("subscriptions" as any)
+          .update({ videos_used: nextUsage } as any)
           .eq("user_id", user.id)
           .select("*")
           .single() as any);
@@ -180,9 +187,14 @@ export const usePlan = () => {
     async (plan: PlanId) => {
       try {
         if (!user) return;
+        const limitMap: Record<PlanId, number | null> = {
+          free: 2,
+          pro: 20,
+          premium: null,
+        };
         const { data, error } = await (supabase
-          .from("usuarios_planos" as any)
-          .update({ plano: plan, limite_diario_json: getPlanLimits(plan) } as any)
+          .from("subscriptions" as any)
+          .update({ plan, videos_limit: limitMap[plan] } as any)
           .eq("user_id", user.id)
           .select("*")
           .single() as any);
@@ -200,7 +212,7 @@ export const usePlan = () => {
 
   return {
     record,
-    planId: isFounder ? "pro" : record?.plano || "start",
+    planId: isFounder ? "premium" : record?.plan || "free",
     limits,
     usage,
     loading,
