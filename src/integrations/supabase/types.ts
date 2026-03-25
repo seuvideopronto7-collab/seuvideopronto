@@ -203,34 +203,43 @@ export type Database = {
       video_jobs: {
         Row: {
           audio_url: string | null
+          caption_text: string | null
           created_at: string
+          error: string | null
           id: string
           image_url: string | null
           progress: number
           prompt: string | null
           status: string
+          updated_at: string | null
           user_id: string | null
           video_url: string | null
         }
         Insert: {
           audio_url?: string | null
+          caption_text?: string | null
           created_at?: string
+          error?: string | null
           id?: string
           image_url?: string | null
           progress?: number
           prompt?: string | null
           status?: string
+          updated_at?: string | null
           user_id?: string | null
           video_url?: string | null
         }
         Update: {
           audio_url?: string | null
+          caption_text?: string | null
           created_at?: string
+          error?: string | null
           id?: string
           image_url?: string | null
           progress?: number
           prompt?: string | null
           status?: string
+          updated_at?: string | null
           user_id?: string | null
           video_url?: string | null
         }

@@ -1,0 +1,1 @@
+ALTER TABLE public.video_jobs ADD COLUMN IF NOT EXISTS caption_text text, ADD COLUMN IF NOT EXISTS error text, ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
