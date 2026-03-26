@@ -1,14 +1,51 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+// ── Rate limiting (5 req/min per user) ──
+const rateLimitMap = new Map<string, number[]>();
+const RATE_LIMIT = 5;
+const RATE_WINDOW_MS = 60_000;
+
+const isRateLimited = (userId: string): boolean => {
+  const now = Date.now();
+  const timestamps = (rateLimitMap.get(userId) || []).filter(t => now - t < RATE_WINDOW_MS);
+  if (timestamps.length >= RATE_LIMIT) return true;
+  timestamps.push(now);
+  rateLimitMap.set(userId, timestamps);
+  return false;
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   try {
+    // ── Auth ──
+    const authHeader = req.headers.get("Authorization") || "";
+    if (!authHeader.startsWith("Bearer ")) return json({ error: "Unauthorized" }, 401);
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabase = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const token = authHeader.replace("Bearer ", "");
+    const { data, error } = await supabase.auth.getClaims(token);
+    if (error || !data?.claims) return json({ error: "Unauthorized" }, 401);
+    const userId = data.claims.sub as string;
+
+    // ── Rate limit ──
+    if (isRateLimited(userId)) return json({ error: "Rate limit excedido. Tente novamente em 1 minuto." }, 429);
+
     const { fileUrl, videoLink, modo, produto, nicho, publico, dor, beneficio, link } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
@@ -104,53 +141,38 @@ Retorne EXATAMENTE este formato JSON:
             description: "Analyze content and generate optimized viral version",
             parameters: {
               type: "object",
-              properties: {
-                result: { type: "object" }
-              },
-              required: ["result"]
-            }
-          }
+              properties: { result: { type: "object" } },
+              required: ["result"],
+            },
+          },
         }],
         tool_choice: { type: "function", function: { name: "analyze_and_recreate" } },
       }),
     });
 
     if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit excedido. Tente novamente em alguns segundos." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "Créditos insuficientes. Adicione fundos em Settings > Workspace > Usage." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+      if (response.status === 429) return json({ error: "Rate limit excedido. Tente novamente em alguns segundos." }, 429);
+      if (response.status === 402) return json({ error: "Créditos insuficientes." }, 402);
       const text = await response.text();
       console.error("AI error:", response.status, text);
       throw new Error("AI gateway error");
     }
 
-    const data = await response.json();
-
+    const aiData = await response.json();
     let result;
-    const toolCalls = data.choices?.[0]?.message?.tool_calls;
+    const toolCalls = aiData.choices?.[0]?.message?.tool_calls;
     if (toolCalls && toolCalls.length > 0) {
       const args = JSON.parse(toolCalls[0].function.arguments);
       result = args.result || args;
     } else {
-      const content = data.choices?.[0]?.message?.content || "";
+      const content = aiData.choices?.[0]?.message?.content || "";
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       result = jsonMatch ? JSON.parse(jsonMatch[0]) : { error: "Failed to parse response" };
     }
 
-    return new Response(JSON.stringify(result), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return json(result);
   } catch (e) {
     console.error("Error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
   }
 });
