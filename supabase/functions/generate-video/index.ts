@@ -13,6 +13,17 @@ const json = (body: unknown, status = 200) =>
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
+// ── Rate limiting (5 req/min per user) ──
+const rateLimitMap = new Map<string, number[]>();
+const isRateLimited = (userId: string): boolean => {
+  const now = Date.now();
+  const timestamps = (rateLimitMap.get(userId) || []).filter(t => now - t < 60_000);
+  if (timestamps.length >= 5) return true;
+  timestamps.push(now);
+  rateLimitMap.set(userId, timestamps);
+  return false;
+};
+
 const getNextResetDate = () => {
   const now = new Date();
   const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0));
