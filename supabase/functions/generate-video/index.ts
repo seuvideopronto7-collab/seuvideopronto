@@ -13,6 +13,17 @@ const json = (body: unknown, status = 200) =>
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
+// ── Rate limiting (5 req/min per user) ──
+const rateLimitMap = new Map<string, number[]>();
+const isRateLimited = (userId: string): boolean => {
+  const now = Date.now();
+  const timestamps = (rateLimitMap.get(userId) || []).filter(t => now - t < 60_000);
+  if (timestamps.length >= 5) return true;
+  timestamps.push(now);
+  rateLimitMap.set(userId, timestamps);
+  return false;
+};
+
 const getNextResetDate = () => {
   const now = new Date();
   const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0));
@@ -195,6 +206,32 @@ serve(async (req) => {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   try {
+    // ── Auth: always require valid JWT ──
+    const authHeader = req.headers.get("Authorization") || "";
+    if (!authHeader.startsWith("Bearer ")) return json({ error: "Unauthorized" }, 401);
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
+
+    const authClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await authClient.auth.getClaims(token);
+
+    // Allow service_role calls (from process-video-queue) — they won't have user claims but have valid auth
+    const isServiceRole = authHeader.includes(Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "____NOMATCH____");
+    if (!isServiceRole && (claimsError || !claimsData?.claims)) {
+      return json({ error: "Unauthorized" }, 401);
+    }
+
+    const callerUserId = isServiceRole ? "service_role" : (claimsData?.claims?.sub as string);
+
+    // ── Rate limit (skip for service_role) ──
+    if (!isServiceRole && isRateLimited(callerUserId)) {
+      return json({ error: "Rate limit excedido. Tente novamente em 1 minuto." }, 429);
+    }
+
     const body = await req.json();
     const {
       imageUrl,
