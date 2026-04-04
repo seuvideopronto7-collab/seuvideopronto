@@ -1,84 +1,212 @@
-import { useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Activity, Clapperboard, Cloud, Cpu, Users } from "lucide-react";
+import { Activity, Clapperboard, Cloud, Cpu, Users, TrendingUp, Video, BarChart3 } from "lucide-react";
 import AdminLayout from "@/components/admin/AdminLayout";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
+import { Progress } from "@/components/ui/progress";
+
+interface Stats {
+  totalVideos: number;
+  activeJobs: number;
+  totalUsers: number;
+  completedToday: number;
+  failedJobs: number;
+  avgProgress: number;
+}
+
+interface RecentJob {
+  id: string;
+  status: string;
+  progress: number;
+  created_at: string;
+  prompt: string | null;
+  video_url: string | null;
+}
 
 const AdminMasterDashboard = () => {
   const navigate = useNavigate();
+  const [stats, setStats] = useState<Stats>({
+    totalVideos: 0,
+    activeJobs: 0,
+    totalUsers: 0,
+    completedToday: 0,
+    failedJobs: 0,
+    avgProgress: 0,
+  });
+  const [recentJobs, setRecentJobs] = useState<RecentJob[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const stats = useMemo(
-    () => [
-      { label: "Vídeos gerados hoje", value: "38", icon: Clapperboard },
-      { label: "Processamentos ativos", value: "5", icon: Activity },
-      { label: "APIs conectadas", value: "7", icon: Cloud },
-      { label: "Usuários ativos", value: "124", icon: Users },
-    ],
-    [],
-  );
+  useEffect(() => {
+    const fetchStats = async () => {
+      setLoading(true);
+      try {
+        const [videosRes, usersRes, activeRes, recentRes] = await Promise.all([
+          supabase.from("video_jobs").select("id, status, progress, created_at", { count: "exact" }),
+          supabase.from("profiles").select("id", { count: "exact" }),
+          supabase.from("video_jobs").select("id", { count: "exact" }).in("status", ["started", "generating_script", "generating_voice", "generating_video", "processing"]),
+          supabase.from("video_jobs").select("id, status, progress, created_at, prompt, video_url").order("created_at", { ascending: false }).limit(10),
+        ]);
 
-  const systemStatus = [
-    { label: "Runway", status: "online" },
-    { label: "ElevenLabs", status: "online" },
-    { label: "Upload", status: "ok" },
+        const allJobs = videosRes.data || [];
+        const today = new Date().toISOString().slice(0, 10);
+        const completedToday = allJobs.filter(
+          (j: any) => j.status === "completed" && j.created_at?.startsWith(today)
+        ).length;
+        const failedJobs = allJobs.filter((j: any) => j.status === "error" || j.status === "failed").length;
+        const progresses = allJobs.map((j: any) => j.progress || 0);
+        const avgProgress = progresses.length > 0 ? Math.round(progresses.reduce((a: number, b: number) => a + b, 0) / progresses.length) : 0;
+
+        setStats({
+          totalVideos: videosRes.count || 0,
+          activeJobs: activeRes.count || 0,
+          totalUsers: usersRes.count || 0,
+          completedToday,
+          failedJobs,
+          avgProgress,
+        });
+        setRecentJobs((recentRes.data as any) || []);
+      } catch (e) {
+        console.error("Failed to fetch admin stats:", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStats();
+
+    // Realtime updates for video_jobs
+    const channel = supabase
+      .channel("admin-video-jobs")
+      .on("postgres_changes", { event: "*", schema: "public", table: "video_jobs" }, () => {
+        fetchStats();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
+  const statCards = [
+    { label: "Total de vídeos", value: stats.totalVideos, icon: Clapperboard, color: "from-primary to-purple-500" },
+    { label: "Jobs ativos", value: stats.activeJobs, icon: Activity, color: "from-cyan-500 to-blue-500" },
+    { label: "Usuários", value: stats.totalUsers, icon: Users, color: "from-green-500 to-emerald-500" },
+    { label: "Concluídos hoje", value: stats.completedToday, icon: TrendingUp, color: "from-amber-500 to-orange-500" },
   ];
 
+  const statusColor = (status: string) => {
+    if (status === "completed") return "text-green-400";
+    if (status === "error" || status === "failed") return "text-red-400";
+    if (status === "fallback") return "text-amber-400";
+    return "text-cyan-400";
+  };
+
   return (
-    <AdminLayout title="Dashboard Admin" description="Controle total do sistema e distribuição">
+    <AdminLayout title="Dashboard CEO" description="Controle total do sistema — métricas em tempo real">
+      {/* Stats grid */}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {stats.map((item) => (
+        {statCards.map((item) => (
           <div key={item.label} className="cinema-panel p-5 flex items-center gap-4">
-            <div className="h-12 w-12 rounded-2xl bg-[#7B2FFF]/20 text-[#7B2FFF] flex items-center justify-center">
-              <item.icon className="h-5 w-5" />
+            <div className={`h-12 w-12 rounded-2xl bg-gradient-to-br ${item.color} bg-opacity-20 flex items-center justify-center`}>
+              <item.icon className="h-5 w-5 text-white" />
             </div>
             <div>
               <p className="text-xs text-muted-foreground">{item.label}</p>
-              <p className="text-2xl font-semibold text-white">{item.value}</p>
+              <p className="text-2xl font-semibold text-foreground">
+                {loading ? "..." : item.value}
+              </p>
             </div>
           </div>
         ))}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+        {/* Recent jobs */}
         <div className="cinema-panel p-6 space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-semibold">Status do sistema</h2>
-              <p className="text-xs text-muted-foreground">Monitoramento em tempo real</p>
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <Video className="h-5 w-5 text-primary" /> Jobs recentes
+              </h2>
+              <p className="text-xs text-muted-foreground">Últimos 10 processamentos</p>
             </div>
-            <div className="flex items-center gap-2 rounded-full border border-[#00E5FF]/30 bg-[#00E5FF]/10 px-3 py-1 text-xs font-semibold text-[#00E5FF]">
+            <div className="flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
               <Cpu className="h-3.5 w-3.5" />
-              Core online
+              {stats.activeJobs} ativos
             </div>
           </div>
-          <div className="grid gap-3 sm:grid-cols-3">
-            {systemStatus.map((item) => (
-              <div key={item.label} className="rounded-2xl border border-border/50 bg-muted/20 p-4">
-                <p className="text-xs text-muted-foreground">{item.label}</p>
-                <p className="text-sm font-semibold text-white mt-2">
-                  {item.status === "online" ? "Online" : item.status === "ok" ? "Ok" : "Offline"}
-                </p>
-                <div className="mt-3 h-1 rounded-full bg-white/10">
-                  <div className="h-1 w-3/4 rounded-full bg-gradient-to-r from-[#7B2FFF] to-[#00E5FF]" />
+
+          <div className="space-y-2 max-h-[400px] overflow-y-auto">
+            {recentJobs.map((job) => (
+              <div key={job.id} className="rounded-xl border border-border/50 bg-muted/20 p-3 flex items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className={`font-semibold uppercase ${statusColor(job.status)}`}>
+                      {job.status.replace(/_/g, " ")}
+                    </span>
+                    <span className="text-muted-foreground font-mono truncate">
+                      {job.id.slice(0, 8)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1 truncate">
+                    {job.prompt || "Sem prompt"}
+                  </p>
+                  <Progress value={job.progress} className="h-1 mt-2" />
+                </div>
+                <div className="text-[10px] text-muted-foreground whitespace-nowrap">
+                  {new Date(job.created_at).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
                 </div>
               </div>
             ))}
+            {recentJobs.length === 0 && !loading && (
+              <p className="text-xs text-muted-foreground text-center py-8">Nenhum job encontrado</p>
+            )}
           </div>
         </div>
 
-        <div className="cinema-panel p-6 space-y-4">
-          <h2 className="text-lg font-semibold">Atalhos rápidos</h2>
-          <p className="text-xs text-muted-foreground">Ações críticas com um clique</p>
-          <div className="grid gap-3">
-            <Button variant="neon" onClick={() => navigate("/admin/video-generator")}>
-              Gerar vídeo agora
-            </Button>
-            <Button variant="glass" onClick={() => navigate("/admin/distribution")}>
-              Nova distribuição
-            </Button>
-            <Button variant="outline" onClick={() => navigate("/admin/distribution")}>
-              Ver central
-            </Button>
+        {/* Right panel */}
+        <div className="space-y-4">
+          {/* KPIs */}
+          <div className="cinema-panel p-6 space-y-4">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-primary" /> KPIs
+            </h2>
+            <div className="grid gap-3">
+              <div className="rounded-xl border border-border/50 bg-muted/20 p-4 flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Taxa de sucesso</span>
+                <span className="text-lg font-semibold text-green-400">
+                  {stats.totalVideos > 0
+                    ? Math.round(((stats.totalVideos - stats.failedJobs) / stats.totalVideos) * 100)
+                    : 0}%
+                </span>
+              </div>
+              <div className="rounded-xl border border-border/50 bg-muted/20 p-4 flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Falhas totais</span>
+                <span className="text-lg font-semibold text-red-400">{stats.failedJobs}</span>
+              </div>
+              <div className="rounded-xl border border-border/50 bg-muted/20 p-4 flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Progresso médio</span>
+                <span className="text-lg font-semibold text-primary">{stats.avgProgress}%</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick actions */}
+          <div className="cinema-panel p-6 space-y-4">
+            <h2 className="text-lg font-semibold">Atalhos rápidos</h2>
+            <div className="grid gap-3">
+              <Button variant="neon" onClick={() => navigate("/admin/video-generator")}>
+                🎬 Gerar vídeo agora
+              </Button>
+              <Button variant="glass" onClick={() => navigate("/admin/users")}>
+                👥 Gerenciar usuários
+              </Button>
+              <Button variant="glass" onClick={() => navigate("/admin/distribution")}>
+                📤 Nova distribuição
+              </Button>
+              <Button variant="outline" onClick={() => navigate("/admin/logs")}>
+                📋 Ver logs
+              </Button>
+            </div>
           </div>
         </div>
       </div>
