@@ -24,23 +24,6 @@ const isRateLimited = (userId: string): boolean => {
   return false;
 };
 
-const getNextResetDate = () => {
-  const now = new Date();
-  const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0));
-  return next.toISOString();
-};
-
-const resolvePlanConfig = (plan?: string) => {
-  const normalized = (plan || "free").toLowerCase();
-  if (normalized === "premium") {
-    return { plan: "premium", limit: null, priority: 3 };
-  }
-  if (normalized === "pro") {
-    return { plan: "pro", limit: 20, priority: 2 };
-  }
-  return { plan: "free", limit: 2, priority: 1 };
-};
-
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 const updateJob = async (
@@ -98,7 +81,7 @@ const generateVoiceover = async (script: string): Promise<ArrayBuffer | null> =>
     return null;
   }
 
-  const voiceId = "onwK4e9ZLuTAKqWW03F9"; // Daniel - commercial male voice
+  const voiceId = "onwK4e9ZLuTAKqWW03F9"; // Daniel
   const res = await fetch(
     `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`,
     {
@@ -139,7 +122,6 @@ const generateRunwayVideo = async (imageUrl: string, prompt: string): Promise<st
     return null;
   }
 
-  // Create task
   const createRes = await fetch(apiUrl, {
     method: "POST",
     headers: {
@@ -168,23 +150,19 @@ const generateRunwayVideo = async (imageUrl: string, prompt: string): Promise<st
     return null;
   }
 
-  // Poll for completion (max 120s)
   const pollUrl = Deno.env.get("RUNWAY_API_URL")
     ? `${Deno.env.get("RUNWAY_API_URL")}/${taskId}`
     : `https://api.dev.runwayml.com/v1/tasks/${taskId}`;
 
   for (let i = 0; i < 40; i++) {
     await new Promise((r) => setTimeout(r, 3000));
-
     const pollRes = await fetch(pollUrl, {
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "X-Runway-Version": "2024-11-06",
       },
     });
-
     if (!pollRes.ok) continue;
-
     const status = await pollRes.json();
     if (status.status === "SUCCEEDED") {
       return status.output?.[0] || status.output?.url || null;
@@ -206,30 +184,29 @@ serve(async (req) => {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   try {
-    // ── Auth: always require valid JWT ──
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
+
+    // ── Auth ──
     const authHeader = req.headers.get("Authorization") || "";
     if (!authHeader.startsWith("Bearer ")) return json({ error: "Unauthorized" }, 401);
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
+    const isServiceRole = authHeader.includes(serviceRoleKey);
 
-    const authClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await authClient.auth.getClaims(token);
+    let callerUserId = "service_role";
 
-    // Allow service_role calls (from process-video-queue) — they won't have user claims but have valid auth
-    const isServiceRole = authHeader.includes(Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "____NOMATCH____");
-    if (!isServiceRole && (claimsError || !claimsData?.claims)) {
-      return json({ error: "Unauthorized" }, 401);
-    }
+    if (!isServiceRole) {
+      const authClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data: { user }, error: authError } = await authClient.auth.getUser();
+      if (authError || !user) return json({ error: "Unauthorized" }, 401);
+      callerUserId = user.id;
 
-    const callerUserId = isServiceRole ? "service_role" : (claimsData?.claims?.sub as string);
-
-    // ── Rate limit (skip for service_role) ──
-    if (!isServiceRole && isRateLimited(callerUserId)) {
-      return json({ error: "Rate limit excedido. Tente novamente em 1 minuto." }, 429);
+      if (isRateLimited(callerUserId)) {
+        return json({ error: "Rate limit excedido. Tente novamente em 1 minuto." }, 429);
+      }
     }
 
     const body = await req.json();
@@ -237,11 +214,6 @@ serve(async (req) => {
       imageUrl,
       image,
       prompt,
-      estilo,
-      movimento,
-      duracao,
-      conteudoRelacionado,
-      textoNaTela,
       narracao,
       createJob,
       productType,
@@ -249,100 +221,61 @@ serve(async (req) => {
     } = body;
 
     const resolvedImageUrl = imageUrl || image;
-
-    if (conteudoRelacionado === false) {
-      return json({ error: "Conteudo nao relacionado. Geracao bloqueada." }, 422);
-    }
-    if (!resolvedImageUrl) {
-      return json({ error: "imageUrl requerido" }, 400);
-    }
-
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
+    if (!resolvedImageUrl) return json({ error: "imageUrl requerido" }, 400);
 
     const wantsJob = Boolean(createJob);
     let jobId: string | null = null;
     let adminClient: ReturnType<typeof createClient> | null = null;
 
-    // ── Auth & create job ─────────────────────────────────────────────────
-    if (wantsJob) {
-      if (!supabaseUrl || !serviceRoleKey) {
-        return json({ error: "Supabase env not configured" }, 500);
-      }
-
-      const authHeader = req.headers.get("Authorization") || "";
-      if (!authHeader) return json({ error: "Unauthorized" }, 401);
-
-      const userClient = createClient(supabaseUrl, anonKey, {
-        auth: { persistSession: false },
-        global: { headers: { Authorization: authHeader } },
-      });
-      const { data: authData, error: authError } = await userClient.auth.getUser();
-      if (authError || !authData?.user) return json({ error: "Unauthorized" }, 401);
+    // ── Create job ──
+    if (wantsJob && callerUserId !== "service_role") {
+      if (!supabaseUrl || !serviceRoleKey) return json({ error: "Supabase env not configured" }, 500);
 
       adminClient = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
 
-      const { data: existingSub, error: subError } = await adminClient
-        .from("subscriptions")
-        .select("id, plan, videos_limit, videos_used, reset_date, status")
-        .eq("user_id", authData.user.id)
+      // Check plan limits using usuarios_planos table
+      const { data: planRow } = await adminClient
+        .from("usuarios_planos")
+        .select("plano, uso_hoje_json, limite_diario_json, reset_at")
+        .eq("user_id", callerUserId)
         .maybeSingle();
 
-      if (subError) throw subError;
+      if (planRow) {
+        const limites = (planRow.limite_diario_json || {}) as Record<string, number>;
+        const uso = (planRow.uso_hoje_json || {}) as Record<string, number>;
+        const videoLimit = limites.videos_dia;
+        const videosUsed = uso.videos_dia || 0;
 
-      const planConfig = resolvePlanConfig(existingSub?.plan || "free");
-      let subscription = existingSub;
+        // Reset if needed
+        if (planRow.reset_at && new Date(planRow.reset_at).getTime() <= Date.now()) {
+          await adminClient
+            .from("usuarios_planos")
+            .update({
+              uso_hoje_json: {},
+              reset_at: new Date(Date.now() + 86400000).toISOString(),
+            })
+            .eq("user_id", callerUserId);
+        } else if (typeof videoLimit === "number" && videosUsed >= videoLimit) {
+          return json({ error: "Limite diário de vídeos atingido.", code: "PLAN_LIMIT" }, 429);
+        }
 
-      if (!subscription) {
-        const { data: created, error: createSubError } = await adminClient
-          .from("subscriptions")
-          .insert({
-            user_id: authData.user.id,
-            plan: planConfig.plan,
-            videos_limit: planConfig.limit,
-            videos_used: 0,
-            reset_date: getNextResetDate(),
-            status: "active",
+        // Increment usage
+        await adminClient
+          .from("usuarios_planos")
+          .update({
+            uso_hoje_json: { ...uso, videos_dia: videosUsed + 1 },
           })
-          .select("id, plan, videos_limit, videos_used, reset_date, status")
-          .single();
-        if (createSubError) throw createSubError;
-        subscription = created;
+          .eq("user_id", callerUserId);
       }
 
-      if (subscription?.reset_date && new Date(subscription.reset_date).getTime() <= Date.now()) {
-        const { data: resetSub, error: resetError } = await adminClient
-          .from("subscriptions")
-          .update({ videos_used: 0, reset_date: getNextResetDate() })
-          .eq("user_id", authData.user.id)
-          .select("id, plan, videos_limit, videos_used, reset_date, status")
-          .single();
-        if (resetError) throw resetError;
-        subscription = resetSub;
-      }
-
-      const resolvedLimit = subscription?.videos_limit ?? planConfig.limit;
-      if (resolvedLimit !== null && subscription && subscription.videos_used >= resolvedLimit) {
-        return json({ error: "Limite diário de vídeos atingido.", code: "PLAN_LIMIT" }, 429);
-      }
-
-      if (subscription) {
-        const { error: consumeError } = await adminClient
-          .from("subscriptions")
-          .update({ videos_used: (subscription.videos_used || 0) + 1 })
-          .eq("user_id", authData.user.id);
-        if (consumeError) throw consumeError;
-      }
       const { data: job, error: jobError } = await adminClient
         .from("video_jobs")
         .insert({
-          user_id: authData.user.id,
+          user_id: callerUserId,
           status: "started",
           prompt: prompt || null,
           image_url: resolvedImageUrl,
           progress: 5,
-          priority: resolvePlanConfig(subscription?.plan || "free").priority,
         })
         .select("id")
         .single();
@@ -351,12 +284,12 @@ serve(async (req) => {
       jobId = job.id;
     }
 
-    const productInfo = productType || estilo || "produto premium";
+    const productInfo = productType || style || "produto premium";
     const promptText = prompt || `Vídeo cinematográfico para ${productInfo}`;
 
-    // ── Pipeline: Script → Voice → Video ──────────────────────────────────
+    // ── Pipeline: Script → Voice → Video ──
 
-    // Step 1: Generate script
+    // Step 1: Script
     if (wantsJob && adminClient && jobId) {
       await updateJob(adminClient, jobId, { progress: 15, status: "generating_script" });
     }
@@ -369,25 +302,19 @@ serve(async (req) => {
       script = narracao || "Descubra o produto que vai revolucionar sua rotina. Qualidade premium, resultado imediato. Garanta o seu agora.";
     }
 
-    // Step 2: Generate voiceover
+    // Step 2: Voice
     if (wantsJob && adminClient && jobId) {
-      await updateJob(adminClient, jobId, {
-        progress: 35,
-        status: "generating_voice",
-        caption_text: script,
-      });
+      await updateJob(adminClient, jobId, { progress: 35, status: "generating_voice", caption_text: script });
     }
 
     let audioUrl: string | null = null;
     try {
       const audioBuffer = await generateVoiceover(script);
       if (audioBuffer && adminClient) {
-        // Upload audio to storage
         const audioPath = `voiceovers/${jobId || Date.now()}.mp3`;
         const { error: uploadErr } = await adminClient.storage
           .from("audio")
           .upload(audioPath, audioBuffer, { contentType: "audio/mpeg", upsert: true });
-
         if (!uploadErr) {
           const { data: urlData } = adminClient.storage.from("audio").getPublicUrl(audioPath);
           audioUrl = urlData.publicUrl;
@@ -397,13 +324,9 @@ serve(async (req) => {
       console.error("Voiceover generation failed:", e);
     }
 
-    // Step 3: Generate video
+    // Step 3: Video
     if (wantsJob && adminClient && jobId) {
-      await updateJob(adminClient, jobId, {
-        progress: 55,
-        status: "generating_video",
-        audio_url: audioUrl,
-      });
+      await updateJob(adminClient, jobId, { progress: 55, status: "generating_video", audio_url: audioUrl });
     }
 
     let videoUrl: string | null = null;
@@ -413,7 +336,7 @@ serve(async (req) => {
       console.error("Video generation failed:", e);
     }
 
-    // ── Fallback if no video ──────────────────────────────────────────────
+    // ── Fallback ──
     if (!videoUrl) {
       const fallbackUrl = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4";
       if (wantsJob && adminClient && jobId) {
@@ -426,17 +349,10 @@ serve(async (req) => {
           error: "Video provider unavailable, fallback applied",
         });
       }
-      return json({
-        videoUrl: fallbackUrl,
-        audioUrl,
-        script,
-        provider: "fallback",
-        error: "Video provider unavailable",
-        jobId,
-      });
+      return json({ videoUrl: fallbackUrl, audioUrl, script, provider: "fallback", jobId });
     }
 
-    // ── Success ───────────────────────────────────────────────────────────
+    // ── Success ──
     if (wantsJob && adminClient && jobId) {
       await updateJob(adminClient, jobId, {
         status: "completed",
@@ -448,13 +364,7 @@ serve(async (req) => {
       });
     }
 
-    return json({
-      videoUrl,
-      audioUrl,
-      script,
-      provider: "runway",
-      jobId,
-    });
+    return json({ videoUrl, audioUrl, script, provider: "runway", jobId });
   } catch (e) {
     console.error("Error:", e);
     return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
