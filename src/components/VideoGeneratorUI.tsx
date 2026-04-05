@@ -220,9 +220,10 @@ const VideoGeneratorUI = () => {
     setIsGeneratingScript(true);
     try {
       const objectiveLabel = objective || objectives[0];
+      const isCinematic = objectiveLabel === "Cinematográfico";
       const response = await supabase.functions.invoke("generate-viral", {
         body: {
-          tipo: "roteiro",
+          tipo: isCinematic ? "cinematografico" : "roteiro",
           produto: productName || productType,
           nicho: niche || styleType,
           publico: "Compradores premium",
@@ -230,7 +231,7 @@ const VideoGeneratorUI = () => {
             ? `${objectiveLabel} | PRO: storytelling, cenas simuladas, CTA agressivo`
             : objectiveLabel,
           marca: brandName || undefined,
-          modo: "comercial",
+          modo: isCinematic ? "cinematografico" : "comercial",
         },
       });
 
