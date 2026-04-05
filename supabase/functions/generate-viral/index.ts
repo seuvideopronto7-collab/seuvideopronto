@@ -398,6 +398,70 @@ Retorne EXATAMENTE este formato JSON:
     "legenda": "sincronizar com narracao"
   }
 }`;
+    } else if (tipo === "cinematografico") {
+      systemPrompt = `Você é um DIRETOR DE CINEMA + COPYWRITER + ESTRATEGISTA DIGITAL de nível Hollywood.
+Crie conteúdo de vídeo comercial EXTREMAMENTE ENVOLVENTE, no estilo Instagram Reels + TikTok + anúncio de alta conversão.
+OBJETIVO: Gerar desejo, autoridade e conversão. Sempre responda em JSON válido.`;
+      userPrompt = `Crie um vídeo comercial cinematográfico com base neste contexto:
+${context}
+
+ESTILO:
+- Cinematográfico (nível Hollywood)
+- Corte rápido
+- Storytelling emocional
+- Linguagem simples e direta
+- Alta retenção (primeiros 3 segundos MATADORES)
+
+ESTRUTURA:
+1. GANCHO (0-3s) - Frase que pare o scroll imediatamente
+2. QUEBRA DE PADRÃO - Algo inesperado ou curioso
+3. PROMESSA FORTE - Resultado claro e desejável
+4. DEMONSTRAÇÃO VISUAL - Simular uso do produto/sistema
+5. PROVA / AUTORIDADE - Números, resultados ou percepção de valor
+6. CTA - Levar para ação (comentário, link, WhatsApp)
+
+Retorne EXATAMENTE este formato JSON:
+{
+  "roteiro_completo": "roteiro narrado completo (30-60s) com marcações de tempo",
+  "falas": [
+    {"tempo": "0-3s", "tipo": "GANCHO", "texto": "fala do gancho", "direcao": "tom de voz, emoção"},
+    {"tempo": "3-8s", "tipo": "QUEBRA_PADRAO", "texto": "fala da quebra", "direcao": "tom de voz"},
+    {"tempo": "8-18s", "tipo": "PROMESSA", "texto": "fala da promessa", "direcao": "tom de voz"},
+    {"tempo": "18-28s", "tipo": "DEMONSTRACAO", "texto": "fala da demonstração", "direcao": "tom de voz"},
+    {"tempo": "28-38s", "tipo": "PROVA", "texto": "fala da prova", "direcao": "tom de voz"},
+    {"tempo": "38-45s", "tipo": "CTA", "texto": "fala do CTA", "direcao": "tom de voz, urgência"}
+  ],
+  "cenas": [
+    {"cena": 1, "tempo": "0-3s", "descricao_visual": "descrição cinematográfica detalhada", "camera": "tipo de movimento de câmera", "iluminacao": "tipo de luz", "texto_tela": "texto overlay"},
+    {"cena": 2, "tempo": "3-8s", "descricao_visual": "descrição", "camera": "movimento", "iluminacao": "luz", "texto_tela": "overlay"},
+    {"cena": 3, "tempo": "8-18s", "descricao_visual": "descrição", "camera": "movimento", "iluminacao": "luz", "texto_tela": "overlay"},
+    {"cena": 4, "tempo": "18-28s", "descricao_visual": "descrição", "camera": "movimento", "iluminacao": "luz", "texto_tela": "overlay"},
+    {"cena": 5, "tempo": "28-38s", "descricao_visual": "descrição", "camera": "movimento", "iluminacao": "luz", "texto_tela": "overlay"},
+    {"cena": 6, "tempo": "38-45s", "descricao_visual": "descrição", "camera": "movimento", "iluminacao": "luz", "texto_tela": "overlay"}
+  ],
+  "trilha_sonora": {
+    "estilo": "estilo musical recomendado",
+    "crescimento": "como a música evolui",
+    "referencia": "artista ou música de referência",
+    "bpm": "batidas por minuto sugeridas"
+  },
+  "edicao": {
+    "estilo": "estilo de edição (ex: cortes rápidos, transições suaves)",
+    "ritmo": "ritmo da edição",
+    "efeitos": ["efeito 1", "efeito 2", "efeito 3"],
+    "cor": "paleta de cores / color grading"
+  },
+  "ganchos_alternativos": [
+    {"opcao": 1, "texto": "gancho alternativo 1", "angulo": "ângulo emocional"},
+    {"opcao": 2, "texto": "gancho alternativo 2", "angulo": "ângulo emocional"},
+    {"opcao": 3, "texto": "gancho alternativo 3", "angulo": "ângulo emocional"}
+  ],
+  "seo": {
+    "titulos": ["título 1", "título 2", "título 3"],
+    "hashtags": ["#hash1", "#hash2", "#hash3", "#hash4", "#hash5"],
+    "descricao": "descrição otimizada para redes"
+  }
+}`;
     }
 
     if ((modo || "").toLowerCase() === "comercial") {
