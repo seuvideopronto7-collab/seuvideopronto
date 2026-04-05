@@ -19,7 +19,7 @@ const productTypes = ["Natural", "Suplemento", "Cosmetico", "Tecnologia", "Outro
 const styleTypes = ["Luxo", "Fitness", "Saude", "Tecnologia"];
 
 const finalStatuses = new Set(["completed", "failed", "fallback", "error"]);
-const objectives = ["Vendas", "Viral", "Autoridade"];
+const objectives = ["Vendas", "Viral", "Autoridade", "Cinematográfico"];
 
 type ScriptData = {
   hook: string;
