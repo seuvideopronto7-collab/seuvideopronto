@@ -238,6 +238,25 @@ const VideoGeneratorUI = () => {
       if (response.error) throw response.error;
 
       const payload = response.data || {};
+      
+      if (isCinematic) {
+        const falas = payload?.falas || [];
+        const hookFala = falas.find((f: any) => f.tipo === "GANCHO");
+        const ctaFala = falas.find((f: any) => f.tipo === "CTA");
+        const hook = hookFala?.texto || payload?.ganchos_alternativos?.[0]?.texto || "Gancho cinematográfico";
+        const cta = ctaFala?.texto || "Clique e garanta o seu agora.";
+        const benefits = falas
+          .filter((f: any) => !["GANCHO", "CTA"].includes(f.tipo))
+          .slice(0, 3)
+          .map((f: any) => f.texto);
+        const fullScript = payload?.roteiro_completo || falas.map((f: any) => `[${f.tempo}] ${f.texto}`).join("\n");
+        const onScreenText = (payload?.cenas || []).map((c: any) => c.texto_tela).filter(Boolean).slice(0, 6);
+        const result = { hook, benefits, cta, fullScript, onScreenText } as ScriptData;
+        setScriptData(result);
+        if (fullScript) setNarrationText(fullScript);
+        return result;
+      }
+
       const roteiro = payload?.roteiro || payload?.result?.roteiro || {};
       const hook = roteiro?.hook || payload?.hook || "Seu produto precisa parecer premium agora.";
       const cta = roteiro?.cta || payload?.cta || "Clique e garanta o seu agora.";
