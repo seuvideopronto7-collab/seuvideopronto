@@ -1,239 +1,343 @@
+import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
+import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
+import {
+  Upload,
+  FileText,
+  BarChart3,
+  PenTool,
+  Search,
+  Film,
+  Send,
+  Check,
+  Loader2,
+  ChevronRight,
+  ArrowLeft,
+} from "lucide-react";
+
+type StepStatus = "pendente" | "em_andamento" | "concluido";
+
+interface PipelineStep {
+  id: number;
+  label: string;
+  icon: React.ElementType;
+  description: string;
+}
+
+const STEPS: PipelineStep[] = [
+  { id: 1, label: "Entrada", icon: Upload, description: "Upload de imagem ou briefing do produto" },
+  { id: 2, label: "Conteúdo", icon: FileText, description: "Dados do produto, nicho e público-alvo" },
+  { id: 3, label: "Análise", icon: BarChart3, description: "IA analisa o conteúdo e identifica padrões" },
+  { id: 4, label: "Roteiro", icon: PenTool, description: "Roteiro cinematográfico com gancho e CTA" },
+  { id: 5, label: "SEO", icon: Search, description: "Títulos, hashtags e descrições otimizadas" },
+  { id: 6, label: "Montagem", icon: Film, description: "Render do vídeo com narração e trilha" },
+  { id: 7, label: "Publicação", icon: Send, description: "Publicar em TikTok, Reels e Shorts" },
+];
+
 export default function SvpGeradorVideoPremium() {
-  const steps = [
-    {
-      title: "Upload Inteligente",
-      desc: "Envie imagem, vídeo-base ou briefing. A IA identifica nicho, produto e estilo ideal.",
-    },
-    {
-      title: "Roteiro Automático",
-      desc: "Gancho, benefícios, CTA e texto de tela gerados automaticamente com foco em conversão.",
-    },
-    {
-      title: "Motor Cinema PRO",
-      desc: "Zoom cinematográfico, glow, partículas, parallax, trilha e narração em fluxo único.",
-    },
-    {
-      title: "Render + Distribuição",
-      desc: "Entrega em vertical 9:16, pronto para Instagram, TikTok, Shorts e download.",
-    },
-  ];
+  const auth = useAuth();
+  const navigate = useNavigate();
+  const [pipelineId, setPipelineId] = useState<string | null>(null);
+  const [etapaAtual, setEtapaAtual] = useState(1);
+  const [etapasConcluidas, setEtapasConcluidas] = useState<number[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [activeStep, setActiveStep] = useState<number | null>(null);
 
-  const modes = [
-    { name: "Modo Rápido", detail: "1 imagem + roteiro + narração + vídeo curto" },
-    { name: "Modo PRO", detail: "cenas extras, storytelling, cortes premium e CTA forte" },
-    { name: "Modo Escala", detail: "gera múltiplas variações para testes de criativo" },
-  ];
+  const userId = auth?.user?.id;
 
-  const presets = [
-    "Produto Premium",
-    "Infoproduto",
-    "Moda & Beleza",
-    "Saúde & Bem-estar",
-    "Marketplace",
-    "Lançamento",
-  ];
+  // Load or create pipeline
+  useEffect(() => {
+    if (!userId) return;
+    const load = async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("video_pipeline" as any)
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        console.error("Pipeline load error:", error);
+        setLoading(false);
+        return;
+      }
+
+      if (data) {
+        const d = data as any;
+        setPipelineId(d.id);
+        setEtapaAtual(d.etapa_atual || 1);
+        setEtapasConcluidas(d.etapas_concluidas || []);
+      } else {
+        // Create new pipeline
+        const { data: newData, error: insertError } = await supabase
+          .from("video_pipeline" as any)
+          .insert({ user_id: userId, etapa_atual: 1, etapas_concluidas: [], status: "em_andamento" } as any)
+          .select()
+          .single();
+        if (!insertError && newData) {
+          setPipelineId((newData as any).id);
+        }
+      }
+      setLoading(false);
+    };
+    load();
+  }, [userId]);
+
+  const savePipeline = useCallback(
+    async (nextEtapa: number, nextConcluidas: number[]) => {
+      if (!pipelineId) return;
+      setSaving(true);
+      const allDone = nextConcluidas.length >= 7;
+      await supabase
+        .from("video_pipeline" as any)
+        .update({
+          etapa_atual: nextEtapa,
+          etapas_concluidas: nextConcluidas,
+          status: allDone ? "concluido" : "em_andamento",
+        } as any)
+        .eq("id", pipelineId);
+      setSaving(false);
+    },
+    [pipelineId],
+  );
+
+  const getStepStatus = (stepId: number): StepStatus => {
+    if (etapasConcluidas.includes(stepId)) return "concluido";
+    if (stepId === etapaAtual) return "em_andamento";
+    return "pendente";
+  };
+
+  const handleStepClick = (stepId: number) => {
+    setActiveStep(activeStep === stepId ? null : stepId);
+  };
+
+  const completeStep = async (stepId: number) => {
+    const newConcluidas = etapasConcluidas.includes(stepId)
+      ? etapasConcluidas
+      : [...etapasConcluidas, stepId].sort((a, b) => a - b);
+
+    const nextStep = Math.min(stepId + 1, 7);
+    setEtapasConcluidas(newConcluidas);
+    setEtapaAtual(nextStep);
+    setActiveStep(null);
+    await savePipeline(nextStep, newConcluidas);
+    toast.success(`Etapa "${STEPS[stepId - 1].label}" concluída!`);
+  };
+
+  const resetStep = async (stepId: number) => {
+    const newConcluidas = etapasConcluidas.filter((s) => s !== stepId);
+    setEtapasConcluidas(newConcluidas);
+    if (etapaAtual > stepId) {
+      setEtapaAtual(stepId);
+      await savePipeline(stepId, newConcluidas);
+    } else {
+      await savePipeline(etapaAtual, newConcluidas);
+    }
+    toast.info(`Etapa "${STEPS[stepId - 1].label}" reaberta.`);
+  };
+
+  const progressPercent = Math.round((etapasConcluidas.length / 7) * 100);
+  const allDone = etapasConcluidas.length >= 7;
+
+  const handleMainAction = () => {
+    if (allDone) {
+      toast.success("Pipeline concluído! Publicando...");
+    } else {
+      // Navigate to the current step
+      const nextIncomplete = STEPS.find((s) => !etapasConcluidas.includes(s.id));
+      if (nextIncomplete) {
+        setActiveStep(nextIncomplete.id);
+        setEtapaAtual(nextIncomplete.id);
+      }
+    }
+  };
+
+  if (!auth || auth.loading || loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-[#050816] text-white">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(88,80,236,0.22),transparent_35%),radial-gradient(circle_at_right,rgba(0,212,255,0.14),transparent_30%),linear-gradient(to_bottom,#050816,#091126)]" />
-
-      <div className="relative z-10 mx-auto max-w-7xl px-4 py-6 md:px-6 lg:px-8">
-        <header className="mb-6 overflow-hidden rounded-[28px] border border-white/10 bg-white/5 shadow-2xl backdrop-blur-xl">
-          <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-            <div className="p-6 md:p-8 lg:p-10">
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-cyan-200">
-                SVP • Motor Cinema Automático
-              </div>
-              <h1 className="max-w-3xl text-3xl font-black leading-tight md:text-5xl">
-                Gerador de Vídeo Premium
-                <span className="block bg-gradient-to-r from-cyan-300 via-white to-violet-300 bg-clip-text text-transparent">
-                  do briefing ao Reels pronto
-                </span>
-              </h1>
-              <p className="mt-4 max-w-2xl text-sm text-white/70 md:text-base">
-                Suba uma imagem, escolha o modo de criação e deixe a IA montar roteiro, narração, cenas,
-                efeitos cinematográficos e render final com visual de anúncio premium.
-              </p>
-
-              <div className="mt-6 flex flex-wrap gap-3">
-                <button className="rounded-2xl bg-gradient-to-r from-cyan-400 to-violet-500 px-5 py-3 text-sm font-bold text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:scale-[1.02]">
-                  Gerar Vídeo Agora 🎬
-                </button>
-                <button className="rounded-2xl border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white/85 transition hover:bg-white/10">
-                  Ver Fluxo Completo
-                </button>
-              </div>
-
-              <div className="mt-8 grid gap-3 md:grid-cols-3">
-                {modes.map((mode) => (
-                  <div key={mode.name} className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                    <div className="text-sm font-bold text-white">{mode.name}</div>
-                    <div className="mt-1 text-xs leading-5 text-white/60">{mode.detail}</div>
-                  </div>
-                ))}
-              </div>
+    <div className="min-h-screen bg-background pb-24">
+      {/* HEADER */}
+      <header className="border-b border-border/40 bg-card/50 backdrop-blur-sm sticky top-0 z-30">
+        <div className="max-w-[900px] mx-auto px-4 py-4 flex items-center gap-3">
+          <button
+            onClick={() => navigate("/")}
+            className="rounded-lg p-2 hover:bg-muted/60 transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5 text-muted-foreground" />
+          </button>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl sm:text-[28px] font-extrabold text-foreground tracking-tight truncate">
+              Pipeline de Criação
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Sistema guiado de produção de vídeo
+            </p>
+          </div>
+          {saving && (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              Salvando...
             </div>
+          )}
+        </div>
+      </header>
 
-            <div className="p-4 md:p-6 lg:p-8">
-              <div className="rounded-[24px] border border-cyan-400/20 bg-slate-950/60 p-4 shadow-[0_0_60px_rgba(34,211,238,0.12)]">
-                <div className="mb-4 flex items-center justify-between">
-                  <div>
-                    <div className="text-sm font-bold">Painel de geração</div>
-                    <div className="text-xs text-white/55">Fluxo principal + automação premium</div>
-                  </div>
-                  <div className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-[11px] font-semibold text-emerald-300">
-                    pipeline online
-                  </div>
-                </div>
+      <main className="max-w-[900px] mx-auto px-4 pt-6 space-y-6">
+        {/* STATUS + PROGRESS */}
+        <section className="rounded-2xl border border-border/40 bg-card/60 backdrop-blur-sm p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-foreground">Status do Pipeline</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {etapasConcluidas.length}/{STEPS.length} etapas concluídas
+              </p>
+            </div>
+            <span className="text-2xl font-bold text-primary">{progressPercent}%</span>
+          </div>
+          <Progress value={progressPercent} className="h-3" />
+        </section>
 
-                <div className="space-y-3">
-                  <label className="block rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-5 text-center">
-                    <div className="text-sm font-semibold">Upload da imagem principal</div>
-                    <div className="mt-1 text-xs text-white/55">
-                      PNG, JPG ou WEBP • produto, mockup ou capa
+        {/* INTERACTIVE STEPS */}
+        <section className="space-y-3">
+          {STEPS.map((step) => {
+            const status = getStepStatus(step.id);
+            const isActive = activeStep === step.id;
+            const Icon = step.icon;
+
+            return (
+              <div key={step.id} className="space-y-0">
+                <button
+                  onClick={() => handleStepClick(step.id)}
+                  className={`w-full text-left rounded-2xl border p-4 transition-all ${
+                    isActive
+                      ? "border-primary/50 bg-primary/5 shadow-[0_0_20px_-8px_hsl(var(--primary)/0.3)]"
+                      : status === "concluido"
+                        ? "border-green-500/30 bg-green-500/5 hover:border-green-500/50"
+                        : status === "em_andamento"
+                          ? "border-primary/30 bg-card/60 hover:border-primary/50"
+                          : "border-border/30 bg-card/30 hover:border-border/60"
+                  }`}
+                >
+                  <div className="flex items-center gap-4">
+                    {/* Status icon */}
+                    <div
+                      className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${
+                        status === "concluido"
+                          ? "bg-green-500/15 text-green-500"
+                          : status === "em_andamento"
+                            ? "bg-primary/15 text-primary"
+                            : "bg-muted/40 text-muted-foreground"
+                      }`}
+                    >
+                      {status === "concluido" ? (
+                        <Check className="w-5 h-5" />
+                      ) : (
+                        <Icon className="w-5 h-5" />
+                      )}
                     </div>
-                    <div className="mt-4 inline-flex rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold text-white/80">
-                      Selecionar arquivo
-                    </div>
-                  </label>
 
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-white/50">
-                        Preset
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {presets.map((preset) => (
-                          <span
-                            key={preset}
-                            className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] text-white/75"
-                          >
-                            {preset}
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-muted-foreground">
+                          {step.id}/7
+                        </span>
+                        <h3 className="text-sm font-bold text-foreground truncate">
+                          {step.label}
+                        </h3>
+                        {status === "concluido" && (
+                          <span className="text-[10px] font-semibold uppercase tracking-wider text-green-500 bg-green-500/10 px-2 py-0.5 rounded-full">
+                            concluído
                           </span>
-                        ))}
+                        )}
+                        {status === "em_andamento" && (
+                          <span className="text-[10px] font-semibold uppercase tracking-wider text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                            atual
+                          </span>
+                        )}
                       </div>
+                      <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                        {step.description}
+                      </p>
                     </div>
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-white/50">
-                        Formato
-                      </div>
-                      <div className="space-y-2 text-sm text-white/80">
-                        <div className="flex items-center justify-between rounded-xl bg-white/5 px-3 py-2">
-                          <span>Vertical Reels</span>
-                          <span className="text-cyan-300">9:16</span>
-                        </div>
-                        <div className="flex items-center justify-between rounded-xl bg-white/5 px-3 py-2">
-                          <span>Resolução</span>
-                          <span className="text-cyan-300">1080 x 1920</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
 
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                    <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-white/50">
-                      Briefing do vídeo
-                    </div>
-                    <textarea
-                      className="h-28 w-full resize-none rounded-2xl border border-white/10 bg-slate-950/60 p-4 text-sm text-white placeholder:text-white/30 focus:outline-none"
-                      placeholder="Ex: Quero um vídeo cinematográfico para vender uma loção premium, com narração masculina, efeito de luxo, CTA forte e estilo de anúncio viral."
+                    <ChevronRight
+                      className={`w-4 h-4 text-muted-foreground transition-transform shrink-0 ${isActive ? "rotate-90" : ""}`}
                     />
                   </div>
+                </button>
 
-                  <div className="grid gap-3 md:grid-cols-3">
-                    {["Roteiro IA", "Narração PRO", "Trilha Cinemática"].map((item) => (
-                      <div key={item} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                        <div className="text-sm font-bold">{item}</div>
-                        <div className="mt-1 text-xs text-white/55">Ativado automaticamente</div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <button className="w-full rounded-2xl bg-gradient-to-r from-cyan-400 to-violet-500 px-5 py-4 text-sm font-black text-slate-950 shadow-xl shadow-cyan-500/20 transition hover:scale-[1.01]">
-                    GERAR VÍDEO PREMIUM
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        <section className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
-          <div className="rounded-[28px] border border-white/10 bg-white/5 p-5 shadow-2xl backdrop-blur-xl">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-bold">Fluxo de execução</h2>
-                <p className="text-sm text-white/55">Passo a passo visual do pipeline</p>
-              </div>
-              <div className="rounded-full border border-violet-400/20 bg-violet-400/10 px-3 py-1 text-[11px] font-semibold text-violet-200">
-                cinema stack
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              {steps.map((step, index) => (
-                <div key={step.title} className="flex gap-3 rounded-2xl border border-white/10 bg-slate-950/40 p-4">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-400/20 to-violet-500/20 text-sm font-black text-cyan-200">
-                    {index + 1}
-                  </div>
-                  <div>
-                    <div className="text-sm font-bold">{step.title}</div>
-                    <div className="mt-1 text-xs leading-5 text-white/60">{step.desc}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-[28px] border border-white/10 bg-white/5 p-5 shadow-2xl backdrop-blur-xl">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-bold">Preview do projeto</h2>
-                <p className="text-sm text-white/55">Visual do vídeo antes do render final</p>
-              </div>
-              <div className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-[11px] font-semibold text-cyan-200">
-                render status
-              </div>
-            </div>
-
-            <div className="grid gap-4 xl:grid-cols-[0.72fr_0.28fr]">
-              <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,15,37,0.6),rgba(6,8,18,0.95))] p-4">
-                <div className="aspect-[9/16] w-full rounded-[24px] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(34,211,238,0.18),transparent_20%),linear-gradient(180deg,#0b1328,#04070f)] p-4 shadow-inner">
-                  <div className="flex h-full flex-col justify-between rounded-[20px] border border-white/10 bg-white/[0.02] p-4">
-                    <div>
-                      <div className="inline-flex rounded-full border border-red-400/20 bg-red-400/10 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-red-200">
-                        cena 01 • gancho
-                      </div>
-                      <div className="mt-4 max-w-[85%] text-2xl font-black leading-tight text-white md:text-3xl">
-                        O vídeo que faz seu produto parecer anúncio de marca grande.
-                      </div>
-                    </div>
-                    <div className="space-y-3">
-                      <div className="h-2 rounded-full bg-white/10">
-                        <div className="h-2 w-2/3 rounded-full bg-gradient-to-r from-cyan-300 to-violet-400" />
-                      </div>
-                      <div className="rounded-2xl border border-white/10 bg-black/25 p-3 text-xs text-white/70">
-                        Zoom cinematográfico • Partículas • Glow • Narração • CTA
-                      </div>
+                {/* Expanded action panel */}
+                {isActive && (
+                  <div className="mx-4 mt-0 rounded-b-2xl border border-t-0 border-border/30 bg-card/40 p-4 space-y-3 animate-in slide-in-from-top-2 duration-200">
+                    <p className="text-sm text-muted-foreground">{step.description}</p>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      {status === "concluido" ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => resetStep(step.id)}
+                          className="w-full sm:w-auto"
+                        >
+                          Reabrir etapa
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          onClick={() => completeStep(step.id)}
+                          className="w-full sm:w-auto bg-primary hover:bg-primary/90"
+                        >
+                          <Check className="w-4 h-4 mr-1" />
+                          Marcar como concluída
+                        </Button>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          navigate("/");
+                          // Could navigate to specific tool based on step
+                        }}
+                        className="w-full sm:w-auto"
+                      >
+                        Abrir ferramenta
+                      </Button>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
-
-              <div className="space-y-3">
-                {["Gancho", "Benefícios", "CTA", "Legenda", "Áudio"].map((item, index) => (
-                  <div key={item} className="rounded-2xl border border-white/10 bg-slate-950/40 p-4">
-                    <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-white/45">
-                      Bloco {index + 1}
-                    </div>
-                    <div className="text-sm font-bold">{item}</div>
-                    <div className="mt-1 text-xs text-white/55">Editável pelo usuário ou IA</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+            );
+          })}
         </section>
+      </main>
+
+      {/* FIXED BOTTOM CTA */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-border/40 bg-background/95 backdrop-blur-md">
+        <div className="max-w-[900px] mx-auto px-4 py-3">
+          <Button
+            onClick={handleMainAction}
+            className={`w-full py-6 text-base font-bold rounded-xl transition-all ${
+              allDone
+                ? "bg-green-600 hover:bg-green-700 text-white shadow-[0_0_30px_-8px_rgba(34,197,94,0.5)]"
+                : "bg-primary hover:bg-primary/90 text-primary-foreground shadow-[0_0_30px_-8px_hsl(var(--primary)/0.4)]"
+            }`}
+          >
+            {allDone ? "🚀 Publicar Vídeo" : "▶️ Continuar Produção"}
+          </Button>
+        </div>
       </div>
     </div>
   );
