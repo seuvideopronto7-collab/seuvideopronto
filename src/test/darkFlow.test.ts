@@ -25,9 +25,7 @@ const logger = {
 
 describe("cleanAndParseDarkFlowResponse", () => {
   it("remove markdown fences antes do parse", () => {
-    const parsed = cleanAndParseDarkFlowResponse(````json
-{"hook":"Teste","contexto":"Ctx"}
-````);
+    const parsed = cleanAndParseDarkFlowResponse('```json\n{"hook":"Teste","contexto":"Ctx"}\n```');
 
     expect(parsed).toMatchObject({ hook: "Teste", contexto: "Ctx" });
   });
