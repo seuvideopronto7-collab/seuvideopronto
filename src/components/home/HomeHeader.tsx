@@ -126,6 +126,14 @@ const HomeHeader = () => {
               </div>
               <DropdownMenuSeparator />
               <DropdownMenuItem
+                onClick={() => fileInputRef.current?.click()}
+                className="cursor-pointer gap-2 transition-all duration-200"
+                disabled={uploading}
+              >
+                {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
+                {uploading ? "Enviando..." : "Alterar foto"}
+              </DropdownMenuItem>
+              <DropdownMenuItem
                 onClick={() => navigate("/dashboard")}
                 className="cursor-pointer gap-2 transition-all duration-200"
               >
@@ -148,6 +156,13 @@ const HomeHeader = () => {
                 Sair
               </DropdownMenuItem>
             </DropdownMenuContent>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={handleAvatarUpload}
+            />
           </DropdownMenu>
         </div>
       </div>
