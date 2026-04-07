@@ -208,8 +208,10 @@ export type Database = {
           error: string | null
           id: string
           image_url: string | null
+          images: Json
           progress: number
           prompt: string | null
+          scenes: Json
           status: string
           updated_at: string | null
           user_id: string | null
@@ -222,8 +224,10 @@ export type Database = {
           error?: string | null
           id?: string
           image_url?: string | null
+          images?: Json
           progress?: number
           prompt?: string | null
+          scenes?: Json
           status?: string
           updated_at?: string | null
           user_id?: string | null
@@ -236,8 +240,10 @@ export type Database = {
           error?: string | null
           id?: string
           image_url?: string | null
+          images?: Json
           progress?: number
           prompt?: string | null
+          scenes?: Json
           status?: string
           updated_at?: string | null
           user_id?: string | null
