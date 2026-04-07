@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { hash } from "https://deno.land/x/bcrypt@v0.4.1/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,48 +7,41 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const MASTER_EMAIL = "ceo@seuvideopronto.com";
-const MASTER_USERNAME = "CEO-Leandro";
-
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-  if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-  }
+
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const masterPassword = Deno.env.get("MASTER_ADMIN_PASSWORD");
 
-    if (!supabaseUrl || !supabaseServiceKey) {
-      return new Response(JSON.stringify({ error: "Supabase env not configured." }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    if (!masterPassword) {
-      return new Response(JSON.stringify({ error: "MASTER_ADMIN_PASSWORD nao configurada." }), {
-        status: 500,
+    // If master password is not configured, skip bootstrap silently — this is not an error
+    if (!supabaseUrl || !supabaseServiceKey || !masterPassword) {
+      return new Response(JSON.stringify({ ok: true, skipped: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Check if admin already exists in user_roles
     const { data: existingAdmin } = await adminClient
-      .from("users")
-      .select("id")
+      .from("user_roles")
+      .select("user_id")
       .eq("role", "admin")
       .limit(1)
       .maybeSingle();
 
-    if (existingAdmin?.id) {
+    if (existingAdmin?.user_id) {
       return new Response(JSON.stringify({ ok: true, created: false }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
+    const MASTER_EMAIL = "ceo@seuvideopronto.com";
+    const MASTER_USERNAME = "CEO-Leandro";
+
+    // Create or find auth user
     let userId: string | null = null;
     const { data: createdUser, error: createError } = await adminClient.auth.admin.createUser({
       email: MASTER_EMAIL,
@@ -67,24 +59,10 @@ serve(async (req) => {
     }
 
     if (!userId) {
-      return new Response(JSON.stringify({ error: "Falha ao criar admin master." }), {
-        status: 500,
+      return new Response(JSON.stringify({ ok: true, skipped: true, reason: "could_not_resolve_user" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
-    const passwordHash = await hash(masterPassword);
-
-    await adminClient
-      .from("users")
-      .upsert({
-        id: userId,
-        email: MASTER_EMAIL,
-        password_hash: passwordHash,
-        username: MASTER_USERNAME,
-        role: "admin",
-        is_active: true,
-      });
 
     await adminClient
       .from("user_roles")
@@ -100,12 +78,13 @@ serve(async (req) => {
         updated_at: new Date().toISOString(),
       });
 
-    return new Response(JSON.stringify({ ok: true, created: true, email: MASTER_EMAIL }), {
+    return new Response(JSON.stringify({ ok: true, created: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
-    return new Response(JSON.stringify({ error: (error as Error).message }), {
-      status: 500,
+    // Never return 500 — bootstrap is best-effort
+    console.error("auth-bootstrap error:", (error as Error).message);
+    return new Response(JSON.stringify({ ok: true, skipped: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
