@@ -18,7 +18,7 @@ import { usePlan } from "@/hooks/usePlan";
 const productTypes = ["Natural", "Suplemento", "Cosmetico", "Tecnologia", "Outro"];
 const styleTypes = ["Luxo", "Fitness", "Saude", "Tecnologia"];
 
-const finalStatuses = new Set(["completed", "failed", "fallback", "error"]);
+const finalStatuses = new Set(["completed", "done", "failed", "fallback", "error"]);
 const objectives = ["Vendas", "Viral", "Autoridade", "Cinematográfico"];
 
 type ScriptData = {
