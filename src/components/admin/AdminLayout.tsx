@@ -54,7 +54,7 @@ const AdminLayout = ({ title, description, children, actionLabel, onAction }: Ad
   const [open, setOpen] = useState(false);
   const location = useLocation();
 
-  const avatarUrl = user?.user_metadata?.avatar_url || null;
+  const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url || null;
   const displayName = profile?.full_name || user?.user_metadata?.name || user?.email?.split("@")[0] || "Admin";
   const initials = displayName.slice(0, 2).toUpperCase();
 
