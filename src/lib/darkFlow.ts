@@ -16,12 +16,13 @@ export interface DarkFlowResult {
   lista?: string[];
   solucao?: string;
   cta?: string;
+  titulo?: string;
   legenda?: string;
   hashtags?: string[];
   roteiro?: string;
   texto_falado?: string;
   vozes?: string;
-  cenas?: string[];
+  cenas?: string[] | Array<{ tempo?: string; texto?: string; visual?: string; emocao?: string; prompt_imagem?: string }>;
   design?: {
     fundo?: string;
     texto?: string;
