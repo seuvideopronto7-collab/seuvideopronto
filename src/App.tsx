@@ -24,6 +24,7 @@ import NotFound from "./pages/NotFound";
 import Apis from "./pages/Apis";
 import EditorProReal from "./pages/EditorProReal";
 import SvpGeradorVideoPremium from "./pages/SvpGeradorVideoPremium";
+import ImageToVideo from "./pages/ImageToVideo";
 
 const queryClient = new QueryClient();
 
