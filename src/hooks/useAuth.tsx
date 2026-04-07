@@ -49,6 +49,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isFounder, setIsFounder] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // Safety timeout: never stay loading forever
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (loading) {
+        console.warn("PDG AUTH: loading timeout reached, forcing ready state");
+        setLoading(false);
+      }
+    }, 4000);
+    return () => clearTimeout(timeout);
+  }, [loading]);
+
   const fetchProfile = async (userId: string, userEmail?: string | null) => {
     try {
       const { data } = await supabase

@@ -226,7 +226,7 @@ const App = () => (
                 )
               }
             />
-            <Route path="*" element={wrapSafe("Not Found", <NotFound />)} />
+            <Route path="*" element={<Navigate to="/auth" replace />} />
           </Routes>
         </AuthProvider>
       </BrowserRouter>
