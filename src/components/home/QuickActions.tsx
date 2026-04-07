@@ -1,10 +1,12 @@
-import { Flame, ShoppingCart, Calendar, Compass } from "lucide-react";
+import { Flame, ShoppingCart, Calendar, Compass, Camera } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 interface QuickActionsProps {
   onSelect: (tab: string) => void;
 }
 
 const actions = [
+  { id: "imagem-video", icon: Camera, label: "Imagem → Vídeo", desc: "Vídeo comercial com IA", color: "from-pink-600 to-rose-600", route: "/imagem-para-video" },
   { id: "darkflow", icon: Flame, label: "Dark Flow", desc: "Gatilhos virais", color: "from-orange-600 to-red-600" },
   { id: "sales", icon: ShoppingCart, label: "Máquina de Vendas", desc: "Automação comercial", color: "from-emerald-600 to-green-600" },
   { id: "calendar", icon: Calendar, label: "30 Dias", desc: "Calendário de conteúdo", color: "from-blue-600 to-indigo-600" },
