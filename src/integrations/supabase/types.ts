@@ -115,6 +115,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          avatar_url: string | null
           created_at: string
           email: string
           full_name: string
@@ -127,6 +128,7 @@ export type Database = {
           youtube_channel: string
         }
         Insert: {
+          avatar_url?: string | null
           created_at?: string
           email?: string
           full_name?: string
@@ -139,6 +141,7 @@ export type Database = {
           youtube_channel?: string
         }
         Update: {
+          avatar_url?: string | null
           created_at?: string
           email?: string
           full_name?: string
