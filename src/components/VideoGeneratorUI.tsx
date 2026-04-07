@@ -586,21 +586,33 @@ const VideoGeneratorUI = () => {
 
   const progressLabel = useMemo(() => {
     if (!jobStatus) return "Aguardando";
-    if (jobStatus === "completed") return "Concluído";
+    if (jobStatus === "done" || jobStatus === "completed") return "Concluído";
     if (jobStatus === "failed" || jobStatus === "error") return "Erro";
     if (jobStatus === "fallback") return "Fallback";
     if (jobStatus === "render_local") return "Render local";
+    if (jobStatus === "generating_images") return "Gerando cenas";
+    if (jobStatus === "generating_audio") return "Gerando narração";
+    if (jobStatus === "rendering") return "Montando vídeo";
+    if (jobStatus === "generating_script") return "Gerando roteiro";
+    if (jobStatus === "generating_voice") return "Gerando voz";
+    if (jobStatus === "generating_video") return "Gerando vídeo";
     return jobStatus.replace(/_/g, " ");
   }, [jobStatus]);
 
   const statusMessage = useMemo(() => {
     if (!jobStatus) return "Aguardando início do job";
-    if (jobStatus === "processing") return "Renderizando vídeo...";
-    if (jobStatus === "completed") return "Vídeo pronto para visualização";
-    if (jobStatus === "failed" || jobStatus === "error") return "Falha no processamento";
-    if (jobStatus === "fallback") return "Fallback aplicado automaticamente";
-    if (jobStatus === "render_local") return "Render local em andamento";
-    return "Processamento em andamento";
+    if (jobStatus === "generating_images") return "🎨 Gerando imagens cinematográficas das cenas...";
+    if (jobStatus === "generating_audio") return "🎙️ Gerando narração com voz premium...";
+    if (jobStatus === "rendering") return "🎬 Montando vídeo final com Shotstack...";
+    if (jobStatus === "generating_script") return "📝 Criando roteiro com IA...";
+    if (jobStatus === "generating_voice") return "🎙️ Sintetizando voz...";
+    if (jobStatus === "generating_video") return "🎥 Gerando vídeo...";
+    if (jobStatus === "processing") return "⚙️ Processando...";
+    if (jobStatus === "done" || jobStatus === "completed") return "✅ Vídeo pronto para visualização";
+    if (jobStatus === "failed" || jobStatus === "error") return "❌ Falha no processamento";
+    if (jobStatus === "fallback") return "⚠️ Fallback aplicado automaticamente";
+    if (jobStatus === "render_local") return "🖥️ Render local em andamento";
+    return "⏳ Processamento em andamento";
   }, [jobStatus]);
 
   const progressValue = isLocalRendering ? localProgress : progress;
