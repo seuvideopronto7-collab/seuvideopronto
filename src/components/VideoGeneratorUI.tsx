@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
-import { createVideoJob, fetchVideoJob } from "@/services/api";
+import { createVideoJob, fetchVideoJob, startVideoPipeline } from "@/services/api";
 import { buscarAPI } from "@/lib/apiRegistry";
 import { renderVideoFromImage } from "@/lib/videoRender";
 import { generateEpicSoundtrack } from "@/lib/audioSynth";
@@ -18,7 +18,7 @@ import { usePlan } from "@/hooks/usePlan";
 const productTypes = ["Natural", "Suplemento", "Cosmetico", "Tecnologia", "Outro"];
 const styleTypes = ["Luxo", "Fitness", "Saude", "Tecnologia"];
 
-const finalStatuses = new Set(["completed", "failed", "fallback", "error"]);
+const finalStatuses = new Set(["completed", "done", "failed", "fallback", "error"]);
 const objectives = ["Vendas", "Viral", "Autoridade", "Cinematográfico"];
 
 type ScriptData = {
@@ -130,7 +130,7 @@ const VideoGeneratorUI = () => {
           setProgress(job.progress ?? 0);
           setVideoUrl(job.video_url || null);
           if (nextStatus && nextStatus !== lastRealtimeStatusRef.current) {
-            if (job.status === "completed") toast.success("\ud83c\udfac V\u00eddeo pronto!");
+            if (job.status === "completed" || job.status === "done") toast.success("🎬 Vídeo pronto!");
             if (nextStatus === "error" || nextStatus === "failed") {
               toast.error(job.error || "Erro no processamento");
             }
@@ -526,7 +526,26 @@ const VideoGeneratorUI = () => {
       const script = await generateScript();
       const prompt = buildCinematicPrompt(productType, styleType, useDarkflow, useViral, modePro);
 
-      const payload = {
+      // Build scenes from script
+      const scenesFromScript = (script?.onScreenText || []).map((text, i) => ({
+        texto: text,
+        visual: `scene ${i + 1} for ${productType}`,
+        emocao: ["curiosidade", "tensão", "solução", "urgência"][Math.min(i, 3)],
+        prompt_imagem: `${prompt}, scene: ${text}`,
+      }));
+
+      // Ensure at least 4 scenes
+      while (scenesFromScript.length < 4) {
+        scenesFromScript.push({
+          texto: script?.cta || "Garanta o seu agora",
+          visual: `product premium shot`,
+          emocao: "urgência",
+          prompt_imagem: `${prompt}, premium product close-up`,
+        });
+      }
+
+      // Create job in DB first
+      const createResponse = await createVideoJob({
         imageUrl: resolvedImageUrl,
         productType,
         style: styleType,
@@ -537,17 +556,25 @@ const VideoGeneratorUI = () => {
         script,
         textoNaTela: script?.onScreenText || [],
         narracao: narrationText || script?.fullScript || "",
-      };
-      const response = await createVideoJob(payload);
-      const id = response?.jobId;
+      });
+
+      const id = createResponse?.jobId;
       if (!id) throw new Error("Job nao retornado pelo servidor.");
       setJobId(id);
-      setJobStatus(response?.status || "processing");
-      if (response?.videoUrl) {
-        setVideoUrl(response.videoUrl);
-        setProgress(100);
-      }
-      toast.success("Job criado. Processando...");
+      setJobStatus("pending");
+
+      // Start the full pipeline (images → audio → render)
+      startVideoPipeline({
+        jobId: id,
+        imageUrl: resolvedImageUrl,
+        script: narrationText || script?.fullScript || "",
+        scenes: scenesFromScript,
+      }).catch((err) => {
+        console.error("Pipeline async error:", err);
+        // Status updates come via realtime, no need to block
+      });
+
+      toast.success("Pipeline iniciado! Acompanhe o progresso.");
     } catch (error: any) {
       console.error("PDG DEBUG: erro detectado e tratado", error);
       toast.error(error?.message || "Falha ao iniciar o job.");
@@ -559,21 +586,33 @@ const VideoGeneratorUI = () => {
 
   const progressLabel = useMemo(() => {
     if (!jobStatus) return "Aguardando";
-    if (jobStatus === "completed") return "Concluído";
+    if (jobStatus === "done" || jobStatus === "completed") return "Concluído";
     if (jobStatus === "failed" || jobStatus === "error") return "Erro";
     if (jobStatus === "fallback") return "Fallback";
     if (jobStatus === "render_local") return "Render local";
+    if (jobStatus === "generating_images") return "Gerando cenas";
+    if (jobStatus === "generating_audio") return "Gerando narração";
+    if (jobStatus === "rendering") return "Montando vídeo";
+    if (jobStatus === "generating_script") return "Gerando roteiro";
+    if (jobStatus === "generating_voice") return "Gerando voz";
+    if (jobStatus === "generating_video") return "Gerando vídeo";
     return jobStatus.replace(/_/g, " ");
   }, [jobStatus]);
 
   const statusMessage = useMemo(() => {
     if (!jobStatus) return "Aguardando início do job";
-    if (jobStatus === "processing") return "Renderizando vídeo...";
-    if (jobStatus === "completed") return "Vídeo pronto para visualização";
-    if (jobStatus === "failed" || jobStatus === "error") return "Falha no processamento";
-    if (jobStatus === "fallback") return "Fallback aplicado automaticamente";
-    if (jobStatus === "render_local") return "Render local em andamento";
-    return "Processamento em andamento";
+    if (jobStatus === "generating_images") return "🎨 Gerando imagens cinematográficas das cenas...";
+    if (jobStatus === "generating_audio") return "🎙️ Gerando narração com voz premium...";
+    if (jobStatus === "rendering") return "🎬 Montando vídeo final com Shotstack...";
+    if (jobStatus === "generating_script") return "📝 Criando roteiro com IA...";
+    if (jobStatus === "generating_voice") return "🎙️ Sintetizando voz...";
+    if (jobStatus === "generating_video") return "🎥 Gerando vídeo...";
+    if (jobStatus === "processing") return "⚙️ Processando...";
+    if (jobStatus === "done" || jobStatus === "completed") return "✅ Vídeo pronto para visualização";
+    if (jobStatus === "failed" || jobStatus === "error") return "❌ Falha no processamento";
+    if (jobStatus === "fallback") return "⚠️ Fallback aplicado automaticamente";
+    if (jobStatus === "render_local") return "🖥️ Render local em andamento";
+    return "⏳ Processamento em andamento";
   }, [jobStatus]);
 
   const progressValue = isLocalRendering ? localProgress : progress;
