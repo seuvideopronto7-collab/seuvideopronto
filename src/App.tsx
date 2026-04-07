@@ -227,6 +227,17 @@ const App = () => (
                 )
               }
             />
+            <Route
+              path="/imagem-para-video"
+              element={
+                wrapSafe(
+                  "Imagem para Video",
+                  <ProtectedRoute>
+                    <ImageToVideo />
+                  </ProtectedRoute>,
+                )
+              }
+            />
             <Route path="*" element={<Navigate to="/auth" replace />} />
           </Routes>
         </AuthProvider>
