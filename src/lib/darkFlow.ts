@@ -322,6 +322,28 @@ export const getMissingDarkFlowFields = (result: DarkFlowResult) =>
     return !hasText(result[field]);
   });
 
+const getMissingDarkFlowFieldsFromRaw = (result: Record<string, unknown>) => {
+  const roteiro = firstText(result.roteiro, result.texto_falado, (result.video as { narracao?: string } | undefined)?.narracao);
+  const vozes = firstText(
+    result.vozes,
+    [
+      (result.voz as { estilo?: string } | undefined)?.estilo,
+      (result.voz as { tom?: string } | undefined)?.tom,
+      (result.voz as { ritmo?: string } | undefined)?.ritmo,
+      (result.voz as { naturalidade?: string } | undefined)?.naturalidade,
+    ]
+      .filter(Boolean)
+      .join(", "),
+  );
+
+  return REQUIRED_FIELDS.filter((field) => {
+    if (field === "roteiro") return !hasText(roteiro);
+    if (field === "vozes") return !hasText(vozes);
+    if (field === "cenas") return !toStringArray(result.cenas).length;
+    return !hasText(result[field]);
+  });
+};
+
 export const hasRenderableDarkFlowContent = (result: DarkFlowResult) =>
   Boolean(result.hook || result.contexto || result.solucao || result.roteiro || result.lista?.length);
 
@@ -367,7 +389,9 @@ export const createDarkFlowGenerator = ({
           throw new Error("Resposta vazia ao gerar conteúdo dark");
         }
 
-        const parsed = normalizeDarkFlowResult(data, form);
+        const rawParsed = cleanAndParseDarkFlowResponse(data) as Record<string, unknown>;
+        const missingFieldsBeforeNormalization = getMissingDarkFlowFieldsFromRaw(rawParsed);
+        const parsed = normalizeDarkFlowResult(rawParsed, form);
         logger.log("Resposta parseada:", parsed);
 
         if ((parsed as { error?: string; success?: boolean }).error || (parsed as { success?: boolean }).success === false) {
@@ -379,9 +403,9 @@ export const createDarkFlowGenerator = ({
         }
 
         const missingFields = getMissingDarkFlowFields(parsed);
-        if (missingFields.length && attempt === 0) {
-          logger.warn("Resposta IA incompleta, tentando novamente:", missingFields);
-          lastError = new Error(`Campos ausentes: ${missingFields.join(", ")}`);
+        if (missingFieldsBeforeNormalization.length && attempt === 0) {
+          logger.warn("Resposta IA incompleta, tentando novamente:", missingFieldsBeforeNormalization);
+          lastError = new Error(`Campos ausentes: ${missingFieldsBeforeNormalization.join(", ")}`);
           continue;
         }
 

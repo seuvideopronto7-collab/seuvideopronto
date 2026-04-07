@@ -67,7 +67,7 @@ const DarkFlowEngine = () => {
 
   const runDarkFlowPipeline = (payload: DarkFlowResult, sourceLabel: string) => {
     setResult(payload);
-    toast.success(`Conteudo Dark gerado (${sourceLabel})`);
+    console.log("Dark Flow renderizado:", sourceLabel, payload);
   };
 
   const handleDetectNiches = async () => {
