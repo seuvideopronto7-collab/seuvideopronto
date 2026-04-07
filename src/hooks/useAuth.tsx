@@ -11,6 +11,7 @@ interface Profile {
   instagram: string;
   tiktok: string;
   is_active: boolean;
+  avatar_url: string;
 }
 
 interface AuthContextType {
