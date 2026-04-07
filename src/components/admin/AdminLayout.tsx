@@ -63,9 +63,7 @@ const AdminLayout = ({ title, description, children, actionLabel, onAction }: Ad
       {/* ── Header ── */}
       <div className="flex items-start justify-between mb-8">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center text-sm font-bold text-primary-foreground shrink-0">
-            SVP
-          </div>
+          <img src={logoSvp} alt="SVP" className="w-10 h-10 rounded-xl object-contain shrink-0" width={40} height={40} />
           <div>
             <p className="text-sm font-semibold text-sidebar-foreground">Admin Studio</p>
             <p className="text-[11px] text-muted-foreground">Modo cinema ativo</p>
