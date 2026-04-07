@@ -477,26 +477,9 @@ Retorne EXATAMENTE este formato JSON:
         body: JSON.stringify({
           model: "google/gemini-3-flash-preview",
           messages: [
-            { role: "system", content: extraSystem ? `${systemPrompt}\n${extraSystem}` : systemPrompt },
+            { role: "system", content: (extraSystem ? `${systemPrompt}\n${extraSystem}` : systemPrompt) + "\nIMPORTANT: Return ONLY valid JSON, no markdown fences." },
             { role: "user", content: userPrompt },
           ],
-          tools: [
-            {
-              type: "function",
-              function: {
-                name: "generate_content",
-                description: "Generate viral content in structured format",
-                parameters: {
-                  type: "object",
-                  properties: {
-                    result: { type: "object" },
-                  },
-                  required: ["result"],
-                },
-              },
-            },
-          ],
-          tool_choice: { type: "function", function: { name: "generate_content" } },
         }),
       });
 
@@ -517,17 +500,15 @@ Retorne EXATAMENTE este formato JSON:
       }
 
       const data = await response.json();
-      let result;
-      const toolCalls = data.choices?.[0]?.message?.tool_calls;
-      if (toolCalls && toolCalls.length > 0) {
-        const args = JSON.parse(toolCalls[0].function.arguments);
-        result = args.result || args;
-      } else {
-        const content = data.choices?.[0]?.message?.content || "";
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
-        result = jsonMatch ? JSON.parse(jsonMatch[0]) : { error: "Failed to parse response" };
+      const content = data.choices?.[0]?.message?.content || "";
+      // Strip markdown fences if present
+      const cleaned = content.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        console.error("No JSON found in response:", content.substring(0, 200));
+        throw new Error("Failed to parse AI response");
       }
-      return result;
+      return JSON.parse(jsonMatch[0]);
     };
 
     const isVideoType = ["roteiro", "viral_video"].includes(tipo);
