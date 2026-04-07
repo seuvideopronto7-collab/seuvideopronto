@@ -2,7 +2,7 @@ import { ReactNode, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   Bell, Film, Menu, Settings, ShieldCheck, Users,
-  LayoutGrid, Share2, LogOut, X, CircleDot, User,
+  LayoutGrid, Share2, LogOut, X, CircleDot,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,7 @@ import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import AdminLiveLayer from "@/components/admin/AdminLiveLayer";
+import logoSvp from "@/assets/logo-svp.png";
 
 type AdminLayoutProps = {
   title: string;
@@ -53,7 +54,7 @@ const AdminLayout = ({ title, description, children, actionLabel, onAction }: Ad
   const [open, setOpen] = useState(false);
   const location = useLocation();
 
-  const avatarUrl = user?.user_metadata?.avatar_url || null;
+  const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url || null;
   const displayName = profile?.full_name || user?.user_metadata?.name || user?.email?.split("@")[0] || "Admin";
   const initials = displayName.slice(0, 2).toUpperCase();
 
@@ -62,9 +63,7 @@ const AdminLayout = ({ title, description, children, actionLabel, onAction }: Ad
       {/* ── Header ── */}
       <div className="flex items-start justify-between mb-8">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center text-sm font-bold text-primary-foreground shrink-0">
-            SVP
-          </div>
+          <img src={logoSvp} alt="SVP" className="w-10 h-10 rounded-xl object-contain shrink-0" width={40} height={40} />
           <div>
             <p className="text-sm font-semibold text-sidebar-foreground">Admin Studio</p>
             <p className="text-[11px] text-muted-foreground">Modo cinema ativo</p>
