@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
-import { createVideoJob, fetchVideoJob } from "@/services/api";
+import { createVideoJob, fetchVideoJob, startVideoPipeline } from "@/services/api";
 import { buscarAPI } from "@/lib/apiRegistry";
 import { renderVideoFromImage } from "@/lib/videoRender";
 import { generateEpicSoundtrack } from "@/lib/audioSynth";
