@@ -51,7 +51,7 @@ export const createVideoJob = async (payload: CreateVideoJobInput) => {
 };
 
 export const fetchVideoJob = async (jobId: string) => {
-  const { data, error } = await supabase.from("video_jobs" as any).select("*").eq("id", jobId).maybeSingle();
+  const { data, error } = await supabase.from("video_jobs" as any).select("id, status, progress, video_url, audio_url, error, caption_text, created_at, images, scenes").eq("id", jobId).maybeSingle();
   if (error) throw error;
   return (data as any) as VideoJob | null;
 };
