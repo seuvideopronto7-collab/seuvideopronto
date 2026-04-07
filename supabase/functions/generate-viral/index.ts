@@ -614,7 +614,7 @@ Retorne EXATAMENTE este formato JSON:
 
     const requestCompletion = async (extraSystem?: string) => {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const timeoutId = setTimeout(() => controller.abort(), 14000);
       let response: Response;
 
       try {
