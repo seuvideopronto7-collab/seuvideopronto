@@ -442,7 +442,12 @@ Retorne EXATAMENTE este formato JSON:
   "roteiro": "roteiro corrido completo para o video",
   "texto_falado": "texto falado do video",
   "vozes": "Masculina brasileira, confiante, ritmo medio, natural",
-  "cenas": ["cena 1", "cena 2", "cena 3", "cena 4"],
+  "cenas": [
+    {"tempo": "0-3s", "texto": "fala da cena", "visual": "descricao visual cinematografica", "emocao": "curiosidade", "prompt_imagem": "cinematic dark lighting prompt"},
+    {"tempo": "3-7s", "texto": "fala da cena", "visual": "descricao visual", "emocao": "tensao", "prompt_imagem": "cinematic prompt"},
+    {"tempo": "7-12s", "texto": "fala da cena", "visual": "descricao visual", "emocao": "solucao", "prompt_imagem": "cinematic prompt"},
+    {"tempo": "12-15s", "texto": "fala do CTA", "visual": "descricao visual", "emocao": "urgencia", "prompt_imagem": "cinematic prompt"}
+  ],
   "design": {
     "fundo": "#000000",
     "texto": "#FFFFFF",
