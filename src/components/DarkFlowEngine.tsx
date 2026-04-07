@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { zipSync, strToU8 } from "fflate";
 import { Sparkles, Zap, Download, Flame, Mic2, Video, Palette, Link2, Loader2 } from "lucide-react";
 import { buildFallbackDarkFlow, createDarkFlowGenerator, type DarkFlowResult } from "@/lib/darkFlow";
-import { buildVideoStructure, buildTimeline, type VideoTimeline, type GenerationStage, STAGE_LABELS } from "@/lib/videoPipeline";
+import { buildVideoStructure, buildTimeline, generateVisualPrompt, type VideoTimeline, type VideoScene, type GenerationStage, STAGE_LABELS } from "@/lib/videoPipeline";
 import VideoPreview from "@/components/VideoPreview";
 
 const DarkFlowEngine = () => {
@@ -125,11 +125,25 @@ const DarkFlowEngine = () => {
         marca: form.marca,
       };
 
-      const cenas = buildVideoStructure(roteiro, contexto);
+      // Try to use structured cenas from AI first, fallback to building from roteiro
+      let cenas: VideoScene[] = [];
+      const rawCenas = outcome.result.cenas;
+      if (Array.isArray(rawCenas) && rawCenas.length > 0 && typeof rawCenas[0] === "object") {
+        cenas = (rawCenas as Array<{ tempo?: string; texto?: string; visual?: string; emocao?: string; prompt_imagem?: string }>).map((c, i) => ({
+          tempo: c.tempo || `${i * 4}s - ${(i + 1) * 4}s`,
+          texto: c.texto || "",
+          visual: c.visual || generateVisualPrompt(c.texto || "", contexto.tema, c.emocao || "curiosidade"),
+          emocao: c.emocao || "curiosidade",
+          prompt_imagem: c.prompt_imagem || generateVisualPrompt(c.texto || "", contexto.tema, c.emocao || "curiosidade"),
+        }));
+      } else {
+        cenas = buildVideoStructure(roteiro, contexto);
+      }
+
       if (cenas.length > 0) {
         setStage("montando_video");
         const timeline = buildTimeline(
-          outcome.result.hook || `Vídeo ${form.nicho || form.produto}`,
+          outcome.result.titulo || outcome.result.hook || `Vídeo ${form.nicho || form.produto}`,
           cenas,
           {
             estilo: outcome.result.voz?.estilo || "Masculina brasileira",
