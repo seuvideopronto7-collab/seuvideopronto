@@ -76,6 +76,127 @@ const includesContextAnchor = (text: string, anchors: string[]) => {
   return anchors.filter(Boolean).some((anchor) => lowered.includes(anchor.toLowerCase()));
 };
 
+const hasText = (value: unknown): value is string => typeof value === "string" && value.trim().length > 0;
+
+const toStringArray = (value: unknown) => {
+  if (!Array.isArray(value)) return [] as string[];
+  return value
+    .map((item) => (typeof item === "string" ? item.trim() : ""))
+    .filter(Boolean);
+};
+
+const extractTextContent = (data: any) => {
+  const content = data?.choices?.[0]?.message?.content;
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => {
+        if (typeof part === "string") return part;
+        if (typeof part?.text === "string") return part.text;
+        return "";
+      })
+      .join("");
+  }
+  return "";
+};
+
+const cleanAndParseJson = (response: string) => {
+  let cleaned = response.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+  const jsonStart = cleaned.search(/[\[{]/);
+  if (jsonStart === -1) {
+    throw new Error("No JSON object found in response");
+  }
+
+  const openChar = cleaned[jsonStart];
+  const closeChar = openChar === "[" ? "]" : "}";
+  const jsonEnd = cleaned.lastIndexOf(closeChar);
+  if (jsonEnd === -1 || jsonEnd <= jsonStart) {
+    throw new Error("Incomplete JSON returned by AI");
+  }
+
+  cleaned = cleaned.substring(jsonStart, jsonEnd + 1);
+
+  try {
+    return JSON.parse(cleaned);
+  } catch (error) {
+    console.error("Initial JSON parse failed, attempting repair:", error);
+    cleaned = cleaned
+      .replace(/,\s*([}\]])/g, "$1")
+      .replace(/[\x00-\x1F\x7F]/g, "");
+    return JSON.parse(cleaned);
+  }
+};
+
+const normalizeDarkFlowEngineResult = (result: any, contexto: ReturnType<typeof buildContextoMestre>, links: { checkout?: string; landing?: string; link?: string }) => {
+  const tema = contexto.tema || "conteúdo dark";
+  const publico = contexto.publico || "público digital";
+  const lista = toStringArray(result?.lista);
+  const cenas = toStringArray(result?.cenas);
+  const videoAnimado = toStringArray(result?.video?.texto_animado);
+  const roteiro = [result?.roteiro, result?.texto_falado, result?.video?.narracao].find(hasText) || `Hook forte sobre ${tema}, contexto direto, solução prática e CTA final.`;
+  const vozes = [result?.vozes, [result?.voz?.estilo, result?.voz?.tom, result?.voz?.ritmo, result?.voz?.naturalidade].filter(Boolean).join(", ")]
+    .find(hasText) || "Masculina brasileira, confiante, ritmo médio, natural";
+
+  return {
+    ...result,
+    hook: hasText(result?.hook) ? result.hook : `Você está deixando resultado na mesa em ${tema}.`,
+    contexto: hasText(result?.contexto) ? result.contexto : `Estratégia direta para ${publico} com foco em ${contexto.objetivo || "vendas"}.`,
+    tese: hasText(result?.tese) ? result.tese : hasText(result?.contexto) ? result.contexto : `${tema} precisa de copy específica e CTA imediato para converter.`,
+    lista: lista.length ? lista : [
+      `Erro central que trava ${tema}`,
+      "Promessa sem prova real",
+      "CTA sem urgência clara",
+    ],
+    solucao: hasText(result?.solucao) ? result.solucao : `Reposicione a oferta com promessa, prova e CTA ligados a ${tema}.`,
+    cta: hasText(result?.cta) ? result.cta : "LINK NA BIO",
+    legenda: hasText(result?.legenda) ? result.legenda : `Ajuste sua mensagem em ${tema} para destravar conversão.`,
+    hashtags: toStringArray(result?.hashtags).length ? toStringArray(result?.hashtags) : ["#darkflow", "#marketing", "#vendas", `#${tema.replace(/[^a-z0-9]/gi, "")}`.toLowerCase()],
+    roteiro,
+    texto_falado: hasText(result?.texto_falado) ? result.texto_falado : roteiro,
+    vozes,
+    cenas: cenas.length ? cenas : videoAnimado.length ? videoAnimado.map((item) => `Cena com texto animado: ${item}`) : [
+      `Abrir com alerta visual sobre ${tema}`,
+      `Mostrar o erro principal de ${tema}`,
+      "Apresentar a solução com prova e CTA",
+    ],
+    design: {
+      fundo: "#000000",
+      texto: "#FFFFFF",
+      destaque: "#FF0000",
+      check: "#00FF7F",
+      tipografia: "BOLD, CAIXA ALTA, ALTA LEGIBILIDADE",
+      efeitos: ["glow vermelho leve", "sombra leve", "centralizado"],
+      ...(result?.design || {}),
+    },
+    imagem: {
+      prompt: `Imagem dark com destaque central para ${tema}`,
+      elementos: ["texto central", "destaque vermelho", "check verde"],
+      formato: "9:16",
+      ...(result?.imagem || {}),
+    },
+    video: {
+      narracao: hasText(result?.video?.narracao) ? result.video.narracao : roteiro,
+      texto_animado: videoAnimado.length ? videoAnimado : ["HOOK", "PROVA", "CTA"],
+      fundo_dinamico: "texturas dark + motion blur",
+      musica: "leve e tensa",
+      formatos: ["9:16", "1:1"],
+      ...(result?.video || {}),
+    },
+    voz: {
+      estilo: "Masculina brasileira",
+      tom: "confiante",
+      ritmo: "medio",
+      naturalidade: "natural",
+      ...(result?.voz || {}),
+    },
+    links: {
+      checkout: links.checkout || links.link || "",
+      landing: links.landing || links.link || "",
+      ...(result?.links || {}),
+    },
+  };
+};
+
 const validateResult = (tipo: string, result: any, contexto: ReturnType<typeof buildContextoMestre>) => {
   const anchors = [contexto.tema, contexto.publico, contexto.problema, contexto.objetivo].filter(Boolean);
   if (!anchors.length) return { ok: false, reason: "contexto_incompleto" };
@@ -101,6 +222,26 @@ const validateResult = (tipo: string, result: any, contexto: ReturnType<typeof b
     if (Array.isArray(imagens) && imagens.some((img) => isGenericText(JSON.stringify(img)))) {
       return { ok: false, reason: "imagem_irrelevante" };
     }
+  }
+
+  if (tipo === "dark_flow_engine") {
+    const combined = [
+      result?.hook,
+      result?.contexto,
+      result?.tese,
+      result?.solucao,
+      result?.cta,
+      result?.roteiro,
+      ...(result?.cenas || []),
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    if (!result?.hook || !result?.contexto || !result?.tese || !result?.solucao || !result?.cta || !result?.roteiro || !result?.vozes || !result?.cenas?.length) {
+      return { ok: false, reason: "dark_flow_incompleto" };
+    }
+    if (isGenericText(combined)) return { ok: false, reason: "conteudo_generico" };
+    if (!includesContextAnchor(combined, anchors)) return { ok: false, reason: "dark_flow_sem_contexto" };
   }
 
   return { ok: true };
@@ -145,7 +286,7 @@ serve(async (req) => {
       });
     }
 
-    const contexto = buildContextoMestre({ produto, nicho, publico, dor, objetivo, contextoMestre });
+    const contexto = buildContextoMestre({ produto, nicho, publico, dor, objetivo, contextoMestre: { ...contextoMestre, tema: contextoMestre?.tema || nicho || produto || marca || `${objetivo || "vendas"} para ${plataforma || "redes sociais"}` } });
     if (requiresContext(tipo) && !contexto.tema) {
       return new Response(JSON.stringify({ error: "contexto_obrigatorio", reason: "Tema nao informado" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -291,12 +432,16 @@ Retorne EXATAMENTE este formato JSON:
 {
   "hook": "frase agressiva",
   "contexto": "explicacao curta em 1 frase",
+  "tese": "ideia central que sustenta a copy",
   "lista": ["erro 1", "erro 2", "erro 3"],
   "solucao": "apresenta o sistema/produto",
   "cta": "LINK NA BIO",
   "legenda": "legenda curta e direta",
   "hashtags": ["#hash1", "#hash2", "#hash3", "#hash4", "#hash5"],
+  "roteiro": "roteiro corrido completo para o video",
   "texto_falado": "texto falado do video",
+  "vozes": "Masculina brasileira, confiante, ritmo medio, natural",
+  "cenas": ["cena 1", "cena 2", "cena 3", "cena 4"],
   "design": {
     "fundo": "#000000",
     "texto": "#FFFFFF",
@@ -468,20 +613,34 @@ Retorne EXATAMENTE este formato JSON:
     }
 
     const requestCompletion = async (extraSystem?: string) => {
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
-          messages: [
-            { role: "system", content: (extraSystem ? `${systemPrompt}\n${extraSystem}` : systemPrompt) + "\nIMPORTANT: Return ONLY valid JSON, no markdown fences." },
-            { role: "user", content: userPrompt },
-          ],
-        }),
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      let response: Response;
+
+      try {
+        response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-3-flash-preview",
+            messages: [
+              { role: "system", content: (extraSystem ? `${systemPrompt}\n${extraSystem}` : systemPrompt) + "\nIMPORTANT: Return ONLY valid JSON, no markdown fences." },
+              { role: "user", content: userPrompt },
+            ],
+          }),
+          signal: controller.signal,
+        });
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") {
+          throw new Error("Timeout IA");
+        }
+        throw error;
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       if (!response.ok) {
         if (response.status === 429) {
@@ -500,15 +659,11 @@ Retorne EXATAMENTE este formato JSON:
       }
 
       const data = await response.json();
-      const content = data.choices?.[0]?.message?.content || "";
-      // Strip markdown fences if present
-      const cleaned = content.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
-      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        console.error("No JSON found in response:", content.substring(0, 200));
-        throw new Error("Failed to parse AI response");
-      }
-      return JSON.parse(jsonMatch[0]);
+      const content = extractTextContent(data);
+      console.log("Resposta IA:", content);
+      const parsed = cleanAndParseJson(content);
+      console.log("Resposta parseada:", parsed);
+      return parsed;
     };
 
     const isVideoType = ["roteiro", "viral_video"].includes(tipo);
@@ -516,10 +671,16 @@ Retorne EXATAMENTE este formato JSON:
 
     let result = await requestCompletion();
     if (result instanceof Response) return result;
+    if (tipo === "dark_flow_engine") {
+      result = normalizeDarkFlowEngineResult(result, contexto, { checkout, landing, link });
+    }
     const validation = validateResult(tipo, result, contexto);
     if (!validation.ok) {
       result = await requestCompletion(qualityBoost);
       if (result instanceof Response) return result;
+      if (tipo === "dark_flow_engine") {
+        result = normalizeDarkFlowEngineResult(result, contexto, { checkout, landing, link });
+      }
       const retryValidation = validateResult(tipo, result, contexto);
       if (!retryValidation.ok && isVideoType) {
         return new Response(JSON.stringify({ success: false, error: "quality_blocked", reason: retryValidation.reason }), {

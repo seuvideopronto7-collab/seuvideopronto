@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,135 +12,7 @@ import {
 import { toast } from "sonner";
 import { zipSync, strToU8 } from "fflate";
 import { Sparkles, Zap, Download, Flame, Mic2, Video, Palette, Link2 } from "lucide-react";
-
-interface DarkFlowResult {
-  hook?: string;
-  contexto?: string;
-  lista?: string[];
-  solucao?: string;
-  cta?: string;
-  legenda?: string;
-  hashtags?: string[];
-  texto_falado?: string;
-  design?: {
-    fundo?: string;
-    texto?: string;
-    destaque?: string;
-    check?: string;
-    tipografia?: string;
-    efeitos?: string[];
-  };
-  imagem?: {
-    prompt?: string;
-    elementos?: string[];
-    formato?: string;
-  };
-  video?: {
-    narracao?: string;
-    texto_animado?: string[];
-    fundo_dinamico?: string;
-    musica?: string;
-    formatos?: string[];
-  };
-  voz?: {
-    estilo?: string;
-    tom?: string;
-    ritmo?: string;
-    naturalidade?: string;
-  };
-  avatar?: {
-    opcional?: boolean;
-    servicos?: string[];
-    persona?: string;
-  };
-  links?: {
-    checkout?: string;
-    landing?: string;
-  };
-  niches?: {
-    nichos_quentes?: string[];
-    temas_sugeridos?: string[];
-  };
-  assets?: {
-    copies?: string[];
-    scripts?: string[];
-    imagens?: string[];
-    videos?: string[];
-  };
-}
-
-const buildFallbackDarkFlow = (payload: {
-  produto?: string;
-  nicho?: string;
-  objetivo?: string;
-  marca?: string;
-  publico?: string;
-  plataforma?: string;
-  checkout?: string;
-  landing?: string;
-}): DarkFlowResult => {
-  const temaBase = payload.nicho || payload.produto || "produto";
-  const publicoBase = payload.publico || "seu público";
-  const objetivoBase = payload.objetivo || "vendas";
-  const marcaBase = payload.marca || "sua marca";
-  const cleanHashtag = (value: string) => `#${value.replace(/[^a-z0-9]/gi, "")}`.toLowerCase();
-
-  return {
-    hook: `Você está perdendo vendas em ${temaBase} por um erro simples.`,
-    contexto: `Conteúdo rápido para ${publicoBase} com foco em ${objetivoBase}.`,
-    lista: [
-      "Você comunica o benefício errado",
-      "Seu gancho não cria urgência",
-      "Seu CTA não deixa claro o próximo passo",
-    ],
-    solucao: `Ajuste o gancho, a promessa e o CTA para fechar mais com ${marcaBase}.`,
-    cta: "LINK NA BIO",
-    legenda: `Se ${temaBase} é sua prioridade, mude isso hoje.`,
-    hashtags: [cleanHashtag(temaBase), "#darkflow", "#marketing", "#vendas", "#conteudoviral"],
-    texto_falado: `Se você quer ${objetivoBase}, pare de fazer isso em ${temaBase}. Aqui vai o ajuste que muda o jogo.`,
-    design: {
-      fundo: "#000000",
-      texto: "#FFFFFF",
-      destaque: "#FF0000",
-      check: "#00FF7F",
-      tipografia: "BOLD, CAIXA ALTA, ALTA LEGIBILIDADE",
-      efeitos: ["glow vermelho leve", "sombra leve", "centralizado"],
-    },
-    imagem: {
-      prompt: `Imagem dark com texto central destacando ${temaBase}, estilo agressivo e contraste alto.`,
-      elementos: ["texto central", "destaque vermelho", "check verde"],
-      formato: "9:16",
-    },
-    video: {
-      narracao: `Narracao direta para ${publicoBase}, com promessa clara e CTA final para ${marcaBase}.`,
-      texto_animado: ["ERRO", "AJUSTE", "CTA"],
-      fundo_dinamico: "texturas dark + motion blur",
-      musica: "leve e tensa",
-      formatos: ["9:16", "1:1"],
-    },
-    voz: {
-      estilo: "Masculina brasileira",
-      tom: "confiante",
-      ritmo: "medio",
-      naturalidade: "natural",
-    },
-    avatar: {
-      opcional: true,
-      servicos: ["HeyGen", "Runway ML"],
-      persona: "Homem 30-40 anos, aparencia profissional, comunicacao direta",
-    },
-    links: {
-      checkout: payload.checkout || "",
-      landing: payload.landing || "",
-    },
-    assets: {
-      copies: ["hook + contexto + lista + solucao + cta"],
-      scripts: ["roteiro completo"],
-      imagens: ["prompt de imagem"],
-      videos: ["spec de video"],
-    },
-  };
-};
+import { buildFallbackDarkFlow, createDarkFlowGenerator, type DarkFlowResult } from "@/lib/darkFlow";
 
 const DarkFlowEngine = () => {
   const [form, setForm] = useState({
@@ -161,17 +33,17 @@ const DarkFlowEngine = () => {
 
   const update = (key: string, value: string) => setForm((p) => ({ ...p, [key]: value }));
 
-  const withTimeout = async <T,>(fn: () => Promise<T>, ms: number) => {
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      timeoutId = setTimeout(() => reject(new Error("Timeout ao gerar conteudo")), ms);
-    });
-    try {
-      return await Promise.race([fn(), timeoutPromise]);
-    } finally {
-      if (timeoutId) clearTimeout(timeoutId);
-    }
-  };
+  const generateDarkFlow = useMemo(
+    () =>
+      createDarkFlowGenerator({
+        invoke: (payload) =>
+          supabase.functions.invoke("generate-viral", {
+            body: payload,
+          }),
+        timeoutMs: 5000,
+      }),
+    [],
+  );
 
   const buildFallbackNiches = () => {
     const base = form.nicho || form.produto || "Negocios digitais";
@@ -201,16 +73,12 @@ const DarkFlowEngine = () => {
   const handleDetectNiches = async () => {
     setIsDetecting(true);
     try {
-      const { data, error } = await withTimeout(
-        () =>
-          supabase.functions.invoke("generate-viral", {
-            body: {
-              ...form,
-              tipo: "dark_flow_niches",
-            },
-          }),
-        10000
-      );
+      const { data, error } = await supabase.functions.invoke("generate-viral", {
+        body: {
+          ...form,
+          tipo: "dark_flow_niches",
+        },
+      });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       setNiches(data?.nichos_quentes || []);
@@ -230,51 +98,36 @@ const DarkFlowEngine = () => {
   const handleGenerate = async () => {
     setIsLoading(true);
     try {
-      const payload = {
-        ...form,
-        tipo: "dark_flow_engine",
-        contextoMestre: {
-          tema: form.nicho || form.produto,
-          publico: form.publico,
-          problema: "",
-          objetivo: form.objetivo,
-          linguagem: "pt-BR",
-          tom: "especialista",
-        },
-      };
-      const { data, error } = await withTimeout(
-        () =>
-          supabase.functions.invoke("generate-viral", {
-            body: payload,
-          }),
-        10000
+      const outcome = await generateDarkFlow(form);
+
+      if (outcome.error) {
+        console.error("Erro real da engine:", outcome.error);
+      }
+
+      runDarkFlowPipeline(
+        outcome.result,
+        outcome.usedFallback ? "Alternativa" : outcome.partial ? "IA + complemento" : "IA",
       );
-      if (error) throw error;
-      if (data?.error || data?.success === false) throw new Error(data?.error || "Erro ao gerar conteudo dark");
-      if (!data) throw new Error("Resposta vazia ao gerar conteudo dark");
-      runDarkFlowPipeline(data || buildFallbackDarkFlow(form), "API");
+
+      if (outcome.usedFallback) {
+        toast.warning("IA indisponível — gerando versão alternativa.");
+        return;
+      }
+
+      if (outcome.partial) {
+        toast.message("Conteúdo gerado com complementos automáticos.");
+      }
+
+      toast.success("Conteúdo Dark gerado com IA");
     } catch (err: any) {
-      console.warn("API falhou, usando modo local");
+      console.error("Erro real da engine:", err);
       const fallback = buildFallbackDarkFlow(form);
-      runDarkFlowPipeline(fallback, "Local");
-      toast.warning("Falha ao gerar conteudo dark. Usando fallback local.");
+      runDarkFlowPipeline(fallback, "Alternativa");
+      toast.warning("IA indisponível — gerando versão alternativa.");
     } finally {
       setIsLoading(false);
     }
   };
-
-  const iniciarGeracao = () => {
-    console.log("DarkFlow ativado");
-    try {
-      void handleGenerate();
-    } catch (e) {
-      console.error("Erro DarkFlow:", e);
-    }
-  };
-
-  useEffect(() => {
-    iniciarGeracao();
-  }, []);
 
   const designPreview = useMemo(() => {
     const design = result?.design;
@@ -392,7 +245,7 @@ const DarkFlowEngine = () => {
           <Zap className="w-4 h-4" /> {isDetecting ? "Detectando nichos..." : "Detectar nichos quentes"}
         </Button>
         <Button variant="neon" size="lg" className="w-full" onClick={handleGenerate} disabled={isLoading}>
-          <Sparkles className="w-4 h-4" /> {isLoading ? "Gerando..." : "GERAR CONTEÚDO DARK"}
+          <Sparkles className="w-4 h-4" /> {isLoading ? "Gerando conteúdo com IA..." : "GERAR CONTEÚDO DARK"}
         </Button>
       </div>
 
