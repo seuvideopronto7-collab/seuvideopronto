@@ -11,8 +11,10 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { zipSync, strToU8 } from "fflate";
-import { Sparkles, Zap, Download, Flame, Mic2, Video, Palette, Link2 } from "lucide-react";
+import { Sparkles, Zap, Download, Flame, Mic2, Video, Palette, Link2, Loader2 } from "lucide-react";
 import { buildFallbackDarkFlow, createDarkFlowGenerator, type DarkFlowResult } from "@/lib/darkFlow";
+import { buildVideoStructure, buildTimeline, generateVisualPrompt, type VideoTimeline, type VideoScene, type GenerationStage, STAGE_LABELS } from "@/lib/videoPipeline";
+import VideoPreview from "@/components/VideoPreview";
 
 const DarkFlowEngine = () => {
   const [form, setForm] = useState({
@@ -26,8 +28,10 @@ const DarkFlowEngine = () => {
     landing: "",
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [stage, setStage] = useState<GenerationStage>("idle");
   const [isDetecting, setIsDetecting] = useState(false);
   const [result, setResult] = useState<DarkFlowResult | null>(null);
+  const [videoTimeline, setVideoTimeline] = useState<VideoTimeline | null>(null);
   const [niches, setNiches] = useState<string[]>([]);
   const [themes, setThemes] = useState<string[]>([]);
 
@@ -40,7 +44,7 @@ const DarkFlowEngine = () => {
           supabase.functions.invoke("generate-viral", {
             body: payload,
           }),
-        timeoutMs: 5000,
+        timeoutMs: 15000,
       }),
     [],
   );
@@ -97,6 +101,8 @@ const DarkFlowEngine = () => {
 
   const handleGenerate = async () => {
     setIsLoading(true);
+    setStage("gerando_roteiro");
+    setVideoTimeline(null);
     try {
       const outcome = await generateDarkFlow(form);
 
@@ -104,10 +110,55 @@ const DarkFlowEngine = () => {
         console.error("Erro real da engine:", outcome.error);
       }
 
+      setStage("criando_cenas");
       runDarkFlowPipeline(
         outcome.result,
         outcome.usedFallback ? "Alternativa" : outcome.partial ? "IA + complemento" : "IA",
       );
+
+      // Build video structure from result
+      const roteiro = outcome.result.roteiro || outcome.result.texto_falado || "";
+      const contexto = {
+        tema: form.nicho || form.produto || "conteúdo",
+        publico: form.publico || "público digital",
+        objetivo: form.objetivo || "vendas",
+        marca: form.marca,
+      };
+
+      // Try to use structured cenas from AI first, fallback to building from roteiro
+      let cenas: VideoScene[] = [];
+      const rawCenas = outcome.result.cenas;
+      if (Array.isArray(rawCenas) && rawCenas.length > 0 && typeof rawCenas[0] === "object") {
+        cenas = (rawCenas as Array<{ tempo?: string; texto?: string; visual?: string; emocao?: string; prompt_imagem?: string }>).map((c, i) => ({
+          tempo: c.tempo || `${i * 4}s - ${(i + 1) * 4}s`,
+          texto: c.texto || "",
+          visual: c.visual || generateVisualPrompt(c.texto || "", contexto.tema, c.emocao || "curiosidade"),
+          emocao: c.emocao || "curiosidade",
+          prompt_imagem: c.prompt_imagem || generateVisualPrompt(c.texto || "", contexto.tema, c.emocao || "curiosidade"),
+        }));
+      } else {
+        cenas = buildVideoStructure(roteiro, contexto);
+      }
+
+      if (cenas.length > 0) {
+        setStage("montando_video");
+        const timeline = buildTimeline(
+          outcome.result.titulo || outcome.result.hook || `Vídeo ${form.nicho || form.produto}`,
+          cenas,
+          {
+            estilo: outcome.result.voz?.estilo || "Masculina brasileira",
+            ritmo: outcome.result.voz?.ritmo || "medio",
+          },
+          {
+            legenda: outcome.result.legenda,
+            hashtags: outcome.result.hashtags,
+            cta: outcome.result.cta,
+          },
+        );
+        setVideoTimeline(timeline);
+      }
+
+      setStage("finalizado");
 
       if (outcome.usedFallback) {
         toast.warning("IA indisponível — gerando versão alternativa.");
@@ -123,9 +174,11 @@ const DarkFlowEngine = () => {
       console.error("Erro real da engine:", err);
       const fallback = buildFallbackDarkFlow(form);
       runDarkFlowPipeline(fallback, "Alternativa");
+      setStage("erro");
       toast.warning("IA indisponível — gerando versão alternativa.");
     } finally {
       setIsLoading(false);
+      setTimeout(() => setStage("idle"), 3000);
     }
   };
 
@@ -245,7 +298,8 @@ const DarkFlowEngine = () => {
           <Zap className="w-4 h-4" /> {isDetecting ? "Detectando nichos..." : "Detectar nichos quentes"}
         </Button>
         <Button variant="neon" size="lg" className="w-full" onClick={handleGenerate} disabled={isLoading}>
-          <Sparkles className="w-4 h-4" /> {isLoading ? "Gerando conteúdo com IA..." : "GERAR CONTEÚDO DARK"}
+          {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+          {isLoading ? (STAGE_LABELS[stage] || "Gerando conteúdo com IA...") : "GERAR CONTEÚDO DARK"}
         </Button>
       </div>
 
@@ -276,6 +330,16 @@ const DarkFlowEngine = () => {
             </div>
           )}
         </div>
+      )}
+
+      {/* Video Preview */}
+      {videoTimeline && videoTimeline.cenas.length > 0 && (
+        <VideoPreview
+          timeline={videoTimeline}
+          onGenerateVideo={() => {
+            toast.message("Motor de exportação MP4 em preparação. Estrutura do vídeo está pronta!");
+          }}
+        />
       )}
 
       {result && (
