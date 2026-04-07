@@ -526,7 +526,26 @@ const VideoGeneratorUI = () => {
       const script = await generateScript();
       const prompt = buildCinematicPrompt(productType, styleType, useDarkflow, useViral, modePro);
 
-      const payload = {
+      // Build scenes from script
+      const scenesFromScript = (script?.onScreenText || []).map((text, i) => ({
+        texto: text,
+        visual: `scene ${i + 1} for ${productType}`,
+        emocao: ["curiosidade", "tensão", "solução", "urgência"][Math.min(i, 3)],
+        prompt_imagem: `${prompt}, scene: ${text}`,
+      }));
+
+      // Ensure at least 4 scenes
+      while (scenesFromScript.length < 4) {
+        scenesFromScript.push({
+          texto: script?.cta || "Garanta o seu agora",
+          visual: `product premium shot`,
+          emocao: "urgência",
+          prompt_imagem: `${prompt}, premium product close-up`,
+        });
+      }
+
+      // Create job in DB first
+      const createResponse = await createVideoJob({
         imageUrl: resolvedImageUrl,
         productType,
         style: styleType,
@@ -537,17 +556,25 @@ const VideoGeneratorUI = () => {
         script,
         textoNaTela: script?.onScreenText || [],
         narracao: narrationText || script?.fullScript || "",
-      };
-      const response = await createVideoJob(payload);
-      const id = response?.jobId;
+      });
+
+      const id = createResponse?.jobId;
       if (!id) throw new Error("Job nao retornado pelo servidor.");
       setJobId(id);
-      setJobStatus(response?.status || "processing");
-      if (response?.videoUrl) {
-        setVideoUrl(response.videoUrl);
-        setProgress(100);
-      }
-      toast.success("Job criado. Processando...");
+      setJobStatus("pending");
+
+      // Start the full pipeline (images → audio → render)
+      startVideoPipeline({
+        jobId: id,
+        imageUrl: resolvedImageUrl,
+        script: narrationText || script?.fullScript || "",
+        scenes: scenesFromScript,
+      }).catch((err) => {
+        console.error("Pipeline async error:", err);
+        // Status updates come via realtime, no need to block
+      });
+
+      toast.success("Pipeline iniciado! Acompanhe o progresso.");
     } catch (error: any) {
       console.error("PDG DEBUG: erro detectado e tratado", error);
       toast.error(error?.message || "Falha ao iniciar o job.");
