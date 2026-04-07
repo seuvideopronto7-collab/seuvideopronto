@@ -2,7 +2,7 @@ import { ReactNode, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   Bell, Film, Menu, Settings, ShieldCheck, Users,
-  LayoutGrid, Share2, LogOut, X, CircleDot, User,
+  LayoutGrid, Share2, LogOut, X, CircleDot,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,7 @@ import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import AdminLiveLayer from "@/components/admin/AdminLiveLayer";
+import logoSvp from "@/assets/logo-svp.png";
 
 type AdminLayoutProps = {
   title: string;
