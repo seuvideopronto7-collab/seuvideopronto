@@ -130,7 +130,7 @@ const VideoGeneratorUI = () => {
           setProgress(job.progress ?? 0);
           setVideoUrl(job.video_url || null);
           if (nextStatus && nextStatus !== lastRealtimeStatusRef.current) {
-            if (job.status === "completed") toast.success("\ud83c\udfac V\u00eddeo pronto!");
+            if (job.status === "completed" || job.status === "done") toast.success("🎬 Vídeo pronto!");
             if (nextStatus === "error" || nextStatus === "failed") {
               toast.error(job.error || "Erro no processamento");
             }
