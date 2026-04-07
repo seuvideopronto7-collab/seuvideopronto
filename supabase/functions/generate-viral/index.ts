@@ -436,6 +436,7 @@ Retorne EXATAMENTE este formato JSON:
   "lista": ["erro 1", "erro 2", "erro 3"],
   "solucao": "apresenta o sistema/produto",
   "cta": "LINK NA BIO",
+  "titulo": "titulo viral do video",
   "legenda": "legenda curta e direta",
   "hashtags": ["#hash1", "#hash2", "#hash3", "#hash4", "#hash5"],
   "roteiro": "roteiro corrido completo para o video",
