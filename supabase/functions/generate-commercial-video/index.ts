@@ -10,7 +10,6 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
 const rateLimitMap = new Map<string, number[]>();
-
 const isRateLimited = (userId: string): boolean => {
   const now = Date.now();
   const timestamps = (rateLimitMap.get(userId) || []).filter(t => now - t < 60_000);
@@ -20,220 +19,487 @@ const isRateLimited = (userId: string): boolean => {
   return false;
 };
 
+// ── Scene count by duration ──
+const sceneCountByDuration: Record<string, number> = {
+  "5s": 2,
+  "15s": 4,
+  "30s": 6,
+  "60s": 8,
+  "2min": 10,
+  "4min": 12,
+};
+
+// ── Voice IDs (ElevenLabs) ──
+const voiceIds: Record<string, string> = {
+  masculina: "onwK4e9ZLuTAKqWW03F9",   // Daniel
+  feminina: "EXAVITQu4vr4xnSDxMaL",     // Sarah
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
+  const SHOTSTACK_API_KEY = Deno.env.get("SHOTSTACK_API_KEY");
+
+  if (!supabaseUrl || !serviceRoleKey) return json({ error: "Server config missing" }, 500);
+
+  const admin = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
+
+  const updateJob = async (jobId: string, fields: Record<string, unknown>) => {
+    await admin.from("video_jobs").update(fields).eq("id", jobId);
+  };
+
   try {
+    // ── Auth ──
     const authHeader = req.headers.get("Authorization") || "";
     if (!authHeader.startsWith("Bearer ")) return json({ error: "Unauthorized" }, 401);
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const supabase = createClient(supabaseUrl, anonKey, {
+    const authClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
-
-    const token = authHeader.replace("Bearer ", "");
-    const { data, error } = await supabase.auth.getClaims(token);
-    if (error || !data?.claims) return json({ error: "Unauthorized" }, 401);
-    const userId = data.claims.sub as string;
-
-    if (isRateLimited(userId)) return json({ error: "Rate limit excedido. Tente novamente em 1 minuto." }, 429);
+    const { data: { user }, error: authError } = await authClient.auth.getUser();
+    if (authError || !user) return json({ error: "Unauthorized" }, 401);
+    if (isRateLimited(user.id)) return json({ error: "Rate limit excedido. Tente novamente em 1 minuto." }, 429);
 
     const body = await req.json();
-    const { imageUrl, objetivo, formato, duracao, produtoNome, nicho } = body;
+    const { imageUrl, objetivo, formato, duracao, produtoNome, nicho, step } = body;
 
     if (!imageUrl) return json({ error: "imageUrl é obrigatório" }, 400);
+    if (!LOVABLE_API_KEY) return json({ error: "AI não configurada" }, 500);
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+    // ═══════════════════════════════════════
+    // STEP 1: ANALYZE + GENERATE SCRIPT
+    // ═══════════════════════════════════════
+    if (!step || step === "analyze") {
+      const sceneCount = sceneCountByDuration[duracao] || 6;
 
-    const objetivoMap: Record<string, string> = {
-      vendas: "Vídeo de VENDAS agressivo: conversão máxima, escassez, urgência, CTA forte, prova social",
-      autoridade: "Vídeo de AUTORIDADE: educativo, posicionamento expert, confiança, profissionalismo",
-      engajamento: "Vídeo de ENGAJAMENTO: viral, emocional, compartilhável, hook irresistível, loop perfeito",
-    };
+      const objetivoMap: Record<string, string> = {
+        vendas: "Vídeo de VENDAS agressivo: conversão máxima, escassez, urgência, CTA forte, prova social, gatilhos mentais",
+        autoridade: "Vídeo de AUTORIDADE: educativo, posicionamento expert, confiança, profissionalismo, branding pessoal",
+        engajamento: "Vídeo de ENGAJAMENTO: viral, emocional, compartilhável, hook irresistível, loop perfeito, alto retention",
+      };
 
-    const formatoMap: Record<string, { ratio: string; res: string }> = {
-      tiktok: { ratio: "9:16", res: "1080x1920" },
-      shorts: { ratio: "9:16", res: "1080x1920" },
-      instagram_feed: { ratio: "1:1", res: "1080x1080" },
-      stories: { ratio: "9:16", res: "1080x1920" },
-      landscape: { ratio: "16:9", res: "1920x1080" },
-    };
+      const formatoMap: Record<string, { ratio: string }> = {
+        tiktok: { ratio: "9:16" },
+        shorts: { ratio: "9:16" },
+        instagram_feed: { ratio: "1:1" },
+        stories: { ratio: "9:16" },
+      };
 
-    const fmt = formatoMap[formato] || formatoMap.tiktok;
-    const duracaoLabel = duracao || "60s";
+      const fmt = formatoMap[formato] || formatoMap.tiktok;
 
-    const systemPrompt = `Você é um diretor criativo de vídeos comerciais premium. Você analisa imagens de produtos e cria roteiros cinematográficos com estrutura de copywriting. Sempre responda usando a função fornecida.`;
+      const systemPrompt = `Você é um diretor criativo de vídeos comerciais premium com expertise em copywriting de alta conversão. Analise imagens de produtos e crie roteiros cinematográficos com estrutura persuasiva completa. Use a função fornecida para retornar os dados estruturados.`;
 
-    const userPrompt = `Analise esta imagem de produto e crie um roteiro comercial completo.
+      const userPrompt = `Analise esta imagem de produto e crie um roteiro comercial completo com EXATAMENTE ${sceneCount} cenas.
 
 IMAGEM DO PRODUTO: ${imageUrl}
 
 CONFIGURAÇÕES:
 - Objetivo: ${objetivoMap[objetivo] || objetivoMap.vendas}
 - Formato: ${formato} (${fmt.ratio})
-- Duração alvo: ${duracaoLabel}
-- Produto: ${produtoNome || "Não especificado"}
-- Nicho: ${nicho || "Não especificado"}
+- Duração alvo: ${duracao}
+- Produto: ${produtoNome || "Detectar automaticamente"}
+- Nicho: ${nicho || "Detectar automaticamente"}
 
-ESTRUTURA OBRIGATÓRIA DO ROTEIRO:
-1. GANCHO (0-3s): Frase que para o scroll imediatamente
-2. DOR (3-8s): Identificar o problema do público
-3. PROMESSA (8-15s): O que o produto resolve
-4. PROVA (15-25s): Elemento de credibilidade
-5. SOLUÇÃO (25-40s): Mostrar o produto em ação
-6. CTA (últimos 5s): Chamada irresistível para ação
+ESTRUTURA OBRIGATÓRIA (adaptar ${sceneCount} cenas a estas etapas):
+1. GANCHO (primeira cena): Frase que para o scroll imediatamente
+2. DOR (1-2 cenas): Identificar o problema do público
+3. PROMESSA (1-2 cenas): O que o produto resolve
+4. PROVA (1-2 cenas): Elemento de credibilidade, prova social
+5. SOLUÇÃO (1-2 cenas): Mostrar o produto em ação
+6. CTA (última cena): Chamada irresistível para ação
 
 Para cada cena, defina:
-- Tipo de movimento de câmera (zoom_in, zoom_out, pan, crop_inteligente, reveal, before_after)
-- Texto overlay na tela
-- Narração
-- Efeito visual (cinematic_glow, particles, blur_bg, color_grade, split_screen)
-- Emoção dominante`;
+- Movimento de câmera: zoom_in, zoom_out, pan, crop_inteligente, reveal, before_after, static
+- Texto overlay curto (max 10 palavras)
+- Narração completa (o que será falado)
+- Efeito visual: cinematic_glow, particles, blur_bg, color_grade, split_screen, none
+- Emoção dominante
+- Prompt de imagem para geração (detalhado, cinematográfico, 9:16)
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          {
-            role: "user",
-            content: [
-              { type: "text", text: userPrompt },
-              { type: "image_url", image_url: { url: imageUrl } },
-            ],
-          },
-        ],
-        tools: [{
-          type: "function",
-          function: {
-            name: "generate_commercial_script",
-            description: "Generate a commercial video script from product image analysis",
-            parameters: {
-              type: "object",
-              properties: {
-                analise_imagem: {
-                  type: "object",
-                  properties: {
-                    produto_detectado: { type: "string" },
-                    nicho_detectado: { type: "string" },
-                    cores_dominantes: { type: "array", items: { type: "string" } },
-                    contexto: { type: "string" },
-                    tem_rosto: { type: "boolean" },
-                    estilo_sugerido: { type: "string" },
-                  },
-                  required: ["produto_detectado", "nicho_detectado", "contexto", "estilo_sugerido"],
-                },
-                roteiro: {
-                  type: "object",
-                  properties: {
-                    titulo: { type: "string" },
-                    gancho: { type: "string" },
-                    dor: { type: "string" },
-                    promessa: { type: "string" },
-                    prova: { type: "string" },
-                    solucao: { type: "string" },
-                    cta: { type: "string" },
-                    narracao_completa: { type: "string" },
-                  },
-                  required: ["titulo", "gancho", "dor", "promessa", "prova", "solucao", "cta", "narracao_completa"],
-                },
-                cenas: {
-                  type: "array",
-                  items: {
+A narração_completa deve ser o script falado COMPLETO, naturla e fluido.`;
+
+      const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-3-flash-preview",
+          messages: [
+            { role: "system", content: systemPrompt },
+            {
+              role: "user",
+              content: [
+                { type: "text", text: userPrompt },
+                { type: "image_url", image_url: { url: imageUrl } },
+              ],
+            },
+          ],
+          tools: [{
+            type: "function",
+            function: {
+              name: "generate_commercial_script",
+              description: "Generate a complete commercial video script from product image analysis",
+              parameters: {
+                type: "object",
+                properties: {
+                  analise_imagem: {
                     type: "object",
                     properties: {
-                      numero: { type: "number" },
-                      etapa: { type: "string", enum: ["gancho", "dor", "promessa", "prova", "solucao", "cta"] },
-                      duracao: { type: "string" },
-                      movimento_camera: { type: "string", enum: ["zoom_in", "zoom_out", "pan", "crop_inteligente", "reveal", "before_after", "static"] },
-                      texto_tela: { type: "string" },
-                      narracao: { type: "string" },
-                      efeito_visual: { type: "string", enum: ["cinematic_glow", "particles", "blur_bg", "color_grade", "split_screen", "none"] },
-                      emocao: { type: "string" },
-                      prompt_imagem: { type: "string" },
+                      produto_detectado: { type: "string" },
+                      nicho_detectado: { type: "string" },
+                      cores_dominantes: { type: "array", items: { type: "string" } },
+                      contexto: { type: "string" },
+                      tem_rosto: { type: "boolean" },
+                      estilo_sugerido: { type: "string" },
                     },
-                    required: ["numero", "etapa", "duracao", "movimento_camera", "texto_tela", "narracao", "efeito_visual", "emocao", "prompt_imagem"],
+                    required: ["produto_detectado", "nicho_detectado", "contexto", "estilo_sugerido"],
+                  },
+                  roteiro: {
+                    type: "object",
+                    properties: {
+                      titulo: { type: "string" },
+                      gancho: { type: "string" },
+                      dor: { type: "string" },
+                      promessa: { type: "string" },
+                      prova: { type: "string" },
+                      solucao: { type: "string" },
+                      cta: { type: "string" },
+                      narracao_completa: { type: "string" },
+                    },
+                    required: ["titulo", "gancho", "dor", "promessa", "prova", "solucao", "cta", "narracao_completa"],
+                  },
+                  cenas: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        numero: { type: "number" },
+                        etapa: { type: "string" },
+                        duracao: { type: "string" },
+                        movimento_camera: { type: "string" },
+                        texto_tela: { type: "string" },
+                        narracao: { type: "string" },
+                        efeito_visual: { type: "string" },
+                        emocao: { type: "string" },
+                        prompt_imagem: { type: "string" },
+                      },
+                      required: ["numero", "etapa", "duracao", "movimento_camera", "texto_tela", "narracao", "efeito_visual", "emocao", "prompt_imagem"],
+                    },
+                  },
+                  copy: {
+                    type: "object",
+                    properties: {
+                      headline: { type: "string" },
+                      subheadline: { type: "string" },
+                      bullet_points: { type: "array", items: { type: "string" } },
+                      hashtags: { type: "array", items: { type: "string" } },
+                    },
+                    required: ["headline", "subheadline", "bullet_points", "hashtags"],
+                  },
+                  config_video: {
+                    type: "object",
+                    properties: {
+                      aspect_ratio: { type: "string" },
+                      resolucao: { type: "string" },
+                      duracao_total: { type: "string" },
+                      estilo_edicao: { type: "string" },
+                      voz_sugerida: { type: "string" },
+                    },
+                    required: ["aspect_ratio", "resolucao", "duracao_total", "estilo_edicao", "voz_sugerida"],
                   },
                 },
-                copy: {
-                  type: "object",
-                  properties: {
-                    headline: { type: "string" },
-                    subheadline: { type: "string" },
-                    bullet_points: { type: "array", items: { type: "string" } },
-                    hashtags: { type: "array", items: { type: "string" } },
-                  },
-                  required: ["headline", "subheadline", "bullet_points", "hashtags"],
-                },
-                config_video: {
-                  type: "object",
-                  properties: {
-                    aspect_ratio: { type: "string" },
-                    resolucao: { type: "string" },
-                    duracao_total: { type: "string" },
-                    estilo_edicao: { type: "string" },
-                    voz_sugerida: { type: "string", enum: ["masculina", "feminina"] },
-                  },
-                  required: ["aspect_ratio", "resolucao", "duracao_total", "estilo_edicao", "voz_sugerida"],
-                },
+                required: ["analise_imagem", "roteiro", "cenas", "copy", "config_video"],
               },
-              required: ["analise_imagem", "roteiro", "cenas", "copy", "config_video"],
             },
+          }],
+          tool_choice: { type: "function", function: { name: "generate_commercial_script" } },
+        }),
+      });
+
+      if (!aiResponse.ok) {
+        if (aiResponse.status === 429) return json({ error: "Rate limit excedido." }, 429);
+        if (aiResponse.status === 402) return json({ error: "Créditos insuficientes." }, 402);
+        const text = await aiResponse.text();
+        console.error("AI error:", aiResponse.status, text);
+        throw new Error("AI gateway error");
+      }
+
+      const aiData = await aiResponse.json();
+      let result;
+      const toolCalls = aiData.choices?.[0]?.message?.tool_calls;
+      if (toolCalls && toolCalls.length > 0) {
+        result = JSON.parse(toolCalls[0].function.arguments);
+      } else {
+        const content = aiData.choices?.[0]?.message?.content || "";
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        result = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
+      }
+
+      if (!result) return json({ error: "Failed to parse AI response" }, 500);
+
+      // Create job in DB
+      const { data: job, error: jobError } = await admin
+        .from("video_jobs")
+        .insert({
+          user_id: user.id,
+          status: "script_ready",
+          progress: 25,
+          image_url: imageUrl,
+          prompt: JSON.stringify({ objetivo, formato, duracao }),
+          scenes: result.cenas || [],
+          caption_text: result.roteiro?.narracao_completa || "",
+        })
+        .select("id")
+        .single();
+
+      if (jobError) {
+        console.error("Job insert error:", jobError);
+        return json({ error: "Falha ao salvar job" }, 500);
+      }
+
+      return json({ step: "analyze", ...result, jobId: job.id });
+    }
+
+    // ═══════════════════════════════════════
+    // STEP 2: RENDER (images + voice + video)
+    // ═══════════════════════════════════════
+    if (step === "render") {
+      const { jobId, scenes, script, voz } = body;
+      if (!jobId) return json({ error: "jobId obrigatório" }, 400);
+
+      // Verify ownership
+      const { data: job } = await admin.from("video_jobs").select("user_id, image_url").eq("id", jobId).maybeSingle();
+      if (!job) return json({ error: "Job não encontrado" }, 404);
+      if (job.user_id !== user.id) {
+        const { data: adminRole } = await admin.from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin").maybeSingle();
+        if (!adminRole) return json({ error: "Forbidden" }, 403);
+      }
+
+      const sourceImage = job.image_url || imageUrl;
+      const sceneList = scenes || [];
+      const narration = script || sceneList.map((s: any) => s.narracao || s.texto_tela).join(". ");
+
+      // ── 2a. Generate scene images ──
+      await updateJob(jobId, { status: "generating_images", progress: 30 });
+      const imageUrls: string[] = [];
+
+      for (let i = 0; i < sceneList.length; i++) {
+        const scene = sceneList[i];
+        try {
+          const scenePrompt = `Generate a cinematic 9:16 vertical marketing image. Style: dark luxury, high contrast, dramatic lighting, ultra realistic 4k. Scene: ${scene.prompt_imagem || scene.visual || scene.texto_tela}. Emotion: ${scene.emocao}. On a clean background`;
+
+          const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${LOVABLE_API_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              model: "google/gemini-2.5-flash-image",
+              messages: [{ role: "user", content: scenePrompt }],
+              modalities: ["image", "text"],
+            }),
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            const base64Url = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+            if (base64Url) {
+              const base64Data = base64Url.replace(/^data:image\/\w+;base64,/, "");
+              const binaryData = Uint8Array.from(atob(base64Data), (c) => c.charCodeAt(0));
+              const path = `scenes/${jobId}/scene-${i}.png`;
+              const { error: uploadErr } = await admin.storage
+                .from("images")
+                .upload(path, binaryData, { contentType: "image/png", upsert: true });
+              if (!uploadErr) {
+                const { data: urlData } = admin.storage.from("images").getPublicUrl(path);
+                imageUrls.push(urlData.publicUrl);
+              } else {
+                imageUrls.push(sourceImage);
+              }
+            } else {
+              imageUrls.push(sourceImage);
+            }
+          } else {
+            imageUrls.push(sourceImage);
+          }
+        } catch {
+          imageUrls.push(sourceImage);
+        }
+
+        const imgProgress = 30 + Math.round(((i + 1) / sceneList.length) * 20);
+        await updateJob(jobId, { progress: imgProgress, images: imageUrls });
+      }
+
+      // ── 2b. Generate voiceover ──
+      await updateJob(jobId, { status: "generating_audio", progress: 55 });
+      let audioUrl: string | null = null;
+
+      if (ELEVENLABS_API_KEY && narration.trim()) {
+        try {
+          const voiceId = voiceIds[voz || "masculina"] || voiceIds.masculina;
+          const res = await fetch(
+            `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`,
+            {
+              method: "POST",
+              headers: { "xi-api-key": ELEVENLABS_API_KEY, "Content-Type": "application/json" },
+              body: JSON.stringify({
+                text: narration,
+                model_id: "eleven_multilingual_v2",
+                voice_settings: { stability: 0.6, similarity_boost: 0.8, style: 0.4, use_speaker_boost: true },
+              }),
+            }
+          );
+
+          if (res.ok) {
+            const audioBuffer = await res.arrayBuffer();
+            const audioPath = `voiceovers/${jobId}.mp3`;
+            const { error: uploadErr } = await admin.storage
+              .from("audio")
+              .upload(audioPath, audioBuffer, { contentType: "audio/mpeg", upsert: true });
+            if (!uploadErr) {
+              const { data: urlData } = admin.storage.from("audio").getPublicUrl(audioPath);
+              audioUrl = urlData.publicUrl;
+            }
+          } else {
+            console.error("ElevenLabs error:", res.status);
+          }
+        } catch (e) {
+          console.error("Audio gen error:", e);
+        }
+      }
+
+      await updateJob(jobId, { progress: 60, audio_url: audioUrl, caption_text: narration });
+
+      // ── 2c. Render video with Shotstack ──
+      if (!SHOTSTACK_API_KEY) {
+        await updateJob(jobId, {
+          status: "done", progress: 100,
+          video_url: null, images: imageUrls,
+          error: "Renderizador indisponível – preview com imagens geradas",
+        });
+        return json({ jobId, status: "done", images: imageUrls, audioUrl, fallback: true });
+      }
+
+      await updateJob(jobId, { status: "rendering", progress: 65 });
+
+      const sceneDuration = Math.max(2, Math.round(
+        (parseInt(duracao) || 60) / sceneList.length
+      ));
+
+      const totalDuration = sceneList.length * sceneDuration;
+
+      const imageClips = imageUrls.map((url: string, i: number) => ({
+        asset: { type: "image", src: url },
+        start: i * sceneDuration,
+        length: sceneDuration,
+        fit: "cover",
+        transition: { in: "fade", out: "fade" },
+      }));
+
+      const captionClips = sceneList.map((scene: any, i: number) => ({
+        asset: {
+          type: "html",
+          html: `<p style="font-family:Montserrat;font-size:42px;color:#fff;text-align:center;text-shadow:2px 2px 8px rgba(0,0,0,0.9);font-weight:800;line-height:1.3">${(scene.texto_tela || "").slice(0, 80)}</p>`,
+          width: 720,
+          height: 200,
+        },
+        start: i * sceneDuration,
+        length: sceneDuration,
+        position: "bottom",
+        offset: { y: 0.12 },
+        transition: { in: "fade", out: "fade" },
+      }));
+
+      const tracks: any[] = [
+        { clips: captionClips },
+        { clips: imageClips },
+      ];
+
+      if (audioUrl) {
+        tracks.push({
+          clips: [{
+            asset: { type: "audio", src: audioUrl, volume: 1 },
+            start: 0,
+            length: totalDuration,
+          }],
+        });
+      }
+
+      const aspectMap: Record<string, string> = {
+        tiktok: "9:16", shorts: "9:16", stories: "9:16", instagram_feed: "1:1",
+      };
+      const sizeMap: Record<string, { width: number; height: number }> = {
+        "9:16": { width: 1080, height: 1920 },
+        "1:1": { width: 1080, height: 1080 },
+        "16:9": { width: 1920, height: 1080 },
+      };
+      const ratio = aspectMap[formato] || "9:16";
+
+      const renderRes = await fetch("https://api.shotstack.io/edit/stage/render", {
+        method: "POST",
+        headers: { "x-api-key": SHOTSTACK_API_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          timeline: { background: "#000000", tracks },
+          output: {
+            format: "mp4",
+            aspectRatio: ratio,
+            size: sizeMap[ratio] || sizeMap["9:16"],
+            fps: 30,
           },
-        }],
-        tool_choice: { type: "function", function: { name: "generate_commercial_script" } },
-      }),
-    });
+        }),
+      });
 
-    if (!response.ok) {
-      if (response.status === 429) return json({ error: "Rate limit excedido." }, 429);
-      if (response.status === 402) return json({ error: "Créditos insuficientes." }, 402);
-      const text = await response.text();
-      console.error("AI error:", response.status, text);
-      throw new Error("AI gateway error");
+      if (!renderRes.ok) {
+        const errText = await renderRes.text();
+        console.error("Shotstack render error:", renderRes.status, errText);
+        await updateJob(jobId, { status: "done", progress: 100, video_url: null, error: `Render failed: ${renderRes.status}` });
+        return json({ jobId, status: "done", images: imageUrls, audioUrl, fallback: true });
+      }
+
+      const renderData = await renderRes.json();
+      const renderId = renderData?.response?.id;
+      if (!renderId) {
+        await updateJob(jobId, { status: "error", progress: 100, error: "No renderId" });
+        return json({ jobId, status: "error", error: "No renderId" }, 500);
+      }
+
+      await updateJob(jobId, { progress: 70 });
+
+      // Poll Shotstack
+      let videoUrl: string | null = null;
+      const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
+      for (let i = 0; i < 60; i++) {
+        await delay(5000);
+        const pollRes = await fetch(`https://api.shotstack.io/edit/stage/render/${renderId}`, {
+          headers: { "x-api-key": SHOTSTACK_API_KEY },
+        });
+        if (!pollRes.ok) continue;
+        const pollData = await pollRes.json();
+        const renderStatus = pollData?.response?.status;
+        await updateJob(jobId, { progress: 70 + Math.min(25, Math.round(i * 0.8)) });
+        if (renderStatus === "done") { videoUrl = pollData?.response?.url || null; break; }
+        if (renderStatus === "failed") { console.error("Render failed:", pollData?.response?.error); break; }
+      }
+
+      if (!videoUrl) {
+        await updateJob(jobId, { status: "error", progress: 100, error: "Render timeout" });
+        return json({ jobId, status: "error", error: "Render timeout" }, 500);
+      }
+
+      await updateJob(jobId, { status: "done", progress: 100, video_url: videoUrl, error: null });
+      return json({ jobId, status: "done", videoUrl, audioUrl, images: imageUrls });
     }
 
-    const aiData = await response.json();
-    let result;
-    const toolCalls = aiData.choices?.[0]?.message?.tool_calls;
-    if (toolCalls && toolCalls.length > 0) {
-      result = JSON.parse(toolCalls[0].function.arguments);
-    } else {
-      const content = aiData.choices?.[0]?.message?.content || "";
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      result = jsonMatch ? JSON.parse(jsonMatch[0]) : { error: "Failed to parse" };
-    }
-
-    // Save job to database
-    const { data: job, error: jobError } = await supabase
-      .from("video_jobs")
-      .insert({
-        user_id: userId,
-        status: "script_ready",
-        progress: 30,
-        image_url: imageUrl,
-        prompt: JSON.stringify({ objetivo, formato, duracao }),
-        scenes: result.cenas || [],
-        caption_text: result.roteiro?.narracao_completa || "",
-      })
-      .select("id")
-      .single();
-
-    if (jobError) console.error("Job insert error:", jobError);
-
-    return json({
-      ...result,
-      jobId: job?.id || null,
-    });
+    return json({ error: "step inválido" }, 400);
   } catch (e) {
     console.error("Error:", e);
     return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
