@@ -1,7 +1,8 @@
+import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
-import { LogOut, Shield, Settings, User } from "lucide-react";
+import { LogOut, Shield, Settings, User, Camera, Loader2 } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -11,14 +12,53 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import logoSvp from "@/assets/logo-svp.png";
 
 const HomeHeader = () => {
-  const { user, signOut, isAdmin, profile } = useAuth();
+  const { user, signOut, isAdmin, profile, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
 
-  const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url || null;
+  const avatarUrl = avatarPreview || profile?.avatar_url || user?.user_metadata?.avatar_url || null;
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    if (!/\.(jpg|jpeg|png|webp)$/i.test(file.name)) {
+      toast.error("Envie uma imagem JPG, PNG ou WEBP.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Imagem muito grande (máx 5MB).");
+      return;
+    }
+    setAvatarPreview(URL.createObjectURL(file));
+    setUploading(true);
+    try {
+      const ext = file.name.split(".").pop() || "png";
+      const path = `${user.id}/avatar.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(path, file, { upsert: true, contentType: file.type });
+      if (uploadError) throw uploadError;
+      const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
+      const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+      await supabase.from("profiles").update({ avatar_url: publicUrl, updated_at: new Date().toISOString() }).eq("id", user.id);
+      await refreshProfile();
+      toast.success("Foto atualizada!");
+    } catch (err: any) {
+      console.error("Avatar upload error:", err);
+      toast.error("Falha ao enviar foto.");
+      setAvatarPreview(null);
+    } finally {
+      setUploading(false);
+    }
+  };
   const displayName =
     profile?.full_name ||
     user?.user_metadata?.name ||
