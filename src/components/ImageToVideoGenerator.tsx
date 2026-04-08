@@ -197,10 +197,52 @@ const ImageToVideoGenerator = () => {
     setApiStatuses({ ...statuses });
   }
 
-  // ── Realtime subscription for job updates ──
+  // ── Realtime + polling fallback for job updates ──
   useEffect(() => {
     if (!jobId) return;
     let active = true;
+
+    const syncJob = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("video_jobs" as any)
+          .select("*")
+          .eq("id", jobId)
+          .maybeSingle();
+        if (!active || error || !data) return;
+        const job = data as any;
+        setProgress(job.progress ?? 0);
+        if (job.images?.length) setGeneratedImages(job.images);
+        if (job.audio_url) setAudioUrl(job.audio_url);
+        if (job.video_url) setVideoUrl(job.video_url);
+        const statusMap: Record<string, PipelineStep> = {
+          generating_images: "generating_images",
+          generating_audio: "generating_audio",
+          rendering: "rendering",
+          done: "done",
+          completed: "done",
+          error: "error",
+          failed: "error",
+        };
+        if (statusMap[job.status]) setPipelineStep(statusMap[job.status]);
+        if (job.status === "done" || job.status === "completed") {
+          toast.success("🎬 Vídeo comercial pronto!");
+          active = false;
+        }
+        if (job.status === "error" || job.status === "failed") {
+          setErrorMsg(job.error || "Erro no processamento");
+          toast.error(job.error || "Erro no pipeline");
+          active = false;
+        }
+      } catch (err) {
+        console.error("Poll error:", err);
+      }
+    };
+
+    // Poll every 3s as fallback
+    const pollInterval = window.setInterval(() => {
+      if (active) syncJob();
+    }, 3000);
 
     const channel = supabase
       .channel(`job-${jobId}`)
@@ -239,7 +281,11 @@ const ImageToVideoGenerator = () => {
       })
       .subscribe();
 
-    return () => { active = false; supabase.removeChannel(channel); };
+    return () => {
+      active = false;
+      window.clearInterval(pollInterval);
+      supabase.removeChannel(channel);
+    };
   }, [jobId]);
 
   // ── File handling ──
