@@ -3,6 +3,11 @@ import { supabase } from "@/integrations/supabase/client";
 export const VIDEO_FALLBACK =
   "/__l5e/assets-v1/bf6a1191-551b-406d-8192-4a97863744de/demo-cinematic.mp4";
 
+const FALLBACK_VIDEO_URLS = new Set([
+  VIDEO_FALLBACK,
+  "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4",
+]);
+
 function isManagedStorageUrl(url: string): boolean {
   return url.includes("/storage/v1/object/");
 }
@@ -41,6 +46,45 @@ function triggerNativeDownload(url: string, filename?: string): void {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+}
+
+function isKnownFallbackVideo(url: string): boolean {
+  return FALLBACK_VIDEO_URLS.has(url);
+}
+
+async function resolveDownloadVideo(urlOrPath: string): Promise<string> {
+  if (!urlOrPath || urlOrPath.trim() === "") {
+    throw new Error("VIDEO_URL_MISSING");
+  }
+
+  if (isKnownFallbackVideo(urlOrPath)) {
+    throw new Error("VIDEO_FALLBACK_ONLY");
+  }
+
+  if (!urlOrPath.startsWith("http")) {
+    const { data, error } = await supabase.storage.from("videos").createSignedUrl(urlOrPath, 3600);
+
+    if (!error && data?.signedUrl) return data.signedUrl;
+
+    const { data: publicData } = supabase.storage.from("videos").getPublicUrl(urlOrPath);
+    if (publicData?.publicUrl) return publicData.publicUrl;
+
+    throw new Error("VIDEO_DOWNLOAD_UNAVAILABLE");
+  }
+
+  if (isManagedStorageUrl(urlOrPath)) {
+    const storagePath = extractStoragePath(urlOrPath);
+
+    if (storagePath) {
+      const { data, error } = await supabase.storage
+        .from(storagePath.bucket)
+        .createSignedUrl(storagePath.path, 3600);
+
+      if (!error && data?.signedUrl) return data.signedUrl;
+    }
+  }
+
+  return urlOrPath;
 }
 
 /**
@@ -103,11 +147,11 @@ export async function resolveVideo(urlOrPath: string): Promise<string> {
  * Force-download a video file via fetch+blob approach.
  */
 export async function downloadVideo(url: string, filename?: string): Promise<void> {
-  const safeUrl = await resolveVideo(url);
-  const downloadName = getDownloadFilename(safeUrl, filename);
+  const downloadUrl = await resolveDownloadVideo(url);
+  const downloadName = getDownloadFilename(url, filename);
 
   try {
-    const res = await fetch(safeUrl);
+    const res = await fetch(downloadUrl);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
     const blob = await res.blob();
@@ -122,16 +166,21 @@ export async function downloadVideo(url: string, filename?: string): Promise<voi
     document.body.removeChild(link);
     URL.revokeObjectURL(blobUrl);
   } catch (error) {
-    console.warn("[VIDEO_PIPELINE_ERROR]", {
-      etapa: "download",
-      url: safeUrl,
-      fallback: "native-anchor",
-    });
+    if (error instanceof TypeError) {
+      console.warn("[VIDEO_PIPELINE_ERROR]", {
+        etapa: "download",
+        url: downloadUrl,
+        fallback: "native-anchor",
+      });
 
-    triggerNativeDownload(safeUrl, downloadName);
+      triggerNativeDownload(downloadUrl, downloadName);
+      return;
+    }
 
     if (error instanceof Error) {
       console.warn("[DOWNLOAD_FALLBACK]", error.message);
     }
+
+    throw error;
   }
 }
