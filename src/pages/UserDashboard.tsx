@@ -119,12 +119,31 @@ const UserDashboard = () => {
     }
   };
 
-  const handleDownload = (url?: string | null) => {
-    if (!url) return;
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "video-final.mp4";
-    link.click();
+  const handleDownload = async (url?: string | null) => {
+    if (!url) {
+      toast.error("Vídeo ainda não está pronto para download.");
+      return;
+    }
+    try {
+      toast.loading("Preparando download...", { id: "dl" });
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = `video-${Date.now()}.mp4`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+      toast.success("Download iniciado!", { id: "dl" });
+    } catch (err) {
+      console.error("[Download] Falha:", err);
+      // Fallback: open in new tab
+      window.open(url, "_blank");
+      toast.dismiss("dl");
+    }
   };
 
   const handleRepost = (jobId: string) => {
