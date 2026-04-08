@@ -182,6 +182,9 @@ const ImageToVideoGenerator = () => {
   const [voz, setVoz] = useState<Voz>("masculina");
   const [produtoNome, setProdutoNome] = useState("");
   const [nicho, setNicho] = useState("");
+  const [intensidade, setIntensidade] = useState<Intensidade>("agressivo");
+  const [avatar, setAvatar] = useState<Avatar>("");
+  const [estiloCta, setEstiloCta] = useState<EstiloCta>("urgencia");
 
   const [pipelineStep, setPipelineStep] = useState<PipelineStep>("idle");
   const [progress, setProgress] = useState(0);
