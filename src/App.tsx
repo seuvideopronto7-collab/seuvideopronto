@@ -239,6 +239,17 @@ const App = () => (
                 )
               }
             />
+            <Route
+              path="/transformar-imagem"
+              element={
+                wrapSafe(
+                  "Transformar Imagem",
+                  <ProtectedRoute>
+                    <TransformImage />
+                  </ProtectedRoute>,
+                )
+              }
+            />
             <Route path="*" element={<Navigate to="/auth" replace />} />
           </Routes>
         </AuthProvider>
