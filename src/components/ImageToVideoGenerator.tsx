@@ -1051,7 +1051,7 @@ const ImageToVideoGenerator = () => {
                         {expandedScene === i && (
                           <div className="space-y-2 pt-2 border-t border-border/15">
                             {generatedImages[i] && (
-                              <img src={generatedImages[i]} alt={`Cena ${cena.numero}`} className="w-full rounded-xl object-cover max-h-36" />
+                              <img src={generatedImages[i]} alt={`Cena ${cena.numero}`} className="w-full rounded-xl object-cover max-h-36" onError={(e) => { console.warn(`[Storage] Falha ao carregar imagem cena ${cena.numero}:`, generatedImages[i]); (e.target as HTMLImageElement).src = "/placeholder.svg"; }} />
                             )}
                             <div>
                               <p className="text-[9px] text-muted-foreground uppercase tracking-wider">Narração</p>
@@ -1147,7 +1147,7 @@ const ImageToVideoGenerator = () => {
                       <Film className="w-4 h-4 text-emerald-400" />
                       <h3 className="text-sm font-semibold text-emerald-400">🎬 Vídeo Pronto!</h3>
                     </div>
-                    <video src={videoUrl} controls className="w-full rounded-xl" />
+                    <video src={videoUrl} controls className="w-full rounded-xl" onError={() => console.error("[Storage] Falha ao carregar vídeo:", videoUrl)} />
                     <a href={videoUrl} download target="_blank" rel="noopener noreferrer">
                       <Button variant="outline" size="sm" className="w-full md:w-auto">
                         <Download className="w-4 h-4" /> Baixar MP4
@@ -1164,7 +1164,7 @@ const ImageToVideoGenerator = () => {
                     </div>
                     <div className="grid grid-cols-3 gap-2">
                       {generatedImages.map((img, i) => (
-                        <img key={i} src={img} alt={`Cena ${i + 1}`} className="rounded-xl object-cover aspect-[9/16] w-full" />
+                        <img key={i} src={img} alt={`Cena ${i + 1}`} className="rounded-xl object-cover aspect-[9/16] w-full" onError={(e) => { console.warn(`[Storage] Falha ao carregar preview cena ${i + 1}:`, img); (e.target as HTMLImageElement).src = "/placeholder.svg"; }} />
                       ))}
                     </div>
                     <Button variant="outline" size="sm" className="w-full md:w-auto" onClick={retry} disabled={isProcessing}>
