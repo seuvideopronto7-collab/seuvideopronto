@@ -438,32 +438,61 @@ const VideoGeneratorUI = () => {
     }
   };
 
+  const [narrationError, setNarrationError] = useState<string | null>(null);
+  const narrationAbortRef = useRef<AbortController | null>(null);
+
   const generateVoiceover = async () => {
     if (!narrationText.trim()) {
       toast.error("Digite ou gere um texto de narração.");
       return;
     }
+    if (isGeneratingVoice) return; // Prevent multiple clicks
+
+    narrationAbortRef.current?.abort();
+    const controller = new AbortController();
+    narrationAbortRef.current = controller;
+
     try {
       setIsGeneratingVoice(true);
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-voiceover`;
-      const response = await fetch(url, {
-        method: "POST",
-        headers: supabaseFunctionHeaders(),
-        body: JSON.stringify({ text: narrationText }),
+      setNarrationError(null);
+
+      // Client-side timeout of 20s (server has 15s)
+      const timeoutId = setTimeout(() => controller.abort(), 20_000);
+
+      const { data, error } = await supabase.functions.invoke("generate-voiceover", {
+        body: { text: narrationText.trim(), jobId: jobId || undefined },
       });
-      if (!response.ok) {
-        const text = await response.text();
-        throw new Error(text || "Falha ao gerar narração");
+
+      clearTimeout(timeoutId);
+
+      if (controller.signal.aborted) {
+        throw new Error("Narração cancelada: timeout excedido");
       }
-      const blob = await response.blob();
-      if (narrationUrl?.startsWith("blob:")) URL.revokeObjectURL(narrationUrl);
-      setNarrationUrl(URL.createObjectURL(blob));
-      toast.success("Narração gerada.");
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      if (data?.audioUrl) {
+        if (narrationUrl?.startsWith("blob:")) URL.revokeObjectURL(narrationUrl);
+        setNarrationUrl(data.audioUrl);
+        toast.success("Narração gerada e salva no storage.");
+      } else {
+        throw new Error("Nenhuma URL de áudio retornada");
+      }
     } catch (error: any) {
-      console.error("PDG DEBUG: erro detectado e tratado", error);
-      toast.error(error?.message || "Falha ao gerar narração.");
+      if (error?.name === "AbortError" || controller.signal.aborted) {
+        const msg = "Narração cancelada: timeout de 20s excedido";
+        setNarrationError(msg);
+        toast.error(msg);
+      } else {
+        const msg = error?.message || "Falha ao gerar narração";
+        setNarrationError(msg);
+        toast.error(msg);
+      }
+      console.error("[narração] erro:", error);
     } finally {
       setIsGeneratingVoice(false);
+      narrationAbortRef.current = null;
     }
   };
 
