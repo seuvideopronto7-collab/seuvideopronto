@@ -901,7 +901,102 @@ const ImageToVideoGenerator = () => {
                   </div>
                 </div>
 
-                {/* Scenes Timeline */}
+                {/* ═══ Copy Score Card ═══ */}
+                {copyScoreData && (
+                  <div className="rounded-2xl border border-border/20 bg-gradient-to-br from-card to-background p-4 shadow-lg space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <BarChart3 className="w-4 h-4 text-primary" />
+                        <h3 className="text-sm font-semibold text-foreground">Analisador de Copy</h3>
+                      </div>
+                      <Badge variant="outline" className={`text-[10px] ${
+                        copyScoreData.nivel === "ultra" ? "border-primary/40 bg-primary/10 text-primary" :
+                        copyScoreData.nivel === "forte" ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400" :
+                        copyScoreData.nivel === "medio" ? "border-amber-500/40 bg-amber-500/10 text-amber-400" :
+                        "border-red-500/40 bg-red-500/10 text-red-400"
+                      }`}>
+                        {copyScoreData.total}/100 — {copyScoreData.nivel.toUpperCase()}
+                      </Badge>
+                    </div>
+                    <div className="grid grid-cols-5 gap-1.5">
+                      {[
+                        { label: "Gancho", value: copyScoreData.detalhes.gancho, max: 20 },
+                        { label: "Urgência", value: copyScoreData.detalhes.urgencia, max: 20 },
+                        { label: "Prova", value: copyScoreData.detalhes.prova, max: 20 },
+                        { label: "Dor", value: copyScoreData.detalhes.dorEmocional, max: 20 },
+                        { label: "CTA", value: copyScoreData.detalhes.cta, max: 20 },
+                      ].map((item, i) => (
+                        <div key={i} className="text-center">
+                          <div className="h-12 bg-muted/20 rounded-lg relative overflow-hidden">
+                            <div
+                              className="absolute bottom-0 left-0 right-0 bg-primary/30 rounded-lg transition-all"
+                              style={{ height: `${(item.value / item.max) * 100}%` }}
+                            />
+                            <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-foreground">{item.value}</span>
+                          </div>
+                          <p className="text-[8px] text-muted-foreground mt-1">{item.label}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">{copyScoreData.recomendacao}</p>
+                    {copyScoreData.total < 70 && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="w-full text-[11px] bg-gradient-to-r from-red-600 to-orange-500 border-0"
+                        onClick={() => {
+                          setIntensidade("black");
+                          analyzeAndGenerate();
+                        }}
+                        disabled={isProcessing}
+                      >
+                        🔥 Reescrever com mais intensidade (Auto)
+                      </Button>
+                    )}
+                  </div>
+                )}
+
+                {/* ═══ Ganchos Gerados ═══ */}
+                {ganchosGerados.length > 0 && (
+                  <div className="rounded-2xl border border-border/20 bg-gradient-to-br from-card to-background p-4 shadow-lg space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Crosshair className="w-4 h-4 text-primary" />
+                        <h3 className="text-sm font-semibold text-foreground">Ganchos Anti-Scroll</h3>
+                      </div>
+                      <div className="flex gap-1.5">
+                        <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => setShowGanchos(!showGanchos)}>
+                          {showGanchos ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => {
+                          const produto = result?.analise_imagem?.produto_detectado || produtoNome || "produto";
+                          setGanchosGerados(gerarGanchos(produto, 5));
+                          toast.success("Novos ganchos gerados!");
+                        }}>
+                          <Shuffle className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+                    {(showGanchos || ganchosGerados.length <= 3) && (
+                      <div className="space-y-1.5">
+                        {ganchosGerados.map((g, i) => (
+                          <div key={i} className="flex items-start gap-2 bg-background/50 rounded-xl p-2.5 border border-border/10">
+                            <Badge variant="outline" className="text-[8px] py-0 shrink-0 border-primary/20 text-primary">{g.tipo.replace("_", " ")}</Badge>
+                            <p className="text-[11px] text-foreground">{g.texto}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <Button variant="outline" size="sm" className="w-full text-[10px]" onClick={() => {
+                      const produto = result?.analise_imagem?.produto_detectado || produtoNome || "produto";
+                      const r = randomizeCopy(produto);
+                      toast.info(`🎲 Gancho: "${r.gancho.slice(0, 40)}..." | CTA: "${r.cta.slice(0, 30)}..."`);
+                    }}>
+                      <Shuffle className="w-3 h-3 mr-1" /> Randomizar Copy Completa
+                    </Button>
+                  </div>
+                )}
+
                 <div className="rounded-2xl border border-border/20 bg-gradient-to-br from-card to-background p-4 shadow-lg space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
