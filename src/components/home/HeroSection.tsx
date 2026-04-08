@@ -19,8 +19,10 @@ const HeroSection = ({ onOpenGenerator }: HeroSectionProps) => {
       const { data, error } = await supabase.functions.invoke("generate-video", {
         body: {
           prompt: "Produto premium com iluminação cinematográfica, câmera lenta, fundo escuro elegante, estilo Apple Ads",
-          voice: true,
-          music: true,
+          imageUrl: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800",
+          productType: "premium",
+          style: "Luxo",
+          createJob: true,
         },
       });
 
