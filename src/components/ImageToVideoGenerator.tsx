@@ -798,11 +798,28 @@ const ImageToVideoGenerator = () => {
               </div>
             </div>
 
-            {/* CTA Button */}
+            {/* CTA Buttons */}
             {pipelineStep === "idle" && (
-              <Button size="lg" className="w-full md:w-auto rounded-xl h-12 text-sm font-semibold shadow-lg" onClick={analyzeAndGenerate} disabled={!file || isProcessing}>
-                <Wand2 className="w-4 h-4" /> Criar Vídeo com IA
-              </Button>
+              <div className="space-y-3">
+                <Button size="lg" className="w-full md:w-auto rounded-xl h-12 text-sm font-semibold shadow-lg" onClick={analyzeAndGenerate} disabled={!file || isProcessing}>
+                  <Wand2 className="w-4 h-4" /> Criar Vídeo com IA
+                </Button>
+                <Button
+                  size="lg"
+                  variant="destructive"
+                  className="w-full md:w-auto rounded-xl h-12 text-sm font-bold shadow-lg bg-gradient-to-r from-red-600 to-orange-500 hover:from-red-700 hover:to-orange-600 border-0"
+                  onClick={() => {
+                    setIntensidade("black");
+                    setEstiloCta("urgencia");
+                    setObjetivo("vendas");
+                    if (file) analyzeAndGenerate();
+                    else toast.error("Envie uma imagem primeiro.");
+                  }}
+                  disabled={!file || isProcessing}
+                >
+                  🔥 GERAR VERSÃO ULTRA VENDEDORA
+                </Button>
+              </div>
             )}
 
             {pipelineStep === "error" && (
