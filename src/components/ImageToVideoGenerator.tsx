@@ -4,7 +4,7 @@ import {
   Wand2, Play, Film, Clock, ChevronDown, ChevronUp,
   Sparkles, Download, Loader2, ImageIcon, Volume2, Type, Zap,
   Target, Camera, RefreshCw, Eye, Music2, Subtitles, Check,
-  Settings2
+  Settings2, Flame, Users, Shield
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,9 @@ export type Objetivo = "vendas" | "autoridade" | "engajamento";
 export type Formato = "tiktok" | "shorts" | "instagram_feed" | "stories";
 export type Duracao = "5s" | "15s" | "30s" | "60s" | "2min" | "4min";
 export type Voz = "masculina" | "feminina";
+export type Intensidade = "suave" | "medio" | "agressivo" | "black";
+export type Avatar = "" | "mulher_pos_gravidez" | "mulher_30" | "homem" | "jovem" | "empreendedor";
+export type EstiloCta = "urgencia" | "escassez" | "exclusividade" | "social" | "garantia";
 
 export type Cena = {
   numero: number;
@@ -59,6 +62,7 @@ export type Copy = {
   subheadline: string;
   bullet_points: string[];
   hashtags: string[];
+  ganchos_alternativos?: string[];
 };
 
 export type ConfigVideo = {
@@ -88,6 +92,30 @@ const objetivoConfig: Record<Objetivo, { label: string; icon: typeof Target; col
   autoridade: { label: "Autoridade", icon: Sparkles, color: "border-blue-500/40 bg-blue-500/10", desc: "Branding pessoal, expert" },
   engajamento: { label: "Engajamento", icon: Zap, color: "border-amber-500/40 bg-amber-500/10", desc: "Viral, compartilhável" },
 };
+
+const intensidadeConfig: Record<Intensidade, { label: string; icon: typeof Flame; color: string; desc: string }> = {
+  suave: { label: "Suave", icon: Shield, color: "border-emerald-500/40 bg-emerald-500/10", desc: "Educativo, sem pressão" },
+  medio: { label: "Médio", icon: Zap, color: "border-blue-500/40 bg-blue-500/10", desc: "Persuasivo equilibrado" },
+  agressivo: { label: "Agressivo", icon: Flame, color: "border-orange-500/40 bg-orange-500/10", desc: "Gatilhos mentais fortes" },
+  black: { label: "🔥 Black", icon: Flame, color: "border-red-600/40 bg-red-600/10", desc: "Máxima persuasão — 7 dígitos" },
+};
+
+const avatarConfig: { value: Avatar; label: string; icon: string }[] = [
+  { value: "", label: "Auto-detectar", icon: "🎯" },
+  { value: "mulher_pos_gravidez", label: "Pós-gravidez", icon: "🤰" },
+  { value: "mulher_30", label: "Mulher 30+", icon: "👩" },
+  { value: "homem", label: "Homem", icon: "👨" },
+  { value: "jovem", label: "Jovem 18-25", icon: "🧑" },
+  { value: "empreendedor", label: "Empreendedor", icon: "💼" },
+];
+
+const estiloCtaConfig: { value: EstiloCta; label: string; icon: string }[] = [
+  { value: "urgencia", label: "Urgência", icon: "⏳" },
+  { value: "escassez", label: "Escassez", icon: "📦" },
+  { value: "exclusividade", label: "Exclusividade", icon: "👑" },
+  { value: "social", label: "Prova Social", icon: "👥" },
+  { value: "garantia", label: "Garantia", icon: "✅" },
+];
 
 const formatoConfig: Record<Formato, { label: string; ratio: string; icon: string }> = {
   tiktok: { label: "TikTok", ratio: "9:16", icon: "📱" },
@@ -122,7 +150,7 @@ const movimentoIcons: Record<string, string> = {
 const stepLabels: Record<PipelineStep, { label: string; icon: typeof Camera }> = {
   idle: { label: "Aguardando", icon: Camera },
   uploading: { label: "Enviando imagem...", icon: Camera },
-  analyzing: { label: "Analisando com IA...", icon: Eye },
+  analyzing: { label: "Criando copy de alta conversão...", icon: Eye },
   script_ready: { label: "Roteiro pronto", icon: Type },
   generating_images: { label: "Gerando cenas...", icon: ImageIcon },
   generating_audio: { label: "Gerando narração...", icon: Volume2 },
@@ -131,7 +159,6 @@ const stepLabels: Record<PipelineStep, { label: string; icon: typeof Camera }> =
   error: { label: "Erro no pipeline", icon: RefreshCw },
 };
 
-// API definitions for status check
 const apiDefinitions = [
   { key: "elevenlabs", name: "ElevenLabs", description: "Voz e narração IA" },
   { key: "runway", name: "Runway", description: "Geração de vídeo IA" },
