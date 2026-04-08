@@ -156,14 +156,14 @@ const HomeHeader = () => {
                 Sair
               </DropdownMenuItem>
             </DropdownMenuContent>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              className="hidden"
-              onChange={handleAvatarUpload}
-            />
           </DropdownMenu>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={handleAvatarUpload}
+          />
         </div>
       </div>
     </header>
