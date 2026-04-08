@@ -289,19 +289,11 @@ const UserDashboard = () => {
                 {/* Video player */}
                 <div className="rounded-lg border border-border/40 bg-background/40 overflow-hidden">
                   {job.video_url ? (
-                    <video
+                    <SafeVideoPlayer
                       src={job.video_url}
-                      className="w-full aspect-video object-cover bg-black"
-                      controls
-                      preload="metadata"
-                      poster={job.image_url || undefined}
-                      onError={(e) => {
-                        console.warn("[Video] Falha ao carregar:", job.video_url);
-                        const el = e.target as HTMLVideoElement;
-                        el.style.display = "none";
-                        const fallback = el.parentElement?.querySelector(".video-fallback") as HTMLElement;
-                        if (fallback) fallback.style.display = "flex";
-                      }}
+                      poster={job.image_url}
+                      showDownload={false}
+                      className="aspect-video object-cover"
                     />
                   ) : job.image_url ? (
                     <img
@@ -311,11 +303,7 @@ const UserDashboard = () => {
                       loading="lazy"
                       onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.svg"; }}
                     />
-                  ) : null}
-                  <div className="video-fallback hidden aspect-video items-center justify-center text-xs text-muted-foreground bg-muted/30">
-                    <Video className="w-6 h-6 mr-2 opacity-40" /> Mídia indisponível
-                  </div>
-                  {!job.video_url && !job.image_url && (
+                  ) : (
                     <div className="aspect-video flex items-center justify-center text-xs text-muted-foreground">
                       Sem preview
                     </div>
