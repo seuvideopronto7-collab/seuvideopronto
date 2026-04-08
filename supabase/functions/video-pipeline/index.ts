@@ -191,16 +191,15 @@ serve(async (req) => {
     // STEP 3: RENDER VIDEO (Shotstack)
     // ═══════════════════════════════════════════════════
     if (!SHOTSTACK_API_KEY) {
-      // Fallback: no Shotstack – mark done with first image as preview
-      console.warn("SHOTSTACK_API_KEY not set, applying fallback");
+      console.warn("SHOTSTACK_API_KEY not set — marking as error (no fallback fake)");
       await updateJob(jobId, {
-        status: "done",
+        status: "error",
         progress: 100,
         video_url: null,
         images: imageUrls,
-        error: "Shotstack indisponível – preview com imagens",
+        error: "Renderizador indisponível — aguardando reprocessamento",
       });
-      return json({ jobId, status: "done", images: imageUrls, audioUrl, fallback: true });
+      return json({ jobId, status: "error", images: imageUrls, audioUrl });
     }
 
     await updateJob(jobId, { status: "rendering", progress: 65 });
@@ -275,12 +274,12 @@ serve(async (req) => {
       const errText = await renderRes.text();
       console.error("Shotstack render error:", renderRes.status, errText);
       await updateJob(jobId, {
-        status: "done",
+        status: "error",
         progress: 100,
         video_url: null,
         error: `Shotstack render failed: ${renderRes.status}`,
       });
-      return json({ jobId, status: "done", images: imageUrls, audioUrl, fallback: true });
+      return json({ jobId, status: "error", images: imageUrls, audioUrl });
     }
 
     const renderData = await renderRes.json();
@@ -329,15 +328,37 @@ serve(async (req) => {
       return json({ jobId, status: "error", error: "Render failed" }, 500);
     }
 
+    // ── PERSIST VIDEO TO STORAGE ──
+    let finalVideoUrl = videoUrl;
+    try {
+      const vRes = await fetch(videoUrl);
+      if (vRes.ok) {
+        const buffer = await vRes.arrayBuffer();
+        if (buffer.byteLength > 1000) {
+          const storagePath = `generated/${jobId}.mp4`;
+          const { error: upErr } = await admin.storage
+            .from("videos")
+            .upload(storagePath, buffer, { contentType: "video/mp4", upsert: true });
+          if (!upErr) {
+            const { data: pubData } = admin.storage.from("videos").getPublicUrl(storagePath);
+            finalVideoUrl = pubData.publicUrl;
+            console.log(`[pipeline] ✅ persisted ${storagePath}`);
+          }
+        }
+      }
+    } catch (e) {
+      console.error("[pipeline] persist failed, keeping original URL:", e);
+    }
+
     // ── SUCCESS ──
     await updateJob(jobId, {
-      status: "done",
+      status: "completed",
       progress: 100,
-      video_url: videoUrl,
+      video_url: finalVideoUrl,
       error: null,
     });
 
-    return json({ jobId, status: "done", videoUrl, audioUrl, images: imageUrls });
+    return json({ jobId, status: "completed", videoUrl: finalVideoUrl, audioUrl, images: imageUrls });
   } catch (e) {
     console.error("Pipeline error:", e);
     return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
