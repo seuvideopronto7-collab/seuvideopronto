@@ -8,6 +8,15 @@ const FALLBACK_VIDEO_URLS = new Set([
   "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4",
 ]);
 
+function isLocalAssetPath(url: string): boolean {
+  return url.startsWith("/__l5e/") || url.startsWith("/");
+}
+
+function toAbsoluteUrl(urlOrPath: string): string {
+  if (urlOrPath.startsWith("http")) return urlOrPath;
+  return `${window.location.origin}${urlOrPath.startsWith("/") ? "" : "/"}${urlOrPath}`;
+}
+
 function isManagedStorageUrl(url: string): boolean {
   return url.includes("/storage/v1/object/");
 }
