@@ -659,7 +659,69 @@ const ImageToVideoGenerator = () => {
               </div>
             </div>
 
-            {/* Formato + Duração + Voz */}
+            {/* Intensidade da Copy */}
+            <div className="rounded-2xl border border-border/20 bg-gradient-to-br from-card to-background p-5 shadow-lg space-y-3">
+              <div className="flex items-center gap-2">
+                <Flame className="w-4 h-4 text-primary" />
+                <label className="text-sm font-semibold text-foreground">Intensidade da Copy</label>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                {(Object.entries(intensidadeConfig) as [Intensidade, typeof intensidadeConfig.suave][]).map(([key, cfg]) => {
+                  const Icon = cfg.icon;
+                  return (
+                    <button
+                      key={key} onClick={() => !isProcessing && setIntensidade(key)}
+                      disabled={isProcessing}
+                      className={`p-2.5 rounded-xl border text-left transition-all duration-300 hover:scale-[1.02] ${
+                        intensidade === key ? `${cfg.color} border-primary/30 shadow-md` : "border-border/20 bg-muted/20 hover:bg-muted/40"
+                      }`}
+                    >
+                      <Icon className={`w-3.5 h-3.5 mb-1 ${intensidade === key ? "text-primary" : "text-muted-foreground"}`} />
+                      <p className="text-[11px] font-semibold">{cfg.label}</p>
+                      <p className="text-[8px] text-muted-foreground mt-0.5">{cfg.desc}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Avatar do Público */}
+            <div className="rounded-2xl border border-border/20 bg-gradient-to-br from-card to-background p-5 shadow-lg space-y-3">
+              <div className="flex items-center gap-2">
+                <Users className="w-4 h-4 text-primary" />
+                <label className="text-sm font-semibold text-foreground">Público-alvo</label>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {avatarConfig.map((av) => (
+                  <button
+                    key={av.value} onClick={() => !isProcessing && setAvatar(av.value)} disabled={isProcessing}
+                    className={`px-3 py-1.5 rounded-lg text-[10px] font-medium border transition-all duration-200 ${
+                      avatar === av.value ? "border-primary/40 bg-primary/10 text-primary" : "border-border/20 text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {av.icon} {av.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Estilo do CTA */}
+            <div className="rounded-2xl border border-border/20 bg-gradient-to-br from-card to-background p-5 shadow-lg space-y-3">
+              <label className="text-sm font-semibold text-foreground">Estilo do CTA</label>
+              <div className="flex flex-wrap gap-1.5">
+                {estiloCtaConfig.map((cta) => (
+                  <button
+                    key={cta.value} onClick={() => !isProcessing && setEstiloCta(cta.value)} disabled={isProcessing}
+                    className={`px-3 py-1.5 rounded-lg text-[10px] font-medium border transition-all duration-200 ${
+                      estiloCta === cta.value ? "border-primary/40 bg-primary/10 text-primary" : "border-border/20 text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {cta.icon} {cta.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="rounded-2xl border border-border/20 bg-gradient-to-br from-card to-background p-5 shadow-lg space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
