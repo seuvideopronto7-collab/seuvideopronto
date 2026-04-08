@@ -4,7 +4,7 @@ import {
   Wand2, Play, Film, Clock, ChevronDown, ChevronUp,
   Sparkles, Download, Loader2, ImageIcon, Volume2, Type, Zap,
   Target, Camera, RefreshCw, Eye, Music2, Subtitles, Check,
-  Settings2
+  Settings2, Flame, Users, Shield
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,9 @@ export type Objetivo = "vendas" | "autoridade" | "engajamento";
 export type Formato = "tiktok" | "shorts" | "instagram_feed" | "stories";
 export type Duracao = "5s" | "15s" | "30s" | "60s" | "2min" | "4min";
 export type Voz = "masculina" | "feminina";
+export type Intensidade = "suave" | "medio" | "agressivo" | "black";
+export type Avatar = "" | "mulher_pos_gravidez" | "mulher_30" | "homem" | "jovem" | "empreendedor";
+export type EstiloCta = "urgencia" | "escassez" | "exclusividade" | "social" | "garantia";
 
 export type Cena = {
   numero: number;
@@ -59,6 +62,7 @@ export type Copy = {
   subheadline: string;
   bullet_points: string[];
   hashtags: string[];
+  ganchos_alternativos?: string[];
 };
 
 export type ConfigVideo = {
@@ -88,6 +92,30 @@ const objetivoConfig: Record<Objetivo, { label: string; icon: typeof Target; col
   autoridade: { label: "Autoridade", icon: Sparkles, color: "border-blue-500/40 bg-blue-500/10", desc: "Branding pessoal, expert" },
   engajamento: { label: "Engajamento", icon: Zap, color: "border-amber-500/40 bg-amber-500/10", desc: "Viral, compartilhável" },
 };
+
+const intensidadeConfig: Record<Intensidade, { label: string; icon: typeof Flame; color: string; desc: string }> = {
+  suave: { label: "Suave", icon: Shield, color: "border-emerald-500/40 bg-emerald-500/10", desc: "Educativo, sem pressão" },
+  medio: { label: "Médio", icon: Zap, color: "border-blue-500/40 bg-blue-500/10", desc: "Persuasivo equilibrado" },
+  agressivo: { label: "Agressivo", icon: Flame, color: "border-orange-500/40 bg-orange-500/10", desc: "Gatilhos mentais fortes" },
+  black: { label: "🔥 Black", icon: Flame, color: "border-red-600/40 bg-red-600/10", desc: "Máxima persuasão — 7 dígitos" },
+};
+
+const avatarConfig: { value: Avatar; label: string; icon: string }[] = [
+  { value: "", label: "Auto-detectar", icon: "🎯" },
+  { value: "mulher_pos_gravidez", label: "Pós-gravidez", icon: "🤰" },
+  { value: "mulher_30", label: "Mulher 30+", icon: "👩" },
+  { value: "homem", label: "Homem", icon: "👨" },
+  { value: "jovem", label: "Jovem 18-25", icon: "🧑" },
+  { value: "empreendedor", label: "Empreendedor", icon: "💼" },
+];
+
+const estiloCtaConfig: { value: EstiloCta; label: string; icon: string }[] = [
+  { value: "urgencia", label: "Urgência", icon: "⏳" },
+  { value: "escassez", label: "Escassez", icon: "📦" },
+  { value: "exclusividade", label: "Exclusividade", icon: "👑" },
+  { value: "social", label: "Prova Social", icon: "👥" },
+  { value: "garantia", label: "Garantia", icon: "✅" },
+];
 
 const formatoConfig: Record<Formato, { label: string; ratio: string; icon: string }> = {
   tiktok: { label: "TikTok", ratio: "9:16", icon: "📱" },
@@ -122,7 +150,7 @@ const movimentoIcons: Record<string, string> = {
 const stepLabels: Record<PipelineStep, { label: string; icon: typeof Camera }> = {
   idle: { label: "Aguardando", icon: Camera },
   uploading: { label: "Enviando imagem...", icon: Camera },
-  analyzing: { label: "Analisando com IA...", icon: Eye },
+  analyzing: { label: "Criando copy de alta conversão...", icon: Eye },
   script_ready: { label: "Roteiro pronto", icon: Type },
   generating_images: { label: "Gerando cenas...", icon: ImageIcon },
   generating_audio: { label: "Gerando narração...", icon: Volume2 },
@@ -131,7 +159,6 @@ const stepLabels: Record<PipelineStep, { label: string; icon: typeof Camera }> =
   error: { label: "Erro no pipeline", icon: RefreshCw },
 };
 
-// API definitions for status check
 const apiDefinitions = [
   { key: "elevenlabs", name: "ElevenLabs", description: "Voz e narração IA" },
   { key: "runway", name: "Runway", description: "Geração de vídeo IA" },
@@ -155,6 +182,9 @@ const ImageToVideoGenerator = () => {
   const [voz, setVoz] = useState<Voz>("masculina");
   const [produtoNome, setProdutoNome] = useState("");
   const [nicho, setNicho] = useState("");
+  const [intensidade, setIntensidade] = useState<Intensidade>("agressivo");
+  const [avatar, setAvatar] = useState<Avatar>("");
+  const [estiloCta, setEstiloCta] = useState<EstiloCta>("urgencia");
 
   const [pipelineStep, setPipelineStep] = useState<PipelineStep>("idle");
   const [progress, setProgress] = useState(0);
@@ -389,6 +419,9 @@ const ImageToVideoGenerator = () => {
           duracao,
           produtoNome: produtoNome.trim(),
           nicho: nicho.trim(),
+          intensidade,
+          avatar,
+          estiloCta,
           step: "analyze",
         },
         15000,
@@ -626,7 +659,69 @@ const ImageToVideoGenerator = () => {
               </div>
             </div>
 
-            {/* Formato + Duração + Voz */}
+            {/* Intensidade da Copy */}
+            <div className="rounded-2xl border border-border/20 bg-gradient-to-br from-card to-background p-5 shadow-lg space-y-3">
+              <div className="flex items-center gap-2">
+                <Flame className="w-4 h-4 text-primary" />
+                <label className="text-sm font-semibold text-foreground">Intensidade da Copy</label>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                {(Object.entries(intensidadeConfig) as [Intensidade, typeof intensidadeConfig.suave][]).map(([key, cfg]) => {
+                  const Icon = cfg.icon;
+                  return (
+                    <button
+                      key={key} onClick={() => !isProcessing && setIntensidade(key)}
+                      disabled={isProcessing}
+                      className={`p-2.5 rounded-xl border text-left transition-all duration-300 hover:scale-[1.02] ${
+                        intensidade === key ? `${cfg.color} border-primary/30 shadow-md` : "border-border/20 bg-muted/20 hover:bg-muted/40"
+                      }`}
+                    >
+                      <Icon className={`w-3.5 h-3.5 mb-1 ${intensidade === key ? "text-primary" : "text-muted-foreground"}`} />
+                      <p className="text-[11px] font-semibold">{cfg.label}</p>
+                      <p className="text-[8px] text-muted-foreground mt-0.5">{cfg.desc}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Avatar do Público */}
+            <div className="rounded-2xl border border-border/20 bg-gradient-to-br from-card to-background p-5 shadow-lg space-y-3">
+              <div className="flex items-center gap-2">
+                <Users className="w-4 h-4 text-primary" />
+                <label className="text-sm font-semibold text-foreground">Público-alvo</label>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {avatarConfig.map((av) => (
+                  <button
+                    key={av.value} onClick={() => !isProcessing && setAvatar(av.value)} disabled={isProcessing}
+                    className={`px-3 py-1.5 rounded-lg text-[10px] font-medium border transition-all duration-200 ${
+                      avatar === av.value ? "border-primary/40 bg-primary/10 text-primary" : "border-border/20 text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {av.icon} {av.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Estilo do CTA */}
+            <div className="rounded-2xl border border-border/20 bg-gradient-to-br from-card to-background p-5 shadow-lg space-y-3">
+              <label className="text-sm font-semibold text-foreground">Estilo do CTA</label>
+              <div className="flex flex-wrap gap-1.5">
+                {estiloCtaConfig.map((cta) => (
+                  <button
+                    key={cta.value} onClick={() => !isProcessing && setEstiloCta(cta.value)} disabled={isProcessing}
+                    className={`px-3 py-1.5 rounded-lg text-[10px] font-medium border transition-all duration-200 ${
+                      estiloCta === cta.value ? "border-primary/40 bg-primary/10 text-primary" : "border-border/20 text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {cta.icon} {cta.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="rounded-2xl border border-border/20 bg-gradient-to-br from-card to-background p-5 shadow-lg space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -857,6 +952,17 @@ const ImageToVideoGenerator = () => {
                           <span key={tag} className="text-[9px] px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
                             {tag}
                           </span>
+                        ))}
+                      </div>
+                    )}
+                    {/* Ganchos Alternativos */}
+                    {result.copy.ganchos_alternativos && result.copy.ganchos_alternativos.length > 0 && (
+                      <div className="space-y-1.5 pt-2 border-t border-border/15">
+                        <p className="text-[9px] uppercase tracking-wider text-muted-foreground font-medium">🎯 Ganchos alternativos (teste A/B)</p>
+                        {result.copy.ganchos_alternativos.map((g, i) => (
+                          <div key={i} className="text-[11px] text-foreground bg-background/50 rounded-lg p-2 border border-border/10">
+                            {i + 1}. {g}
+                          </div>
                         ))}
                       </div>
                     )}

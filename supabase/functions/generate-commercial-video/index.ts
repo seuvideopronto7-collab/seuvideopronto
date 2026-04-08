@@ -82,6 +82,9 @@ serve(async (req) => {
       produtoNome = "",
       nicho = "",
       step = "analyze",
+      intensidade = "agressivo",
+      avatar = "",
+      estiloCta = "urgencia",
     } = body;
 
     console.log("generate-commercial-video request", {
@@ -90,6 +93,9 @@ serve(async (req) => {
       objetivo,
       formato,
       duracao,
+      intensidade,
+      avatar,
+      estiloCta,
       hasJobId: Boolean(body.jobId),
     });
 
@@ -111,6 +117,29 @@ serve(async (req) => {
         engajamento: "Vídeo de ENGAJAMENTO: viral, emocional, compartilhável, hook irresistível, loop perfeito, alto retention",
       };
 
+      const intensidadeMap: Record<string, string> = {
+        suave: "Tom suave e educativo. Copy leve, sem pressão. Foco em informar e gerar curiosidade. Sem urgência extrema.",
+        medio: "Tom equilibrado. Copy persuasiva mas não agressiva. Urgência moderada. Foco em benefícios claros.",
+        agressivo: "Tom AGRESSIVO de vendas. Gatilhos mentais fortes: escassez, medo de perder, prova social com números específicos. Ganchos que PARAM O SCROLL. Frases curtas e impactantes. Dor emocional intensa. CTA com urgência real (últimas unidades, só hoje, tempo limitado).",
+        black: "MODO BLACK: Nível MÁXIMO de persuasão. Copy estilo anúncio de 7 dígitos. Gancho EXTREMAMENTE provocador e polêmico (sem ser ofensivo). Quebra de padrão total na primeira frase. Dor VISCERAL e emocional. Promessa AUDACIOSA mas crível. Prova com números ESPECÍFICOS (ex: 10.327 pessoas). CTA com MÚLTIPLAS camadas de urgência (escassez + tempo + exclusividade). Cada frase deve ser um gatilho mental.",
+      };
+
+      const avatarMap: Record<string, string> = {
+        "mulher_pos_gravidez": "Público: mulher pós-gravidez, 25-40 anos. Dores: corpo mudou, autoestima baixa, quer voltar ao corpo anterior, cansada, sem tempo. Linguagem: empática, maternal mas empoderada.",
+        "mulher_30": "Público: mulher 30+. Dores: metabolismo lento, roupas não servem, frustração com dietas. Linguagem: direta, confiante, 'mulher que resolve'.",
+        "homem": "Público: homem adulto. Dores: barriga, falta de disposição, quer definição. Linguagem: objetiva, sem rodeios, foco em resultado e performance.",
+        "jovem": "Público: jovem 18-25. Dores: insegurança, pressão social, quer se sentir bem. Linguagem: informal, trending, relatable.",
+        "empreendedor": "Público: empreendedor digital. Dores: falta de tempo, precisa de energia e foco. Linguagem: pragmática, ROI, produtividade.",
+      };
+
+      const estiloCtaMap: Record<string, string> = {
+        urgencia: "CTA com URGÊNCIA: 'Últimas unidades', '50% OFF só hoje', 'Oferta expira em X horas'. Criar sensação de perda iminente.",
+        escassez: "CTA com ESCASSEZ: 'Apenas X unidades restantes', 'Lote quase esgotado', 'Vagas limitadas'. Número específico de estoque.",
+        exclusividade: "CTA com EXCLUSIVIDADE: 'Acesso VIP', 'Oferta exclusiva para quem viu este vídeo', 'Disponível só aqui'.",
+        social: "CTA com PROVA SOCIAL: 'Junte-se a X.XXX pessoas', 'Todo mundo está comprando', 'A mais vendida do Brasil'.",
+        garantia: "CTA com GARANTIA: 'Satisfação garantida ou dinheiro de volta', 'Teste sem risco por 30 dias', 'Zero risco'.",
+      };
+
       const formatoMap: Record<string, { ratio: string }> = {
         tiktok: { ratio: "9:16" },
         shorts: { ratio: "9:16" },
@@ -120,9 +149,24 @@ serve(async (req) => {
 
       const fmt = formatoMap[formato] || formatoMap.tiktok;
 
-      const systemPrompt = `Você é um diretor criativo de vídeos comerciais premium com expertise em copywriting de alta conversão. Analise imagens de produtos e crie roteiros cinematográficos com estrutura persuasiva completa. Use a função fornecida para retornar os dados estruturados.`;
+      const intensidadeInstr = intensidadeMap[intensidade] || intensidadeMap.agressivo;
+      const avatarInstr = avatarMap[avatar] || "";
+      const ctaInstr = estiloCtaMap[estiloCta] || estiloCtaMap.urgencia;
 
-      const userPrompt = `Analise esta imagem de produto e crie um roteiro comercial completo com EXATAMENTE ${sceneCount} cenas.
+      const systemPrompt = `Você é o MELHOR copywriter de vídeos de vendas do Brasil — nível 7 dígitos. Você cria roteiros que PARAM O SCROLL, criam DOR EMOCIONAL REAL e FECHAM A VENDA com urgência irresistível.
+
+REGRAS ABSOLUTAS:
+1. GANCHO: A primeira frase DEVE ser provocadora, polêmica ou revelar uma verdade inconveniente. NUNCA use ganchos genéricos como "pare de lutar" ou "descubra o segredo". Use padrões como: "Você NÃO está [problema]... você está [causa real]", "O que ninguém te conta sobre [tema]", "[Número específico] pessoas já [resultado] — e você?"
+2. DOR: Descreva a dor com EMOÇÃO e ESPECIFICIDADE. Não diga "você quer emagrecer" — diga "aquela calça que ficou no fundo do armário porque não fecha mais".
+3. PROMESSA: Seja ESPECÍFICO. Não diga "resultados rápidos" — diga "diferença visível em 7 dias".
+4. PROVA: Use NÚMEROS ESPECÍFICOS (ex: "10.327 pessoas", não "milhares"). Mencione "primeira semana" ao invés de "poucos dias".
+5. CTA: NUNCA use "clique no link da bio" sozinho. Sempre combine com urgência, escassez ou exclusividade.
+6. Cada texto_tela deve ter NO MÁXIMO 6 palavras — impactantes e legíveis em 2 segundos.
+7. A narração deve soar NATURAL e EMOCIONAL — como se estivesse falando direto com UMA pessoa.
+
+Use a função fornecida para retornar os dados estruturados.`;
+
+      const userPrompt = `Analise esta imagem de produto e crie um roteiro comercial ALTAMENTE VENDEDOR com EXATAMENTE ${sceneCount} cenas.
 
 IMAGEM DO PRODUTO: ${imageUrl}
 
@@ -130,26 +174,33 @@ CONFIGURAÇÕES:
 - Objetivo: ${objetivoMap[objetivo] || objetivoMap.vendas}
 - Formato: ${formato} (${fmt.ratio})
 - Duração alvo: ${duracao}
-- Produto: ${produtoNome || "Detectar automaticamente"}
-- Nicho: ${nicho || "Detectar automaticamente"}
+- Produto: ${produtoNome || "Detectar automaticamente pela imagem"}
+- Nicho: ${nicho || "Detectar automaticamente pela imagem"}
+
+NÍVEL DE INTENSIDADE DA COPY:
+${intensidadeInstr}
+
+${avatarInstr ? `AVATAR DO PÚBLICO-ALVO:\n${avatarInstr}\n` : ""}ESTILO DO CTA:
+${ctaInstr}
 
 ESTRUTURA OBRIGATÓRIA (adaptar ${sceneCount} cenas a estas etapas):
-1. GANCHO (primeira cena): Frase que para o scroll imediatamente
-2. DOR (1-2 cenas): Identificar o problema do público
-3. PROMESSA (1-2 cenas): O que o produto resolve
-4. PROVA (1-2 cenas): Elemento de credibilidade, prova social
-5. SOLUÇÃO (1-2 cenas): Mostrar o produto em ação
-6. CTA (última cena): Chamada irresistível para ação
+1. GANCHO (primeira cena): Frase PROVOCADORA que para o scroll. Usar padrão de quebra de crença ou revelação. NUNCA genérico.
+2. DOR (1-2 cenas): Descrever a dor com EMOÇÃO VISCERAL. Roupas que não servem, olhar no espelho com tristeza, frustração real.
+3. PROMESSA (1-2 cenas): Resultado ESPECÍFICO e TANGÍVEL. Com prazo ("em X dias"), com métrica visual ("desinchar visivelmente").
+4. PROVA (1-2 cenas): Números ESPECÍFICOS (ex: "10.327 mulheres"). Mencionar "primeira semana". Depoimentos implícitos.
+5. SOLUÇÃO (1-2 cenas): Mostrar o produto como A RESPOSTA. Posicionar como protocolo/sistema, não como "mais um produto".
+6. CTA (última cena): Combinar URGÊNCIA + ESCASSEZ + AÇÃO CLARA. Nunca apenas "clique no link".
 
 Para cada cena, defina:
 - Movimento de câmera: zoom_in, zoom_out, pan, crop_inteligente, reveal, before_after, static
-- Texto overlay curto (max 10 palavras)
-- Narração completa (o que será falado)
+- Texto overlay curto (MÁXIMO 6 palavras — scroll-stopping)
+- Narração completa (o que será FALADO — natural, emocional, conversacional)
 - Efeito visual: cinematic_glow, particles, blur_bg, color_grade, split_screen, none
-- Emoção dominante
-- Prompt de imagem para geração (detalhado, cinematográfico, 9:16)
+- Emoção dominante: choque, dor, esperança, confiança, urgência, desejo, empoderamento
+- Prompt de imagem para geração (detalhado, cinematográfico, vertical 9:16, dark luxury)
 
-A narração_completa deve ser o script falado COMPLETO, naturla e fluido.`;
+A narração_completa deve ser o script COMPLETO que será falado — fluido, emocional e persuasivo.
+Gere também 3 VARIAÇÕES de gancho alternativas no campo ganchos_alternativos da copy.`;
 
       const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
@@ -228,8 +279,13 @@ A narração_completa deve ser o script falado COMPLETO, naturla e fluido.`;
                       subheadline: { type: "string" },
                       bullet_points: { type: "array", items: { type: "string" } },
                       hashtags: { type: "array", items: { type: "string" } },
+                      ganchos_alternativos: {
+                        type: "array",
+                        items: { type: "string" },
+                        description: "3 variações alternativas do gancho principal para teste A/B",
+                      },
                     },
-                    required: ["headline", "subheadline", "bullet_points", "hashtags"],
+                    required: ["headline", "subheadline", "bullet_points", "hashtags", "ganchos_alternativos"],
                   },
                   config_video: {
                     type: "object",
