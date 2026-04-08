@@ -25,6 +25,7 @@ import Apis from "./pages/Apis";
 import EditorProReal from "./pages/EditorProReal";
 import SvpGeradorVideoPremium from "./pages/SvpGeradorVideoPremium";
 import ImageToVideo from "./pages/ImageToVideo";
+import TransformImage from "./pages/TransformImage";
 
 const queryClient = new QueryClient();
 
@@ -234,6 +235,17 @@ const App = () => (
                   "Imagem para Video",
                   <ProtectedRoute>
                     <ImageToVideo />
+                  </ProtectedRoute>,
+                )
+              }
+            />
+            <Route
+              path="/transformar-imagem"
+              element={
+                wrapSafe(
+                  "Transformar Imagem",
+                  <ProtectedRoute>
+                    <TransformImage />
                   </ProtectedRoute>,
                 )
               }
