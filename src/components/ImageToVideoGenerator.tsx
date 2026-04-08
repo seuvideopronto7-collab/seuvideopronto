@@ -4,7 +4,7 @@ import {
   Wand2, Play, Film, Clock, ChevronDown, ChevronUp,
   Sparkles, Download, Loader2, ImageIcon, Volume2, Type, Zap,
   Target, Camera, RefreshCw, Eye, Music2, Subtitles, Check,
-  Settings2, Flame, Users, Shield
+  Settings2, Flame, Users, Shield, Shuffle, BarChart3, Crosshair
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { UploadBox } from "@/components/ui/upload-box";
 import { ApiStatusItem, type ApiStatus } from "@/components/ui/api-status-item";
 import { useNavigate } from "react-router-dom";
+import { useUltraCopyEngine, type CopyScore } from "@/hooks/useUltraCopyEngine";
 
 // ═══════════════════════════════════════
 // TYPES
