@@ -991,13 +991,27 @@ const VideoGeneratorUI = () => {
               onChange={(event) => setNarrationText(event.target.value)}
             />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              <Button variant="glass" onClick={generateVoiceover} disabled={isGeneratingVoice}>
+              <Button variant="glass" onClick={generateVoiceover} disabled={isGeneratingVoice || !narrationText.trim()}>
                 <Mic2 className="h-4 w-4" /> {isGeneratingVoice ? "Gerando narração..." : "Gerar narração"}
               </Button>
               <Button variant="glass" onClick={() => generateSoundtrack()} disabled={isGeneratingMusic}>
                 <Music2 className="h-4 w-4" /> {isGeneratingMusic ? "Gerando trilha..." : "🎧 Gerar trilha inteligente"}
               </Button>
             </div>
+            {narrationError && (
+              <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 space-y-2">
+                <div className="text-xs text-destructive font-medium">❌ {narrationError}</div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-xs"
+                  onClick={generateVoiceover}
+                  disabled={isGeneratingVoice}
+                >
+                  🔄 Reprocessar narração
+                </Button>
+              </div>
+            )}
             <div className="grid grid-cols-3 gap-2">
               {[
                 { label: "🔥 Vendas", mode: "vendas_agressiva" },
