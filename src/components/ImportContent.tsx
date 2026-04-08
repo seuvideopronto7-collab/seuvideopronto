@@ -30,9 +30,12 @@ const ImportContent = ({ produto, nicho, publico, dor, beneficio, link, onResult
       const { data, error } = await supabase.functions.invoke("generate-video", {
         body: {
           imageUrl,
-          estilo: "cinematografico",
-          movimento: "leve zoom + parallax",
-          duracao: 5,
+          prompt: "Vídeo cinematográfico a partir da imagem",
+          productType: "Outro",
+          style: "Luxo",
+          createJob: false,
+          duration: 5,
+          format: "16:9",
         },
       });
       if (error) throw error;

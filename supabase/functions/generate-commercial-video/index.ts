@@ -57,20 +57,47 @@ serve(async (req) => {
   try {
     // ── Auth ──
     const authHeader = req.headers.get("Authorization") || "";
-    if (!authHeader.startsWith("Bearer ")) return json({ error: "Unauthorized" }, 401);
+    if (!authHeader.startsWith("Bearer ")) return json({ error: "Unauthorized", message: "Token de autenticação ausente." }, 401);
 
     const authClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
     const { data: { user }, error: authError } = await authClient.auth.getUser();
-    if (authError || !user) return json({ error: "Unauthorized" }, 401);
-    if (isRateLimited(user.id)) return json({ error: "Rate limit excedido. Tente novamente em 1 minuto." }, 429);
+    if (authError || !user) return json({ error: "Unauthorized", message: "Usuário não autenticado." }, 401);
+    if (isRateLimited(user.id)) return json({ error: "Rate limit excedido. Tente novamente em 1 minuto.", message: "Muitas tentativas em sequência." }, 429);
 
-    const body = await req.json();
-    const { imageUrl, objetivo, formato, duracao, produtoNome, nicho, step } = body;
+    let body: Record<string, any> = {};
+    try {
+      body = await req.json();
+    } catch (error) {
+      console.error("generate-commercial-video invalid json", error);
+      return json({ error: "JSON inválido", message: "Envie um body JSON válido." }, 400);
+    }
 
-    if (!imageUrl) return json({ error: "imageUrl é obrigatório" }, 400);
-    if (!LOVABLE_API_KEY) return json({ error: "AI não configurada" }, 500);
+    const {
+      imageUrl = "",
+      objetivo = "vendas",
+      formato = "tiktok",
+      duracao = "60s",
+      produtoNome = "",
+      nicho = "",
+      step = "analyze",
+    } = body;
+
+    console.log("generate-commercial-video request", {
+      step,
+      hasImageUrl: Boolean(imageUrl),
+      objetivo,
+      formato,
+      duracao,
+      hasJobId: Boolean(body.jobId),
+    });
+
+    if (!imageUrl || typeof imageUrl !== "string") {
+      return json({ error: "imageUrl é obrigatório", message: "Envie uma URL pública da imagem." }, 400);
+    }
+
+    if (!LOVABLE_API_KEY) return json({ error: "AI não configurada", message: "A IA do backend não está configurada." }, 500);
 
     // ═══════════════════════════════════════
     // STEP 1: ANALYZE + GENERATE SCRIPT
@@ -265,7 +292,7 @@ A narração_completa deve ser o script falado COMPLETO, naturla e fluido.`;
         return json({ error: "Falha ao salvar job" }, 500);
       }
 
-      return json({ step: "analyze", ...result, jobId: job.id });
+      return json({ step: "analyze", message: "Roteiro gerado com sucesso", ...result, jobId: job.id });
     }
 
     // ═══════════════════════════════════════
@@ -386,7 +413,7 @@ A narração_completa deve ser o script falado COMPLETO, naturla e fluido.`;
           video_url: null, images: imageUrls,
           error: "Renderizador indisponível – preview com imagens geradas",
         });
-        return json({ jobId, status: "done", images: imageUrls, audioUrl, fallback: true });
+        return json({ jobId, status: "done", message: "Preview gerado com fallback", images: imageUrls, audioUrl, fallback: true });
       }
 
       await updateJob(jobId, { status: "rendering", progress: 65 });
@@ -462,14 +489,14 @@ A narração_completa deve ser o script falado COMPLETO, naturla e fluido.`;
         const errText = await renderRes.text();
         console.error("Shotstack render error:", renderRes.status, errText);
         await updateJob(jobId, { status: "done", progress: 100, video_url: null, error: `Render failed: ${renderRes.status}` });
-        return json({ jobId, status: "done", images: imageUrls, audioUrl, fallback: true });
+        return json({ jobId, status: "done", message: "Preview gerado com fallback", images: imageUrls, audioUrl, fallback: true });
       }
 
       const renderData = await renderRes.json();
       const renderId = renderData?.response?.id;
       if (!renderId) {
         await updateJob(jobId, { status: "error", progress: 100, error: "No renderId" });
-        return json({ jobId, status: "error", error: "No renderId" }, 500);
+        return json({ jobId, status: "error", message: "Falha ao iniciar render", error: "No renderId" }, 500);
       }
 
       await updateJob(jobId, { progress: 70 });
@@ -492,16 +519,16 @@ A narração_completa deve ser o script falado COMPLETO, naturla e fluido.`;
 
       if (!videoUrl) {
         await updateJob(jobId, { status: "error", progress: 100, error: "Render timeout" });
-        return json({ jobId, status: "error", error: "Render timeout" }, 500);
+        return json({ jobId, status: "error", message: "Tempo limite na renderização", error: "Render timeout" }, 500);
       }
 
       await updateJob(jobId, { status: "done", progress: 100, video_url: videoUrl, error: null });
-      return json({ jobId, status: "done", videoUrl, audioUrl, images: imageUrls });
+      return json({ jobId, status: "done", message: "Vídeo renderizado com sucesso", videoUrl, audioUrl, images: imageUrls });
     }
 
-    return json({ error: "step inválido" }, 400);
+    return json({ error: "step inválido", message: "Use step analyze ou render" }, 400);
   } catch (e) {
     console.error("Error:", e);
-    return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
+    return json({ error: e instanceof Error ? e.message : "Unknown error", message: "Falha interna ao processar vídeo" }, 500);
   }
 });
