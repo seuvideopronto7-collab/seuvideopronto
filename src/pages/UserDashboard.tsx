@@ -289,8 +289,24 @@ const UserDashboard = () => {
                   </span>
                 </div>
                 <div className="rounded-lg border border-border/40 bg-background/40 overflow-hidden">
-                  {job.image_url ? (
-                    <img src={job.image_url} alt="thumbnail" className="w-full h-32 object-cover" loading="lazy" />
+                  {job.video_url ? (
+                    <video
+                      src={job.video_url}
+                      className="w-full h-32 object-cover"
+                      muted
+                      playsInline
+                      onMouseOver={(e) => (e.target as HTMLVideoElement).play()}
+                      onMouseOut={(e) => { const v = e.target as HTMLVideoElement; v.pause(); v.currentTime = 0; }}
+                      onError={(e) => { console.warn("[Video] Falha ao carregar:", job.video_url); (e.target as HTMLVideoElement).style.display = "none"; }}
+                    />
+                  ) : job.image_url ? (
+                    <img
+                      src={job.image_url}
+                      alt="thumbnail"
+                      className="w-full h-32 object-cover"
+                      loading="lazy"
+                      onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.svg"; }}
+                    />
                   ) : (
                     <div className="h-32 flex items-center justify-center text-xs text-muted-foreground">
                       Sem thumbnail
