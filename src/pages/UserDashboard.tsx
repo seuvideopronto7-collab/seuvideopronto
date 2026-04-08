@@ -51,7 +51,7 @@ const UserDashboard = () => {
       setLoadingJobs(true);
       const { data, error } = await supabase
         .from("video_jobs" as any)
-        .select("id,status,created_at,video_url,image_url")
+        .select("id,status,created_at,video_url,image_url,prompt,progress")
         .eq("user_id", profile.id)
         .order("created_at", { ascending: false })
         .limit(12);
@@ -119,12 +119,31 @@ const UserDashboard = () => {
     }
   };
 
-  const handleDownload = (url?: string | null) => {
-    if (!url) return;
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "video-final.mp4";
-    link.click();
+  const handleDownload = async (url?: string | null) => {
+    if (!url) {
+      toast.error("Vídeo ainda não está pronto para download.");
+      return;
+    }
+    try {
+      toast.loading("Preparando download...", { id: "dl" });
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = `video-${Date.now()}.mp4`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+      toast.success("Download iniciado!", { id: "dl" });
+    } catch (err) {
+      console.error("[Download] Falha:", err);
+      // Fallback: open in new tab
+      window.open(url, "_blank");
+      toast.dismiss("dl");
+    }
   };
 
   const handleRepost = (jobId: string) => {
@@ -270,8 +289,24 @@ const UserDashboard = () => {
                   </span>
                 </div>
                 <div className="rounded-lg border border-border/40 bg-background/40 overflow-hidden">
-                  {job.image_url ? (
-                    <img src={job.image_url} alt="thumbnail" className="w-full h-32 object-cover" loading="lazy" />
+                  {job.video_url ? (
+                    <video
+                      src={job.video_url}
+                      className="w-full h-32 object-cover"
+                      muted
+                      playsInline
+                      onMouseOver={(e) => (e.target as HTMLVideoElement).play()}
+                      onMouseOut={(e) => { const v = e.target as HTMLVideoElement; v.pause(); v.currentTime = 0; }}
+                      onError={(e) => { console.warn("[Video] Falha ao carregar:", job.video_url); (e.target as HTMLVideoElement).style.display = "none"; }}
+                    />
+                  ) : job.image_url ? (
+                    <img
+                      src={job.image_url}
+                      alt="thumbnail"
+                      className="w-full h-32 object-cover"
+                      loading="lazy"
+                      onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.svg"; }}
+                    />
                   ) : (
                     <div className="h-32 flex items-center justify-center text-xs text-muted-foreground">
                       Sem thumbnail
