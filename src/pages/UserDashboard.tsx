@@ -280,39 +280,67 @@ const UserDashboard = () => {
             <div className="text-xs text-muted-foreground">Nenhum vídeo gerado ainda.</div>
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {videoJobs.map((job) => (
+            {videoJobs.map((job: any) => (
               <div key={job.id} className="rounded-xl border border-border/40 bg-muted/20 p-4 space-y-3 transition-all duration-200 hover:scale-[1.01]">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="font-mono text-muted-foreground">{job.id.slice(0, 8)}...</span>
-                  <span className="rounded-full border border-border/50 px-2 py-0.5 text-[10px] uppercase tracking-wide">
+                  <span className="font-mono text-muted-foreground">{job.id?.slice(0, 8)}...</span>
+                  <span className={`rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide ${
+                    job.status === 'completed' || job.status === 'fallback'
+                      ? 'border-green-500/50 text-green-400'
+                      : job.status === 'failed'
+                      ? 'border-red-500/50 text-red-400'
+                      : 'border-yellow-500/50 text-yellow-400'
+                  }`}>
                     {job.status || "pending"}
                   </span>
                 </div>
+
+                {/* Video player */}
                 <div className="rounded-lg border border-border/40 bg-background/40 overflow-hidden">
                   {job.video_url ? (
                     <video
                       src={job.video_url}
-                      className="w-full h-32 object-cover"
-                      muted
-                      playsInline
-                      onMouseOver={(e) => (e.target as HTMLVideoElement).play()}
-                      onMouseOut={(e) => { const v = e.target as HTMLVideoElement; v.pause(); v.currentTime = 0; }}
-                      onError={(e) => { console.warn("[Video] Falha ao carregar:", job.video_url); (e.target as HTMLVideoElement).style.display = "none"; }}
+                      className="w-full aspect-video object-cover bg-black"
+                      controls
+                      preload="metadata"
+                      poster={job.image_url || undefined}
+                      onError={(e) => {
+                        console.warn("[Video] Falha ao carregar:", job.video_url);
+                        const el = e.target as HTMLVideoElement;
+                        el.style.display = "none";
+                        const fallback = el.parentElement?.querySelector(".video-fallback") as HTMLElement;
+                        if (fallback) fallback.style.display = "flex";
+                      }}
                     />
                   ) : job.image_url ? (
                     <img
                       src={job.image_url}
                       alt="thumbnail"
-                      className="w-full h-32 object-cover"
+                      className="w-full aspect-video object-cover"
                       loading="lazy"
                       onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.svg"; }}
                     />
-                  ) : (
-                    <div className="h-32 flex items-center justify-center text-xs text-muted-foreground">
-                      Sem thumbnail
+                  ) : null}
+                  <div className="video-fallback hidden aspect-video items-center justify-center text-xs text-muted-foreground bg-muted/30">
+                    <Video className="w-6 h-6 mr-2 opacity-40" /> Mídia indisponível
+                  </div>
+                  {!job.video_url && !job.image_url && (
+                    <div className="aspect-video flex items-center justify-center text-xs text-muted-foreground">
+                      Sem preview
                     </div>
                   )}
                 </div>
+
+                {/* Progress bar for in-progress jobs */}
+                {job.status !== 'completed' && job.status !== 'fallback' && job.status !== 'failed' && (
+                  <div className="space-y-1">
+                    <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                      <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${job.progress || 0}%` }} />
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">{job.progress || 0}% — {job.status}</p>
+                  </div>
+                )}
+
                 <div className="text-[11px] text-muted-foreground">
                   {job.created_at ? new Date(job.created_at).toLocaleString() : ""}
                 </div>
