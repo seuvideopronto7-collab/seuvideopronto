@@ -442,7 +442,24 @@ const ImageToVideoGenerator = () => {
       setJobId(data.jobId);
       setProgress(25);
       setPipelineStep("script_ready");
-      toast.success("Roteiro comercial gerado!");
+
+      // Copy scoring engine
+      const scoreResult = scoreCopy({
+        gancho: (data as any).roteiro?.gancho,
+        roteiro: (data as any).roteiro?.narracao_completa,
+        cta: (data as any).roteiro?.cta,
+        narracao: (data as any).roteiro?.narracao_completa,
+      });
+      setCopyScoreData(scoreResult);
+
+      const produto = (data as any).analise_imagem?.produto_detectado || produtoNome || "produto";
+      setGanchosGerados(gerarGanchos(produto, 5));
+
+      if (scoreResult.total < 70) {
+        toast.warning(`Copy Score: ${scoreResult.total}/100 — ${scoreResult.recomendacao}`);
+      } else {
+        toast.success(`Copy Score: ${scoreResult.total}/100 — ${scoreResult.nivel.toUpperCase()}! 🔥`);
+      }
     } catch (err: any) {
       const message = err?.message || "Erro na análise";
       console.error("Analyze error:", err);
