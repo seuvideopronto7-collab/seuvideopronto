@@ -965,8 +965,8 @@ const VideoGeneratorUI = () => {
               <Button variant="glass" onClick={generateVoiceover} disabled={isGeneratingVoice}>
                 <Mic2 className="h-4 w-4" /> {isGeneratingVoice ? "Gerando narração..." : "Gerar narração"}
               </Button>
-              <Button variant="glass" onClick={generateSoundtrack} disabled={isGeneratingMusic}>
-                <Music2 className="h-4 w-4" /> {isGeneratingMusic ? "Gerando trilha..." : "Gerar trilha sonora"}
+              <Button variant="glass" onClick={() => generateSoundtrack()} disabled={isGeneratingMusic}>
+                <Music2 className="h-4 w-4" /> {isGeneratingMusic ? "Gerando trilha..." : "🎧 Gerar trilha inteligente"}
               </Button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
