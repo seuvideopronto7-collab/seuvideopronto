@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import {
   Wand2, Play, Film, Clock, ChevronDown, ChevronUp,
@@ -145,9 +145,10 @@ const ImageToVideoGenerator = () => {
   const navigate = useNavigate();
 
   // ── State ──
+  const lastTerminalStatusRef = useRef<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [imageUrl, setImageUrl] = useState("");
   const [objetivo, setObjetivo] = useState<Objetivo>("vendas");
   const [formato, setFormato] = useState<Formato>("tiktok");
   const [duracao, setDuracao] = useState<Duracao>("60s");
@@ -182,7 +183,7 @@ const ImageToVideoGenerator = () => {
     setApiStatuses({ ...statuses });
 
     try {
-      const { data, error } = await supabase.functions.invoke("test-api", {
+      const { data } = await supabase.functions.invoke("test-api", {
         body: {},
       });
 
@@ -197,10 +198,86 @@ const ImageToVideoGenerator = () => {
     setApiStatuses({ ...statuses });
   }
 
+  const invokeWithTimeout = useCallback(
+    async <T,>(functionName: string, body: Record<string, unknown>, timeoutMs = 15000) => {
+      let timeoutId: number | undefined;
+      try {
+        return await Promise.race([
+          supabase.functions.invoke(functionName, { body }) as Promise<{ data: T | null; error: any }>,
+          new Promise<never>((_, reject) => {
+            timeoutId = window.setTimeout(() => {
+              reject(new Error("Tempo limite atingido. Tente novamente."));
+            }, timeoutMs);
+          }),
+        ]);
+      } finally {
+        if (timeoutId) window.clearTimeout(timeoutId);
+      }
+    },
+    [],
+  );
+
+  const handleJobUpdate = useCallback((job: any) => {
+    const nextImages = Array.isArray(job.images)
+      ? job.images.filter((img: unknown): img is string => typeof img === "string" && Boolean(img))
+      : [];
+    const fallbackImages = nextImages.length > 0 ? nextImages : imageUrl ? [imageUrl] : [];
+
+    setProgress(job.progress ?? 0);
+    if (nextImages.length > 0) setGeneratedImages(nextImages);
+    if (job.audio_url) setAudioUrl(job.audio_url);
+    if (job.video_url) setVideoUrl(job.video_url);
+
+    const statusMap: Record<string, PipelineStep> = {
+      generating_images: "generating_images",
+      generating_audio: "generating_audio",
+      rendering: "rendering",
+      done: "done",
+      completed: "done",
+      error: "error",
+      failed: "error",
+    };
+
+    if (job.status === "done" || job.status === "completed") {
+      setPipelineStep("done");
+      if (lastTerminalStatusRef.current !== "done") {
+        toast.success("🎬 Vídeo comercial pronto!");
+        lastTerminalStatusRef.current = "done";
+      }
+      return true;
+    }
+
+    if ((job.status === "error" || job.status === "failed") && fallbackImages.length > 0) {
+      setGeneratedImages(fallbackImages);
+      setErrorMsg(job.error || "Falha na renderização final. Exibindo preview das cenas.");
+      setPipelineStep("done");
+      setProgress(100);
+      if (lastTerminalStatusRef.current !== "fallback") {
+        toast.warning("Falha no vídeo final. Exibindo preview das cenas.");
+        lastTerminalStatusRef.current = "fallback";
+      }
+      return true;
+    }
+
+    if (job.status === "error" || job.status === "failed") {
+      setErrorMsg(job.error || "Erro no processamento");
+      setPipelineStep("error");
+      if (lastTerminalStatusRef.current !== "error") {
+        toast.error(job.error || "Erro no pipeline");
+        lastTerminalStatusRef.current = "error";
+      }
+      return true;
+    }
+
+    if (statusMap[job.status]) setPipelineStep(statusMap[job.status]);
+    return false;
+  }, [imageUrl]);
+
   // ── Realtime + polling fallback for job updates ──
   useEffect(() => {
     if (!jobId) return;
     let active = true;
+    lastTerminalStatusRef.current = null;
 
     const syncJob = async () => {
       try {
@@ -210,36 +287,14 @@ const ImageToVideoGenerator = () => {
           .eq("id", jobId)
           .maybeSingle();
         if (!active || error || !data) return;
-        const job = data as any;
-        setProgress(job.progress ?? 0);
-        if (job.images?.length) setGeneratedImages(job.images);
-        if (job.audio_url) setAudioUrl(job.audio_url);
-        if (job.video_url) setVideoUrl(job.video_url);
-        const statusMap: Record<string, PipelineStep> = {
-          generating_images: "generating_images",
-          generating_audio: "generating_audio",
-          rendering: "rendering",
-          done: "done",
-          completed: "done",
-          error: "error",
-          failed: "error",
-        };
-        if (statusMap[job.status]) setPipelineStep(statusMap[job.status]);
-        if (job.status === "done" || job.status === "completed") {
-          toast.success("🎬 Vídeo comercial pronto!");
-          active = false;
-        }
-        if (job.status === "error" || job.status === "failed") {
-          setErrorMsg(job.error || "Erro no processamento");
-          toast.error(job.error || "Erro no pipeline");
-          active = false;
-        }
+        if (handleJobUpdate(data)) active = false;
       } catch (err) {
         console.error("Poll error:", err);
       }
     };
 
-    // Poll every 3s as fallback
+    syncJob();
+
     const pollInterval = window.setInterval(() => {
       if (active) syncJob();
     }, 3000);
@@ -253,31 +308,7 @@ const ImageToVideoGenerator = () => {
         filter: `id=eq.${jobId}`,
       }, (payload) => {
         if (!active) return;
-        const job = payload.new as any;
-        const status = job.status as string;
-        setProgress(job.progress ?? 0);
-
-        if (job.images?.length) setGeneratedImages(job.images);
-        if (job.audio_url) setAudioUrl(job.audio_url);
-        if (job.video_url) setVideoUrl(job.video_url);
-
-        const statusMap: Record<string, PipelineStep> = {
-          generating_images: "generating_images",
-          generating_audio: "generating_audio",
-          rendering: "rendering",
-          done: "done",
-          completed: "done",
-          error: "error",
-          failed: "error",
-        };
-        if (statusMap[status]) setPipelineStep(statusMap[status]);
-        if (status === "done" || status === "completed") {
-          toast.success("🎬 Vídeo comercial pronto!");
-        }
-        if (status === "error" || status === "failed") {
-          setErrorMsg(job.error || "Erro no processamento");
-          toast.error(job.error || "Erro no pipeline");
-        }
+        if (handleJobUpdate(payload.new as any)) active = false;
       })
       .subscribe();
 
@@ -286,21 +317,26 @@ const ImageToVideoGenerator = () => {
       window.clearInterval(pollInterval);
       supabase.removeChannel(channel);
     };
-  }, [jobId]);
+  }, [jobId, handleJobUpdate]);
 
   // ── File handling ──
   const handleFile = useCallback((f: File) => {
     if (!/\.(jpg|jpeg|png|webp)$/i.test(f.name)) {
-      toast.error("Envie JPG, PNG ou WEBP."); return;
+      toast.error("Envie JPG, PNG ou WEBP.");
+      return;
     }
     if (f.size > 20 * 1024 * 1024) {
-      toast.error("Imagem muito grande (máx 20MB)."); return;
+      toast.error("Imagem muito grande (máx 20MB).");
+      return;
     }
     if (previewUrl?.startsWith("blob:")) URL.revokeObjectURL(previewUrl);
+    lastTerminalStatusRef.current = null;
     setFile(f);
     setPreviewUrl(URL.createObjectURL(f));
+    setImageUrl("");
     setResult(null);
     setVideoUrl(null);
+    setJobId(null);
     setGeneratedImages([]);
     setAudioUrl(null);
     setErrorMsg(null);
@@ -321,7 +357,17 @@ const ImageToVideoGenerator = () => {
 
   // ── Step 1: Analyze + Generate Script ──
   const analyzeAndGenerate = async () => {
-    if (!file) { toast.error("Envie uma imagem primeiro."); return; }
+    if (!file) {
+      toast.error("Envie uma imagem primeiro.");
+      return;
+    }
+
+    lastTerminalStatusRef.current = null;
+    setResult(null);
+    setVideoUrl(null);
+    setGeneratedImages([]);
+    setAudioUrl(null);
+    setJobId(null);
     setPipelineStep("uploading");
     setProgress(5);
     setErrorMsg(null);
@@ -334,12 +380,23 @@ const ImageToVideoGenerator = () => {
       setPipelineStep("analyzing");
       setProgress(20);
 
-      const { data, error } = await supabase.functions.invoke("generate-commercial-video", {
-        body: { imageUrl: uploadedUrl, objetivo, formato, duracao, produtoNome: produtoNome || undefined, nicho: nicho || undefined, step: "analyze" },
-      });
+      const { data, error } = await invokeWithTimeout<PipelineResult & { jobId: string; error?: string; message?: string }>(
+        "generate-commercial-video",
+        {
+          imageUrl: uploadedUrl,
+          objetivo,
+          formato,
+          duracao,
+          produtoNome: produtoNome.trim(),
+          nicho: nicho.trim(),
+          step: "analyze",
+        },
+        15000,
+      );
 
       if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      if (data?.error) throw new Error(data.message || data.error);
+      if (!data?.jobId) throw new Error("Job não retornado pela análise.");
 
       setResult(data as PipelineResult);
       setJobId(data.jobId);
@@ -347,60 +404,95 @@ const ImageToVideoGenerator = () => {
       setPipelineStep("script_ready");
       toast.success("Roteiro comercial gerado!");
     } catch (err: any) {
+      const message = err?.message || "Erro na análise";
       console.error("Analyze error:", err);
-      setErrorMsg(err?.message || "Erro na análise");
+      setErrorMsg(message);
       setPipelineStep("error");
-      toast.error(err?.message || "Erro ao analisar imagem.");
+      toast.error(message);
     }
   };
 
   // ── Step 2: Full render pipeline ──
   const startRender = async () => {
     if (!result || !jobId || !imageUrl) {
-      toast.error("Gere o roteiro primeiro."); return;
+      toast.error("Gere o roteiro primeiro.");
+      return;
     }
+
+    lastTerminalStatusRef.current = null;
+    setErrorMsg(null);
     setPipelineStep("generating_images");
     setProgress(30);
 
     try {
-      const { data, error } = await supabase.functions.invoke("generate-commercial-video", {
-        body: {
+      const { data, error } = await invokeWithTimeout<any>(
+        "generate-commercial-video",
+        {
           imageUrl,
           step: "render",
           jobId,
-          scenes: result.cenas,
-          script: result.roteiro.narracao_completa,
+          scenes: result.cenas || [],
+          script: result.roteiro?.narracao_completa || "",
           voz,
           formato,
           duracao,
         },
-      });
+        15000,
+      );
 
       if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      if (data?.error) throw new Error(data.message || data.error);
 
+      if (data?.images) setGeneratedImages(data.images);
+      if (data?.audioUrl) setAudioUrl(data.audioUrl);
       if (data?.videoUrl) {
         setVideoUrl(data.videoUrl);
         setPipelineStep("done");
         setProgress(100);
+        return;
       }
-      if (data?.images) setGeneratedImages(data.images);
-      if (data?.audioUrl) setAudioUrl(data.audioUrl);
       if (data?.fallback) {
+        setErrorMsg(data.message || "Preview gerado com fallback.");
         setPipelineStep("done");
         setProgress(100);
-        toast.warning("Preview gerado (renderizador indisponível).");
+        toast.warning(data.message || "Preview gerado (renderizador indisponível).");
+        return;
       }
+
+      setPipelineStep("rendering");
+      setProgress((prev) => Math.max(prev, 65));
+      toast.info("Render iniciado. Acompanhe o progresso automático.");
     } catch (err: any) {
+      const message = err?.message || "Erro na renderização";
       console.error("Render error:", err);
-      setErrorMsg(err?.message || "Erro na renderização");
+
+      if (message.includes("Tempo limite")) {
+        setErrorMsg("Processamento mais lento que o normal. Continuaremos acompanhando automaticamente.");
+        setPipelineStep("rendering");
+        setProgress((prev) => Math.max(prev, 65));
+        toast.warning("O render continua no backend. Acompanhe o progresso abaixo.");
+        return;
+      }
+
+      const fallbackImages = generatedImages.length > 0 ? generatedImages : imageUrl ? [imageUrl] : [];
+      if (fallbackImages.length > 0) {
+        setGeneratedImages(fallbackImages);
+        setErrorMsg(message);
+        setPipelineStep("done");
+        setProgress(100);
+        toast.warning("Falha ao finalizar o vídeo. Exibindo preview das cenas.");
+        return;
+      }
+
+      setErrorMsg(message);
       setPipelineStep("error");
-      toast.error(err?.message || "Erro ao gerar vídeo.");
+      toast.error(message);
     }
   };
 
   // ── Retry ──
   const retry = () => {
+    lastTerminalStatusRef.current = null;
     setErrorMsg(null);
     if (result) {
       startRender();
@@ -589,7 +681,7 @@ const ImageToVideoGenerator = () => {
 
             {/* CTA Button */}
             {pipelineStep === "idle" && (
-              <Button size="lg" className="w-full md:w-auto rounded-xl h-12 text-sm font-semibold shadow-lg" onClick={analyzeAndGenerate} disabled={!file}>
+              <Button size="lg" className="w-full md:w-auto rounded-xl h-12 text-sm font-semibold shadow-lg" onClick={analyzeAndGenerate} disabled={!file || isProcessing}>
                 <Wand2 className="w-4 h-4" /> Criar Vídeo com IA
               </Button>
             )}
@@ -597,7 +689,7 @@ const ImageToVideoGenerator = () => {
             {pipelineStep === "error" && (
               <div className="space-y-2">
                 {errorMsg && <p className="text-xs text-destructive bg-destructive/10 rounded-xl p-3">{errorMsg}</p>}
-                <Button variant="outline" size="lg" className="w-full md:w-auto rounded-xl h-12" onClick={retry}>
+                <Button variant="outline" size="lg" className="w-full md:w-auto rounded-xl h-12" onClick={retry} disabled={isProcessing}>
                   <RefreshCw className="w-4 h-4" /> Tentar novamente
                 </Button>
               </div>
@@ -782,18 +874,17 @@ const ImageToVideoGenerator = () => {
                   </div>
                 )}
 
-                {/* Generate Video Button */}
                 {pipelineStep === "script_ready" && (
                   <Button
                     size="lg"
                     className="w-full md:w-auto rounded-xl h-12 text-sm font-semibold bg-gradient-to-r from-primary to-primary/80 shadow-lg"
                     onClick={startRender}
+                    disabled={isProcessing}
                   >
                     <Play className="w-4 h-4" /> Gerar Vídeo Final
                   </Button>
                 )}
 
-                {/* Rendering state */}
                 {(pipelineStep === "generating_images" || pipelineStep === "generating_audio" || pipelineStep === "rendering") && (
                   <div className="rounded-2xl border border-primary/20 bg-primary/5 p-5 text-center space-y-3 shadow-lg">
                     <Loader2 className="w-6 h-6 text-primary animate-spin mx-auto" />
@@ -804,10 +895,10 @@ const ImageToVideoGenerator = () => {
                       <span className="flex items-center gap-1"><Volume2 className="w-3 h-3" /> {audioUrl ? "✓" : "..."}</span>
                       <span className="flex items-center gap-1"><Subtitles className="w-3 h-3" /> legendas</span>
                     </div>
+                    {errorMsg && <p className="text-[10px] text-muted-foreground">{errorMsg}</p>}
                   </div>
                 )}
 
-                {/* Video Result */}
                 {videoUrl && pipelineStep === "done" && (
                   <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-5 space-y-3 shadow-lg">
                     <div className="flex items-center gap-2">
@@ -823,15 +914,20 @@ const ImageToVideoGenerator = () => {
                   </div>
                 )}
 
-                {/* Fallback: image grid when no video */}
                 {!videoUrl && pipelineStep === "done" && generatedImages.length > 0 && (
-                  <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-2 shadow-lg">
-                    <p className="text-xs font-medium text-amber-400">Preview das cenas geradas</p>
+                  <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-3 shadow-lg">
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-amber-400">Preview das cenas geradas</p>
+                      {errorMsg && <p className="text-[11px] text-muted-foreground">{errorMsg}</p>}
+                    </div>
                     <div className="grid grid-cols-3 gap-2">
                       {generatedImages.map((img, i) => (
                         <img key={i} src={img} alt={`Cena ${i + 1}`} className="rounded-xl object-cover aspect-[9/16] w-full" />
                       ))}
                     </div>
+                    <Button variant="outline" size="sm" className="w-full md:w-auto" onClick={retry} disabled={isProcessing}>
+                      <RefreshCw className="w-4 h-4" /> Tentar renderizar novamente
+                    </Button>
                   </div>
                 )}
               </div>
