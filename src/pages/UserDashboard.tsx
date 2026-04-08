@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import SafeVideoPlayer from "@/components/SafeVideoPlayer";
+import { downloadVideo } from "@/lib/secureVideo";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -126,21 +128,10 @@ const UserDashboard = () => {
     }
     try {
       toast.loading("Preparando download...", { id: "dl" });
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const blob = await res.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = blobUrl;
-      link.download = `video-${Date.now()}.mp4`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(blobUrl);
+      await downloadVideo(url);
       toast.success("Download iniciado!", { id: "dl" });
     } catch (err) {
       console.error("[Download] Falha:", err);
-      // Fallback: open in new tab
       window.open(url, "_blank");
       toast.dismiss("dl");
     }
