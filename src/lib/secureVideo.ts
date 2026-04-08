@@ -123,6 +123,11 @@ export async function getSecureVideoUrl(url: string): Promise<string> {
 export async function resolveVideo(urlOrPath: string): Promise<string> {
   if (!urlOrPath || urlOrPath.trim() === "") return VIDEO_FALLBACK;
 
+  // Local asset paths (/__l5e/...) — use directly
+  if (isLocalAssetPath(urlOrPath) && !isManagedStorageUrl(urlOrPath)) {
+    return urlOrPath;
+  }
+
   // If it's a storage path (not a full URL), generate a public URL
   if (!urlOrPath.startsWith("http")) {
     const { data } = supabase.storage.from("videos").getPublicUrl(urlOrPath);
