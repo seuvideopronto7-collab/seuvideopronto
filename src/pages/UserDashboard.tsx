@@ -132,8 +132,7 @@ const UserDashboard = () => {
       toast.success("Download iniciado!", { id: "dl" });
     } catch (err) {
       console.error("[Download] Falha:", err);
-      window.open(url, "_blank");
-      toast.dismiss("dl");
+      toast.error("Esse vídeo ainda não tem arquivo final próprio para download.", { id: "dl" });
     }
   };
 
