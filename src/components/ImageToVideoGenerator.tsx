@@ -955,6 +955,17 @@ const ImageToVideoGenerator = () => {
                         ))}
                       </div>
                     )}
+                    {/* Ganchos Alternativos */}
+                    {result.copy.ganchos_alternativos && result.copy.ganchos_alternativos.length > 0 && (
+                      <div className="space-y-1.5 pt-2 border-t border-border/15">
+                        <p className="text-[9px] uppercase tracking-wider text-muted-foreground font-medium">🎯 Ganchos alternativos (teste A/B)</p>
+                        {result.copy.ganchos_alternativos.map((g, i) => (
+                          <div key={i} className="text-[11px] text-foreground bg-background/50 rounded-lg p-2 border border-border/10">
+                            {i + 1}. {g}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
 
