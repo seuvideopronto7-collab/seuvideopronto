@@ -38,10 +38,9 @@ serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data, error } = await supabase.auth.getClaims(token);
-    if (error || !data?.claims) return json({ error: "Unauthorized" }, 401);
-    const userId = data.claims.sub as string;
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error || !user) return json({ error: "Unauthorized" }, 401);
+    const userId = user.id;
 
     // ── Rate limit ──
     if (isRateLimited(userId)) return json({ error: "Rate limit excedido. Tente novamente em 1 minuto." }, 429);

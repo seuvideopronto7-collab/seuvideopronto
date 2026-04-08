@@ -51,10 +51,9 @@ serve(async (req) => {
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
       global: { headers: { Authorization: authHeader } },
     });
-    const token = authHeader.replace("Bearer ", "");
-    const { data, error } = await supabase.auth.getClaims(token);
-    if (error || !data?.claims) return json({ error: "Unauthorized" }, 401);
-    const userId = data.claims.sub as string;
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error || !user) return json({ error: "Unauthorized" }, 401);
+    const userId = user.id;
     if (isRateLimited(userId)) return json({ error: "Rate limit excedido. Tente novamente em 1 minuto." }, 429);
 
     const { text } = await req.json();
