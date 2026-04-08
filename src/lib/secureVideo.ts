@@ -8,6 +8,15 @@ const FALLBACK_VIDEO_URLS = new Set([
   "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4",
 ]);
 
+function isLocalAssetPath(url: string): boolean {
+  return url.startsWith("/__l5e/") || url.startsWith("/");
+}
+
+function toAbsoluteUrl(urlOrPath: string): string {
+  if (urlOrPath.startsWith("http")) return urlOrPath;
+  return `${window.location.origin}${urlOrPath.startsWith("/") ? "" : "/"}${urlOrPath}`;
+}
+
 function isManagedStorageUrl(url: string): boolean {
   return url.includes("/storage/v1/object/");
 }
@@ -61,6 +70,11 @@ async function resolveDownloadVideo(urlOrPath: string): Promise<string> {
     throw new Error("VIDEO_FALLBACK_ONLY");
   }
 
+  // Local asset paths (e.g. /__l5e/...) — convert to absolute URL
+  if (isLocalAssetPath(urlOrPath) && !isManagedStorageUrl(urlOrPath)) {
+    return toAbsoluteUrl(urlOrPath);
+  }
+
   if (!urlOrPath.startsWith("http")) {
     const { data, error } = await supabase.storage.from("videos").createSignedUrl(urlOrPath, 3600);
 
@@ -108,6 +122,11 @@ export async function getSecureVideoUrl(url: string): Promise<string> {
  */
 export async function resolveVideo(urlOrPath: string): Promise<string> {
   if (!urlOrPath || urlOrPath.trim() === "") return VIDEO_FALLBACK;
+
+  // Local asset paths (/__l5e/...) — use directly
+  if (isLocalAssetPath(urlOrPath) && !isManagedStorageUrl(urlOrPath)) {
+    return urlOrPath;
+  }
 
   // If it's a storage path (not a full URL), generate a public URL
   if (!urlOrPath.startsWith("http")) {
