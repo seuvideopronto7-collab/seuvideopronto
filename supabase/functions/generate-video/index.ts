@@ -220,8 +220,7 @@ serve(async (req) => {
       style,
     } = body;
 
-    const resolvedImageUrl = imageUrl || image;
-    if (!resolvedImageUrl) return json({ error: "imageUrl requerido" }, 400);
+    const resolvedImageUrl = imageUrl || image || null;
 
     const wantsJob = Boolean(createJob);
     let jobId: string | null = null;
@@ -324,16 +323,18 @@ serve(async (req) => {
       console.error("Voiceover generation failed:", e);
     }
 
-    // Step 3: Video
+    // Step 3: Video (only if image provided)
     if (wantsJob && adminClient && jobId) {
       await updateJob(adminClient, jobId, { progress: 55, status: "generating_video", audio_url: audioUrl });
     }
 
     let videoUrl: string | null = null;
-    try {
-      videoUrl = await generateRunwayVideo(resolvedImageUrl, promptText);
-    } catch (e) {
-      console.error("Video generation failed:", e);
+    if (resolvedImageUrl) {
+      try {
+        videoUrl = await generateRunwayVideo(resolvedImageUrl, promptText);
+      } catch (e) {
+        console.error("Video generation failed:", e);
+      }
     }
 
     // ── Fallback ──
