@@ -84,16 +84,18 @@ const VideoGeneratorUI = () => {
     };
   }, [narrationUrl, musicUrl]);
 
+  // Polling fallback + realtime for job status
   useEffect(() => {
     if (!jobId) return;
     let active = true;
+
     const watchdog = window.setTimeout(() => {
       if (!active) return;
       console.error("PDG DEBUG: erro detectado e tratado", new Error("Timeout de monitoramento do job"));
       setJobStatus("fallback");
       setProgress((prev) => (prev < 100 ? 100 : prev));
       active = false;
-    }, 60000);
+    }, 120000);
 
     const syncJob = async () => {
       try {
@@ -111,6 +113,12 @@ const VideoGeneratorUI = () => {
     };
 
     syncJob();
+
+    // Polling fallback every 3s
+    const pollInterval = window.setInterval(() => {
+      if (!active) return;
+      syncJob();
+    }, 3000);
 
     const channel = supabase
       .channel("video_jobs")
@@ -149,6 +157,7 @@ const VideoGeneratorUI = () => {
     return () => {
       active = false;
       window.clearTimeout(watchdog);
+      window.clearInterval(pollInterval);
       supabase.removeChannel(channel);
     };
   }, [jobId]);
@@ -172,15 +181,13 @@ const VideoGeneratorUI = () => {
         }
       });
 
+      // Check backend via edge function instead of /api/webhook/health
       try {
-        const controller = new AbortController();
-        const timer = window.setTimeout(() => controller.abort(), 5000);
-        const res = await fetch("/api/webhook/health", { signal: controller.signal });
-        window.clearTimeout(timer);
-        if (!res.ok) throw new Error(`Webhook indisponível (${res.status})`);
-        results.push({ name: "Backend webhook", status: "ok" });
+        const { data, error } = await supabase.functions.invoke("test-api", { body: {} });
+        if (error) throw error;
+        results.push({ name: "Backend", status: "ok" });
       } catch (error: any) {
-        results.push({ name: "Backend webhook", status: "error", message: error?.message || "Sem resposta" });
+        results.push({ name: "Backend", status: "error", message: error?.message || "Sem resposta" });
       }
 
       setApiChecks(results);
@@ -621,10 +628,7 @@ const VideoGeneratorUI = () => {
 
   const downloadVideo = () => {
     if (!videoUrl) return;
-    const link = document.createElement("a");
-    link.href = videoUrl;
-    link.download = "video-final.mp4";
-    link.click();
+    window.open(videoUrl, "_blank");
   };
 
   const copyText = (value: string, label: string) => {
