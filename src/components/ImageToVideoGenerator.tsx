@@ -7,6 +7,7 @@ import {
   Settings2, Flame, Users, Shield, Shuffle, BarChart3, Crosshair
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import SafeVideoPlayer from "@/components/SafeVideoPlayer";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -1147,12 +1148,7 @@ const ImageToVideoGenerator = () => {
                       <Film className="w-4 h-4 text-emerald-400" />
                       <h3 className="text-sm font-semibold text-emerald-400">🎬 Vídeo Pronto!</h3>
                     </div>
-                    <video src={videoUrl} controls className="w-full rounded-xl" onError={() => console.error("[Storage] Falha ao carregar vídeo:", videoUrl)} />
-                    <a href={videoUrl} download target="_blank" rel="noopener noreferrer">
-                      <Button variant="outline" size="sm" className="w-full md:w-auto">
-                        <Download className="w-4 h-4" /> Baixar MP4
-                      </Button>
-                    </a>
+                    <SafeVideoPlayer src={videoUrl} poster={imageUrl} showDownload autoPlay />
                   </div>
                 )}
 
