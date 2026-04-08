@@ -467,14 +467,37 @@ const VideoGeneratorUI = () => {
     }
   };
 
-  const generateSoundtrack = async () => {
+  const soundtrackObjectiveMap: Record<string, string> = {
+    "Vendas": "vendas",
+    "Viral": "viral",
+    "Autoridade": "autoridade",
+    "Cinematográfico": "vendas",
+  };
+
+  const generateSoundtrack = async (mode?: string) => {
     try {
       setIsGeneratingMusic(true);
-      const audioBuffer = await generateEpicSoundtrack(8);
-      const blob = new Blob([audioBuffer], { type: "audio/wav" });
-      if (musicUrl?.startsWith("blob:")) URL.revokeObjectURL(musicUrl);
-      setMusicUrl(URL.createObjectURL(blob));
-      toast.success("Trilha sonora gerada.");
+      const soundtrackObjective = mode || soundtrackObjectiveMap[objective] || "vendas";
+      const durationSec = objective === "Viral" ? 15 : 30;
+
+      const { data, error } = await supabase.functions.invoke("generate-soundtrack", {
+        body: {
+          objective: soundtrackObjective,
+          duration: durationSec,
+          jobId: jobId || undefined,
+        },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      if (data?.audioUrl) {
+        if (musicUrl?.startsWith("blob:")) URL.revokeObjectURL(musicUrl);
+        setMusicUrl(data.audioUrl);
+        toast.success(`🎧 Trilha "${soundtrackObjective}" gerada com sucesso!`);
+      } else {
+        throw new Error("Nenhum áudio retornado");
+      }
     } catch (error: any) {
       console.error("PDG DEBUG: erro detectado e tratado", error);
       toast.error(error?.message || "Falha ao gerar trilha sonora.");
