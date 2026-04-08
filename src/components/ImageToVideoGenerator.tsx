@@ -171,6 +171,7 @@ const apiDefinitions = [
 // ═══════════════════════════════════════
 const ImageToVideoGenerator = () => {
   const navigate = useNavigate();
+  const { score: scoreCopy, ganchos: gerarGanchos, randomize: randomizeCopy, shouldRewrite } = useUltraCopyEngine();
 
   // ── State ──
   const lastTerminalStatusRef = useRef<string | null>(null);
@@ -197,6 +198,11 @@ const ImageToVideoGenerator = () => {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Copy Engine State
+  const [copyScoreData, setCopyScoreData] = useState<CopyScore | null>(null);
+  const [ganchosGerados, setGanchosGerados] = useState<{ tipo: string; texto: string }[]>([]);
+  const [showGanchos, setShowGanchos] = useState(false);
 
   // API status
   const [apiStatuses, setApiStatuses] = useState<Record<string, ApiStatus>>({});
