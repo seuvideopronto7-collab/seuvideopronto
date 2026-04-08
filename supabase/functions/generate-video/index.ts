@@ -209,18 +209,46 @@ serve(async (req) => {
       }
     }
 
-    const body = await req.json();
+    let body: Record<string, any> = {};
+    try {
+      body = await req.json();
+    } catch (error) {
+      console.error("generate-video invalid json", error);
+      return json({ error: "JSON inválido", message: "Envie um body JSON válido." }, 400);
+    }
+
     const {
       imageUrl,
       image,
       prompt,
       narracao,
-      createJob,
-      productType,
-      style,
+      createJob = false,
+      productType = "produto premium",
+      style = "cinematografico",
+      duration = 5,
+      format = "16:9",
     } = body;
 
-    const resolvedImageUrl = imageUrl || image || null;
+    const resolvedImageUrl =
+      typeof imageUrl === "string" && imageUrl.trim()
+        ? imageUrl
+        : typeof image === "string" && image.trim()
+          ? image
+          : null;
+
+    console.log("generate-video request", {
+      hasImage: Boolean(resolvedImageUrl),
+      hasPrompt: Boolean(prompt),
+      createJob: Boolean(createJob),
+      productType,
+      style,
+      duration,
+      format,
+    });
+
+    if (!resolvedImageUrl && !prompt && !narracao) {
+      return json({ error: "prompt ou imageUrl obrigatório", message: "Envie uma imagem ou um prompt para iniciar a geração." }, 400);
+    }
 
     const wantsJob = Boolean(createJob);
     let jobId: string | null = null;

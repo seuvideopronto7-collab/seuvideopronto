@@ -125,14 +125,17 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
 
   const generateVideoFromImage = async (imageUrl: string) => {
     try {
-      const { data, error } = await supabase.functions.invoke("generate-video", {
-        body: {
-          imageUrl,
-          estilo: "cinematografico",
-          movimento: "leve zoom + parallax",
-          duracao: 5,
-        },
-      });
+        const { data, error } = await supabase.functions.invoke("generate-video", {
+          body: {
+            imageUrl,
+            prompt: "Vídeo cinematográfico a partir da imagem",
+            productType: "Outro",
+            style: "Luxo",
+            createJob: false,
+            duration: 5,
+            format: "16:9",
+          },
+        });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       if (data?.videoUrl) return data.videoUrl as string;
