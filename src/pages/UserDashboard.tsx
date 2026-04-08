@@ -270,68 +270,91 @@ const UserDashboard = () => {
             <div className="text-xs text-muted-foreground">Nenhum vídeo gerado ainda.</div>
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {videoJobs.map((job: any) => (
-              <div key={job.id} className="rounded-xl border border-border/40 bg-muted/20 p-4 space-y-3 transition-all duration-200 hover:scale-[1.01]">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-mono text-muted-foreground">{job.id?.slice(0, 8)}...</span>
-                  <span className={`rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide ${
-                    job.status === 'completed' || job.status === 'fallback'
-                      ? 'border-green-500/50 text-green-400'
-                      : job.status === 'failed'
-                      ? 'border-red-500/50 text-red-400'
-                      : 'border-yellow-500/50 text-yellow-400'
-                  }`}>
-                    {job.status || "pending"}
-                  </span>
-                </div>
+            {videoJobs.map((job: any) => {
+              const isReady = job.status === 'completed' && job.video_url;
+              const isFailed = job.status === 'error' || job.status === 'failed';
+              const isProcessing = !isReady && !isFailed;
 
-                {/* Video player */}
-                <div className="rounded-lg border border-border/40 bg-background/40 overflow-hidden">
-                  {job.video_url ? (
-                    <SafeVideoPlayer
-                      src={job.video_url}
-                      poster={job.image_url}
-                      showDownload={false}
-                      className="aspect-video object-cover"
-                    />
-                  ) : job.image_url ? (
-                    <img
-                      src={job.image_url}
-                      alt="thumbnail"
-                      className="w-full aspect-video object-cover"
-                      loading="lazy"
-                      onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.svg"; }}
-                    />
-                  ) : (
-                    <div className="aspect-video flex items-center justify-center text-xs text-muted-foreground">
-                      Sem preview
+              return (
+                <div key={job.id} className="rounded-xl border border-border/40 bg-muted/20 p-4 space-y-3 transition-all duration-200 hover:scale-[1.01]">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-mono text-muted-foreground">{job.id?.slice(0, 8)}...</span>
+                    <span className={`rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide ${
+                      isReady
+                        ? 'border-green-500/50 text-green-400'
+                        : isFailed
+                        ? 'border-red-500/50 text-red-400'
+                        : 'border-yellow-500/50 text-yellow-400'
+                    }`}>
+                      {isReady ? 'CONCLUÍDO' : isFailed ? 'ERRO' : job.status || "processando"}
+                    </span>
+                  </div>
+
+                  {/* Video player — only show real video for completed jobs */}
+                  <div className="rounded-lg border border-border/40 bg-background/40 overflow-hidden">
+                    {isReady ? (
+                      <SafeVideoPlayer
+                        src={job.video_url}
+                        poster={job.image_url}
+                        showDownload={false}
+                        className="aspect-video object-cover"
+                      />
+                    ) : job.image_url ? (
+                      <div className="relative">
+                        <img
+                          src={job.image_url}
+                          alt="thumbnail"
+                          className="w-full aspect-video object-cover"
+                          loading="lazy"
+                          onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.svg"; }}
+                        />
+                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                          {isProcessing ? (
+                            <div className="text-center">
+                              <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto mb-2" />
+                              <p className="text-xs text-white/80">Gerando vídeo...</p>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-white/60">Falha na geração</p>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="aspect-video flex items-center justify-center text-xs text-muted-foreground">
+                        {isProcessing ? "Processando..." : "Sem preview"}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Progress bar for in-progress jobs */}
+                  {isProcessing && (
+                    <div className="space-y-1">
+                      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                        <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${job.progress || 0}%` }} />
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">{job.progress || 0}% — {job.status}</p>
                     </div>
                   )}
-                </div>
 
-                {/* Progress bar for in-progress jobs */}
-                {job.status !== 'completed' && job.status !== 'fallback' && job.status !== 'failed' && (
-                  <div className="space-y-1">
-                    <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                      <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${job.progress || 0}%` }} />
-                    </div>
-                    <p className="text-[10px] text-muted-foreground">{job.progress || 0}% — {job.status}</p>
+                  <div className="text-[11px] text-muted-foreground">
+                    {job.created_at ? new Date(job.created_at).toLocaleString() : ""}
                   </div>
-                )}
-
-                <div className="text-[11px] text-muted-foreground">
-                  {job.created_at ? new Date(job.created_at).toLocaleString() : ""}
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="glass"
+                      size="sm"
+                      onClick={() => handleDownload(job.video_url)}
+                      disabled={!isReady}
+                    >
+                      <Download className="w-4 h-4" /> {isReady ? "Download" : "Indisponível"}
+                    </Button>
+                    <Button variant="glass" size="sm" onClick={() => handleRepost(job.id)} disabled={!isReady}>
+                      <Repeat2 className="w-4 h-4" /> Repostar
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button variant="glass" size="sm" onClick={() => handleDownload(job.video_url)} disabled={!job.video_url}>
-                    <Download className="w-4 h-4" /> Download
-                  </Button>
-                  <Button variant="glass" size="sm" onClick={() => handleRepost(job.id)}>
-                    <Repeat2 className="w-4 h-4" /> Repostar
-                  </Button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 

@@ -34,6 +34,43 @@ const updateJob = async (
   await admin.from("video_jobs").update(fields).eq("id", jobId);
 };
 
+/**
+ * Downloads a video from an external URL and uploads it to Supabase Storage.
+ * Returns the public URL or null on failure.
+ */
+const persistVideoToStorage = async (
+  admin: ReturnType<typeof createClient>,
+  jobId: string,
+  externalUrl: string,
+): Promise<string | null> => {
+  try {
+    const res = await fetch(externalUrl);
+    if (!res.ok) {
+      console.error(`[persistVideo] fetch failed: ${res.status}`);
+      return null;
+    }
+    const buffer = await res.arrayBuffer();
+    if (buffer.byteLength < 1000) {
+      console.error(`[persistVideo] file too small: ${buffer.byteLength}`);
+      return null;
+    }
+    const storagePath = `generated/${jobId}.mp4`;
+    const { error: uploadErr } = await admin.storage
+      .from("videos")
+      .upload(storagePath, buffer, { contentType: "video/mp4", upsert: true });
+    if (uploadErr) {
+      console.error("[persistVideo] upload error:", uploadErr);
+      return null;
+    }
+    const { data } = admin.storage.from("videos").getPublicUrl(storagePath);
+    console.log(`[persistVideo] ✅ saved ${storagePath} (${buffer.byteLength} bytes)`);
+    return data.publicUrl;
+  } catch (e) {
+    console.error("[persistVideo] exception:", e);
+    return null;
+  }
+};
+
 // ── Step 1: Generate script via Lovable AI ──────────────────────────────────
 
 const generateScript = async (prompt: string, productInfo: string): Promise<string> => {
@@ -311,6 +348,11 @@ serve(async (req) => {
       jobId = job.id;
     }
 
+    // Ensure adminClient exists for storage operations
+    if (!adminClient && supabaseUrl && serviceRoleKey) {
+      adminClient = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
+    }
+
     const productInfo = productType || style || "produto premium";
     const promptText = prompt || `Vídeo cinematográfico para ${productInfo}`;
 
@@ -365,20 +407,28 @@ serve(async (req) => {
       }
     }
 
-    // ── Fallback ──
+    // ── PERSIST VIDEO TO STORAGE (OBRIGATÓRIO) ──
+    if (videoUrl && adminClient && jobId) {
+      const persistedUrl = await persistVideoToStorage(adminClient, jobId, videoUrl);
+      if (persistedUrl) {
+        videoUrl = persistedUrl; // Use the storage URL instead of external
+      }
+    }
+
+    // ── Result ──
     if (!videoUrl) {
-      const fallbackUrl = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4";
+      // NO FALLBACK FAKE — mark as error so auto-heal can retry later
       if (wantsJob && adminClient && jobId) {
         await updateJob(adminClient, jobId, {
-          status: "fallback",
+          status: "error",
           progress: 100,
-          video_url: fallbackUrl,
+          video_url: null,
           audio_url: audioUrl,
           caption_text: script,
-          error: "Video provider unavailable, fallback applied",
+          error: "Geração de vídeo falhou — aguardando reprocessamento",
         });
       }
-      return json({ videoUrl: fallbackUrl, audioUrl, script, provider: "fallback", jobId });
+      return json({ videoUrl: null, audioUrl, script, provider: "none", jobId, status: "error" });
     }
 
     // ── Success ──

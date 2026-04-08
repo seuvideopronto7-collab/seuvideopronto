@@ -465,11 +465,11 @@ Gere também 3 VARIAÇÕES de gancho alternativas no campo ganchos_alternativos 
       // ── 2c. Render video with Shotstack ──
       if (!SHOTSTACK_API_KEY) {
         await updateJob(jobId, {
-          status: "done", progress: 100,
+          status: "error", progress: 100,
           video_url: null, images: imageUrls,
-          error: "Renderizador indisponível – preview com imagens geradas",
+          error: "Renderizador indisponível — aguardando reprocessamento",
         });
-        return json({ jobId, status: "done", message: "Preview gerado com fallback", images: imageUrls, audioUrl, fallback: true });
+        return json({ jobId, status: "error", message: "Renderizador indisponível", images: imageUrls, audioUrl });
       }
 
       await updateJob(jobId, { status: "rendering", progress: 65 });
@@ -544,8 +544,8 @@ Gere também 3 VARIAÇÕES de gancho alternativas no campo ganchos_alternativos 
       if (!renderRes.ok) {
         const errText = await renderRes.text();
         console.error("Shotstack render error:", renderRes.status, errText);
-        await updateJob(jobId, { status: "done", progress: 100, video_url: null, error: `Render failed: ${renderRes.status}` });
-        return json({ jobId, status: "done", message: "Preview gerado com fallback", images: imageUrls, audioUrl, fallback: true });
+        await updateJob(jobId, { status: "error", progress: 100, video_url: null, error: `Render failed: ${renderRes.status}` });
+        return json({ jobId, status: "error", message: "Falha na renderização", images: imageUrls, audioUrl });
       }
 
       const renderData = await renderRes.json();
@@ -578,8 +578,29 @@ Gere também 3 VARIAÇÕES de gancho alternativas no campo ganchos_alternativos 
         return json({ jobId, status: "error", message: "Tempo limite na renderização", error: "Render timeout" }, 500);
       }
 
-      await updateJob(jobId, { status: "done", progress: 100, video_url: videoUrl, error: null });
-      return json({ jobId, status: "done", message: "Vídeo renderizado com sucesso", videoUrl, audioUrl, images: imageUrls });
+      // ── PERSIST VIDEO TO STORAGE ──
+      let finalVideoUrl = videoUrl;
+      try {
+        const vRes = await fetch(videoUrl);
+        if (vRes.ok) {
+          const buffer = await vRes.arrayBuffer();
+          if (buffer.byteLength > 1000) {
+            const storagePath = `generated/${jobId}.mp4`;
+            const { error: upErr } = await admin.storage
+              .from("videos")
+              .upload(storagePath, buffer, { contentType: "video/mp4", upsert: true });
+            if (!upErr) {
+              const { data: pubData } = admin.storage.from("videos").getPublicUrl(storagePath);
+              finalVideoUrl = pubData.publicUrl;
+            }
+          }
+        }
+      } catch (e) {
+        console.error("[commercial] persist failed:", e);
+      }
+
+      await updateJob(jobId, { status: "completed", progress: 100, video_url: finalVideoUrl, error: null });
+      return json({ jobId, status: "completed", message: "Vídeo renderizado com sucesso", videoUrl: finalVideoUrl, audioUrl, images: imageUrls });
     }
 
     return json({ error: "step inválido", message: "Use step analyze ou render" }, 400);
