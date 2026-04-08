@@ -70,6 +70,11 @@ async function resolveDownloadVideo(urlOrPath: string): Promise<string> {
     throw new Error("VIDEO_FALLBACK_ONLY");
   }
 
+  // Local asset paths (e.g. /__l5e/...) — convert to absolute URL
+  if (isLocalAssetPath(urlOrPath) && !isManagedStorageUrl(urlOrPath)) {
+    return toAbsoluteUrl(urlOrPath);
+  }
+
   if (!urlOrPath.startsWith("http")) {
     const { data, error } = await supabase.storage.from("videos").createSignedUrl(urlOrPath, 3600);
 
