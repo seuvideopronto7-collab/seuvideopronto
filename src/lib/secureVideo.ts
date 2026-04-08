@@ -58,7 +58,10 @@ function triggerNativeDownload(url: string, filename?: string): void {
 }
 
 function isKnownFallbackVideo(url: string): boolean {
-  return FALLBACK_VIDEO_URLS.has(url);
+  if (FALLBACK_VIDEO_URLS.has(url)) return true;
+  // All local CDN asset paths are demo/placeholder content, not user-generated final videos
+  if (isLocalAssetPath(url) && !isManagedStorageUrl(url)) return true;
+  return false;
 }
 
 async function resolveDownloadVideo(urlOrPath: string): Promise<string> {
