@@ -136,13 +136,13 @@ serve(async (req) => {
       const text = await response.text();
       console.error("generate-video error:", response.status, text);
       await updateJob(jobId, {
-        status: "fallback",
+        status: "error",
         progress: 100,
         video_url: null,
-        error: text || "Falha ao gerar video",
+        error: text || "Falha ao gerar video — aguardando reprocessamento",
       });
       return new Response(
-        JSON.stringify({ id: jobId, status: "fallback", prompt, textoNaTela, narracao, modePro }),
+        JSON.stringify({ id: jobId, status: "error", prompt, textoNaTela, narracao, modePro }),
         {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
