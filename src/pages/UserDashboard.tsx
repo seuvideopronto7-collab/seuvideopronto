@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import SafeVideoPlayer from "@/components/SafeVideoPlayer";
+import { downloadVideo } from "@/lib/secureVideo";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -126,21 +128,10 @@ const UserDashboard = () => {
     }
     try {
       toast.loading("Preparando download...", { id: "dl" });
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const blob = await res.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = blobUrl;
-      link.download = `video-${Date.now()}.mp4`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(blobUrl);
+      await downloadVideo(url);
       toast.success("Download iniciado!", { id: "dl" });
     } catch (err) {
       console.error("[Download] Falha:", err);
-      // Fallback: open in new tab
       window.open(url, "_blank");
       toast.dismiss("dl");
     }
@@ -298,19 +289,11 @@ const UserDashboard = () => {
                 {/* Video player */}
                 <div className="rounded-lg border border-border/40 bg-background/40 overflow-hidden">
                   {job.video_url ? (
-                    <video
+                    <SafeVideoPlayer
                       src={job.video_url}
-                      className="w-full aspect-video object-cover bg-black"
-                      controls
-                      preload="metadata"
-                      poster={job.image_url || undefined}
-                      onError={(e) => {
-                        console.warn("[Video] Falha ao carregar:", job.video_url);
-                        const el = e.target as HTMLVideoElement;
-                        el.style.display = "none";
-                        const fallback = el.parentElement?.querySelector(".video-fallback") as HTMLElement;
-                        if (fallback) fallback.style.display = "flex";
-                      }}
+                      poster={job.image_url}
+                      showDownload={false}
+                      className="aspect-video object-cover"
                     />
                   ) : job.image_url ? (
                     <img
@@ -320,11 +303,7 @@ const UserDashboard = () => {
                       loading="lazy"
                       onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.svg"; }}
                     />
-                  ) : null}
-                  <div className="video-fallback hidden aspect-video items-center justify-center text-xs text-muted-foreground bg-muted/30">
-                    <Video className="w-6 h-6 mr-2 opacity-40" /> Mídia indisponível
-                  </div>
-                  {!job.video_url && !job.image_url && (
+                  ) : (
                     <div className="aspect-video flex items-center justify-center text-xs text-muted-foreground">
                       Sem preview
                     </div>
