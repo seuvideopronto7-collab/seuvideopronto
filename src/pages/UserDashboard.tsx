@@ -51,7 +51,7 @@ const UserDashboard = () => {
       setLoadingJobs(true);
       const { data, error } = await supabase
         .from("video_jobs" as any)
-        .select("id,status,created_at,video_url,image_url")
+        .select("id,status,created_at,video_url,image_url,prompt,progress")
         .eq("user_id", profile.id)
         .order("created_at", { ascending: false })
         .limit(12);
