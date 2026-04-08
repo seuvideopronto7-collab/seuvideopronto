@@ -155,6 +155,39 @@ export type Database = {
         }
         Relationships: []
       }
+      subscriptions: {
+        Row: {
+          created_at: string
+          id: string
+          plan: string
+          reset_date: string | null
+          status: string
+          user_id: string
+          videos_limit: number | null
+          videos_used: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          plan?: string
+          reset_date?: string | null
+          status?: string
+          user_id: string
+          videos_limit?: number | null
+          videos_used?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          plan?: string
+          reset_date?: string | null
+          status?: string
+          user_id?: string
+          videos_limit?: number | null
+          videos_used?: number
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
