@@ -279,8 +279,13 @@ Gere também 3 VARIAÇÕES de gancho alternativas no campo ganchos_alternativos 
                       subheadline: { type: "string" },
                       bullet_points: { type: "array", items: { type: "string" } },
                       hashtags: { type: "array", items: { type: "string" } },
+                      ganchos_alternativos: {
+                        type: "array",
+                        items: { type: "string" },
+                        description: "3 variações alternativas do gancho principal para teste A/B",
+                      },
                     },
-                    required: ["headline", "subheadline", "bullet_points", "hashtags"],
+                    required: ["headline", "subheadline", "bullet_points", "hashtags", "ganchos_alternativos"],
                   },
                   config_video: {
                     type: "object",
