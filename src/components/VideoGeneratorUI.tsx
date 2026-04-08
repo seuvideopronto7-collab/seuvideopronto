@@ -969,6 +969,24 @@ const VideoGeneratorUI = () => {
                 <Music2 className="h-4 w-4" /> {isGeneratingMusic ? "Gerando trilha..." : "🎧 Gerar trilha inteligente"}
               </Button>
             </div>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { label: "🔥 Vendas", mode: "vendas_agressiva" },
+                { label: "🧠 Autoridade", mode: "autoridade" },
+                { label: "🚀 Viral", mode: "viral" },
+              ].map((item) => (
+                <Button
+                  key={item.mode}
+                  variant="outline"
+                  size="sm"
+                  className="text-xs"
+                  disabled={isGeneratingMusic}
+                  onClick={() => generateSoundtrack(item.mode)}
+                >
+                  {item.label}
+                </Button>
+              ))}
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="rounded-xl border border-border/50 bg-muted/10 p-3 space-y-2">
                 <div className="text-xs text-muted-foreground">Preview narração</div>
