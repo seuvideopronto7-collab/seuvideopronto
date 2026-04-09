@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Film, Clock, CheckCircle2, AlertCircle } from "lucide-react";
+import { Film, Clock, CheckCircle2, AlertCircle, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 type VideoJob = {
   id: string;
