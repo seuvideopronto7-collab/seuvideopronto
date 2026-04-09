@@ -570,8 +570,6 @@ const VideoGeneratorUI = () => {
     }
   };
 
-  const [isAutoPipeline, setIsAutoPipeline] = useState(false);
-
   /**
    * 🚀 PIPELINE AUTOMÁTICO COMPLETO
    * INPUT → Análise IA (OCR + Vision) → Roteiro → Narração → Cenas → Composição → Storage
