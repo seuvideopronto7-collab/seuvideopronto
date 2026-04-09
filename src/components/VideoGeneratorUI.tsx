@@ -709,73 +709,6 @@ const VideoGeneratorUI = () => {
     }
   };
 
-
-    try {
-      setIsProcessing(true);
-      setVideoUrl(null);
-      setProgress(0);
-      setJobStatus("queued");
-
-      // 1. Upload image
-      const resolvedImageUrl = await uploadToStorage();
-      if (!resolvedImageUrl) {
-        toast.error("Informe uma URL ou envie uma imagem.");
-        return;
-      }
-
-      // 2. Generate script (LLM)
-      setJobStatus("generating_script");
-      const script = await generateScript();
-      const prompt = buildCinematicPrompt(productType, styleType, useDarkflow, useViral, modePro);
-
-      // 3. Build scenes from script
-      const scenesFromScript = (script?.onScreenText || []).map((text, i) => ({
-        texto: text,
-        visual: `scene ${i + 1} for ${productType}`,
-        emocao: ["curiosidade", "tensão", "solução", "urgência"][Math.min(i, 3)],
-        prompt_imagem: `${prompt}, scene: ${text}`,
-      }));
-      while (scenesFromScript.length < 4) {
-        scenesFromScript.push({
-          texto: script?.cta || "Garanta o seu agora",
-          visual: `product premium shot`,
-          emocao: "urgência",
-          prompt_imagem: `${prompt}, premium product close-up`,
-        });
-      }
-
-      // 4. Create job (DB only, no processing)
-      const { jobId: id } = await createVideoJob({
-        imageUrl: resolvedImageUrl,
-        productType,
-        style: styleType,
-        narracao: narrationText || script?.fullScript || "",
-        prompt,
-      });
-      if (!id) throw new Error("Job não retornado.");
-      setJobId(id);
-      setJobStatus("pending");
-
-      // 5. Start SINGLE pipeline (images → audio → render → storage)
-      startVideoPipeline({
-        jobId: id,
-        imageUrl: resolvedImageUrl,
-        script: narrationText || script?.fullScript || "",
-        scenes: scenesFromScript,
-      }).catch((err) => {
-        console.error("Pipeline error:", err);
-      });
-
-      toast.success("Pipeline iniciado! Acompanhe o progresso.");
-    } catch (error: any) {
-      console.error("startJob error:", error);
-      toast.error(error?.message || "Falha ao iniciar o job.");
-      setJobStatus("error");
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
   const progressLabel = useMemo(() => {
     if (!jobStatus) return "Aguardando";
     if (jobStatus === "done" || jobStatus === "completed") return "Concluído";
@@ -1217,7 +1150,7 @@ const VideoGeneratorUI = () => {
             <Badge variant="secondary">Avançado</Badge>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            <Button variant="neon" onClick={startJob} disabled={isProcessing}>
+            <Button variant="neon" onClick={runAutoPipeline} disabled={isProcessing}>
               <Wand2 className="h-4 w-4" /> {isProcessing ? "Processando..." : "GERAR VÍDEO 🎬"}
             </Button>
             <Button variant="glass" onClick={renderLocalVideo} disabled={isLocalRendering}>
@@ -1243,7 +1176,7 @@ const VideoGeneratorUI = () => {
           </div>
           <div className="text-xs text-muted-foreground">{statusMessage}</div>
           {(jobStatus === "error" || jobStatus === "failed" || jobStatus === "fallback") && (
-            <Button variant="glass" onClick={startJob} disabled={isProcessing}>
+            <Button variant="glass" onClick={runAutoPipeline} disabled={isProcessing}>
               Tentar novamente
             </Button>
           )}
