@@ -569,7 +569,148 @@ const VideoGeneratorUI = () => {
     }
   };
 
-  const startJob = async () => {
+  const [isAutoPipeline, setIsAutoPipeline] = useState(false);
+
+  /**
+   * 🚀 PIPELINE AUTOMÁTICO COMPLETO
+   * INPUT → Análise IA (OCR + Vision) → Roteiro → Narração → Cenas → Composição → Storage
+   */
+  const runAutoPipeline = async () => {
+    if (isAutoPipeline || isProcessing) return;
+
+    try {
+      setIsAutoPipeline(true);
+      setVideoUrl(null);
+      setProgress(0);
+      setJobStatus("analyzing");
+
+      // ── STEP 1: Upload imagem ──
+      toast.info("🔍 Etapa 1/6: Enviando imagem...");
+      const resolvedImageUrl = await uploadToStorage();
+      if (!resolvedImageUrl) {
+        toast.error("Envie uma imagem ou cole uma URL.");
+        return;
+      }
+      setProgress(5);
+
+      // ── STEP 2: Análise IA (OCR + Vision com Gemini) ──
+      toast.info("🧠 Etapa 2/6: Analisando imagem com IA (OCR + detecção)...");
+      setJobStatus("analyzing");
+      setProgress(10);
+
+      let analysisData: any = null;
+      try {
+        const { data, error } = await supabase.functions.invoke("analyze-content", {
+          body: {
+            fileUrl: resolvedImageUrl,
+            modo: objective === "Viral" ? "viral" : objective === "Autoridade" ? "autoridade" : "vendas",
+            produto: productName || undefined,
+            nicho: niche || undefined,
+          },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        analysisData = data;
+
+        // Auto-fill detected data
+        if (data?.analise?.produto_detectado && !productName) {
+          setProductName(data.analise.produto_detectado);
+        }
+        if (data?.analise?.tema && !niche) {
+          setNiche(data.analise.tema);
+        }
+
+        // Build script from analysis
+        const hook = data?.novo_roteiro?.hook || "Pare tudo e veja isso agora";
+        const cta = data?.novo_roteiro?.cta || "Clique e garanta o seu";
+        const benefits = (data?.nova_copy?.bullet_points || []).slice(0, 3);
+        const fullScript = data?.novo_roteiro?.roteiro_completo || "";
+        const textosTela = (data?.novas_cenas || []).map((c: any) => c?.texto_tela).filter(Boolean);
+        setScriptData({ hook, benefits, cta, fullScript, onScreenText: textosTela });
+        if (fullScript) setNarrationText(fullScript);
+
+        toast.success("✅ Análise completa — produto e copy detectados!");
+      } catch (err: any) {
+        console.error("[auto-pipeline] análise falhou, usando fallback:", err);
+        toast.warning("Análise com fallback — continuando pipeline...");
+        const fb = buildFallbackScript();
+        setScriptData(fb);
+        setNarrationText(fb.fullScript);
+      }
+      setProgress(25);
+
+      // ── STEP 3: Gerar roteiro refinado (se análise teve sucesso) ──
+      toast.info("📝 Etapa 3/6: Refinando roteiro...");
+      setJobStatus("generating_script");
+      if (!scriptData?.fullScript || scriptData?.isFallback) {
+        await generateScript();
+      }
+      setProgress(35);
+
+      // ── STEP 4: Criar job no banco ──
+      toast.info("🎯 Etapa 4/6: Criando job...");
+      const prompt = buildCinematicPrompt(productType, styleType, useDarkflow, useViral, modePro);
+
+      // Build scenes from analysis or script
+      const analysisScenes = analysisData?.novas_cenas || [];
+      const scenesFromAnalysis = analysisScenes.length > 0
+        ? analysisScenes.map((c: any, i: number) => ({
+            texto: c.texto_tela || c.descricao || `Cena ${i + 1}`,
+            visual: c.descricao || `scene ${i + 1}`,
+            emocao: ["curiosidade", "tensão", "solução", "urgência"][Math.min(i, 3)],
+            prompt_imagem: c.prompt_imagem || `${prompt}, ${c.descricao}`,
+          }))
+        : (scriptData?.onScreenText || []).map((text, i) => ({
+            texto: text,
+            visual: `scene ${i + 1} for ${productType}`,
+            emocao: ["curiosidade", "tensão", "solução", "urgência"][Math.min(i, 3)],
+            prompt_imagem: `${prompt}, scene: ${text}`,
+          }));
+
+      while (scenesFromAnalysis.length < 4) {
+        scenesFromAnalysis.push({
+          texto: scriptData?.cta || "Garanta o seu agora",
+          visual: "product premium shot",
+          emocao: "urgência",
+          prompt_imagem: `${prompt}, premium product close-up`,
+        });
+      }
+
+      const narration = narrationText || scriptData?.fullScript || "";
+      const { jobId: id } = await createVideoJob({
+        imageUrl: resolvedImageUrl,
+        productType,
+        style: styleType,
+        narracao: narration,
+        prompt,
+      });
+      if (!id) throw new Error("Job não criado.");
+      setJobId(id);
+      setJobStatus("pending");
+      setProgress(40);
+
+      // ── STEP 5+6: Pipeline (imagens → voz → render → storage) ──
+      toast.info("🎬 Etapa 5-6/6: Gerando cenas, narração e montando vídeo...");
+      startVideoPipeline({
+        jobId: id,
+        imageUrl: resolvedImageUrl,
+        script: narration,
+        scenes: scenesFromAnalysis,
+      }).catch((err) => {
+        console.error("[auto-pipeline] pipeline error:", err);
+      });
+
+      toast.success("🚀 Pipeline automático iniciado! Acompanhe o progresso →");
+    } catch (error: any) {
+      console.error("[auto-pipeline] error:", error);
+      toast.error(error?.message || "Falha no pipeline automático.");
+      setJobStatus("error");
+    } finally {
+      setIsAutoPipeline(false);
+    }
+  };
+
+
     try {
       setIsProcessing(true);
       setVideoUrl(null);
