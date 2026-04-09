@@ -167,25 +167,25 @@ const VideoGeneratorUI = () => {
     const runChecks = async () => {
       setIsCheckingApis(true);
       const results: Array<{ name: string; status: "ok" | "error"; message?: string }> = [];
-      const apis = [
-        { key: "elevenlabs", label: "ElevenLabs (voz)" },
-        { key: "runway", label: "Runway (vídeo)" },
-        { key: "pika", label: "Pika (vídeo)" },
-      ];
 
-      apis.forEach((api) => {
-        const entry = buscarAPI(api.key);
-        if (!entry?.conectado) {
-          results.push({ name: api.label, status: "error", message: "API desconectada" });
-        } else {
-          results.push({ name: api.label, status: "ok" });
-        }
-      });
-
-      // Check backend via edge function instead of /api/webhook/health
       try {
         const { data, error } = await supabase.functions.invoke("test-api", { body: {} });
         if (error) throw error;
+
+        const apis = data?.apis || {};
+        const apiMap = [
+          { key: "elevenlabs", label: "ElevenLabs (voz)" },
+          { key: "runway", label: "Runway (vídeo)" },
+          { key: "shotstack", label: "Shotstack (render)" },
+        ];
+
+        apiMap.forEach(({ key, label }) => {
+          results.push({
+            name: label,
+            status: apis[key] ? "ok" : "error",
+            message: apis[key] ? "Conectada" : "Chave não configurada",
+          });
+        });
         results.push({ name: "Backend", status: "ok" });
       } catch (error: any) {
         results.push({ name: "Backend", status: "error", message: error?.message || "Sem resposta" });

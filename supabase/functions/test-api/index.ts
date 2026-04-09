@@ -12,16 +12,15 @@ serve(async (req) => {
   const headers = { ...corsHeaders, "Content-Type": "application/json" };
 
   try {
-    const url = new URL(req.url);
-    const platform = (url.searchParams.get("platform") || "").trim();
-    console.log("Test API ping", { platform, method: req.method });
+    const apis = {
+      elevenlabs: !!Deno.env.get("ELEVENLABS_API_KEY"),
+      runway: !!Deno.env.get("RUNWAY_API_KEY"),
+      shotstack: !!Deno.env.get("SHOTSTACK_API_KEY"),
+    };
 
     return new Response(
-      JSON.stringify({ success: true, status: "conectado", platform: platform || "all" }),
-      {
-        status: 200,
-        headers,
-      },
+      JSON.stringify({ success: true, apis }),
+      { status: 200, headers },
     );
   } catch (error) {
     return new Response(
@@ -29,10 +28,7 @@ serve(async (req) => {
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
       }),
-      {
-        status: 200,
-        headers,
-      },
+      { status: 200, headers },
     );
   }
 });
