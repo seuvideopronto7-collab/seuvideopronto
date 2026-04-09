@@ -63,6 +63,7 @@ const VideoGeneratorUI = () => {
   const [isLocalRendering, setIsLocalRendering] = useState(false);
   const [localProgress, setLocalProgress] = useState(0);
   const lastRealtimeStatusRef = useRef<string | null>(null);
+  const [isAutoPipeline, setIsAutoPipeline] = useState(false);
   const { planId } = usePlan();
 
   useEffect(() => {
