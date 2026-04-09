@@ -128,17 +128,26 @@ const VideoSection = () => {
                   </p>
                 </div>
 
-                {/* Download overlay */}
-                {job.video_url && (
-                  <a
-                    href={job.video_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="absolute top-2 right-2 bg-black/70 text-white text-[10px] px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                {/* Action overlays */}
+                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {job.video_url && (
+                    <a
+                      href={job.video_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="bg-black/70 text-white text-[10px] px-2 py-1 rounded-md"
+                    >
+                      ⬇ Download
+                    </a>
+                  )}
+                  <button
+                    onClick={() => handleDelete(job.id)}
+                    disabled={deleting === job.id}
+                    className="bg-red-600/80 hover:bg-red-600 text-white p-1.5 rounded-md transition-colors disabled:opacity-50"
                   >
-                    ⬇ Download
-                  </a>
-                )}
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
               </div>
             );
           })}
