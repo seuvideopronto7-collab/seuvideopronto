@@ -1,0 +1,1 @@
+CREATE POLICY "Users can delete own jobs" ON public.video_jobs FOR DELETE TO authenticated USING (user_id = auth.uid());

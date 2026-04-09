@@ -6,7 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Save, Loader2, Youtube, Instagram, User, Crown, Video, Download, Repeat2, Camera } from "lucide-react";
+import { Save, Loader2, Youtube, Instagram, User, Crown, Video, Download, Repeat2, Camera, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { usePlan } from "@/hooks/usePlan";
 import { formatLimitLabel, getPlanLabel } from "@/lib/plans";
@@ -138,6 +138,18 @@ const UserDashboard = () => {
 
   const handleRepost = (jobId: string) => {
     toast.message(`Repost programado para ${jobId}`);
+  };
+
+  const handleDelete = async (jobId: string) => {
+    const confirmed = window.confirm("Tem certeza que deseja excluir este vídeo?");
+    if (!confirmed) return;
+    const { error } = await supabase.from("video_jobs").delete().eq("id", jobId);
+    if (error) {
+      toast.error("Erro ao excluir vídeo");
+    } else {
+      toast.success("Vídeo excluído ✅");
+      setVideoJobs((prev) => prev.filter((j) => j.id !== jobId));
+    }
   };
 
   const update = (key: string, value: string) =>
@@ -339,7 +351,7 @@ const UserDashboard = () => {
                   <div className="text-[11px] text-muted-foreground">
                     {job.created_at ? new Date(job.created_at).toLocaleString() : ""}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <Button
                       variant="glass"
                       size="sm"
@@ -350,6 +362,14 @@ const UserDashboard = () => {
                     </Button>
                     <Button variant="glass" size="sm" onClick={() => handleRepost(job.id)} disabled={!isReady}>
                       <Repeat2 className="w-4 h-4" /> Repostar
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => handleDelete(job.id)}
+                    >
+                      <Trash2 className="w-4 h-4" /> Excluir
                     </Button>
                   </div>
                 </div>
