@@ -339,7 +339,7 @@ const UserDashboard = () => {
                   <div className="text-[11px] text-muted-foreground">
                     {job.created_at ? new Date(job.created_at).toLocaleString() : ""}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <Button
                       variant="glass"
                       size="sm"
@@ -350,6 +350,14 @@ const UserDashboard = () => {
                     </Button>
                     <Button variant="glass" size="sm" onClick={() => handleRepost(job.id)} disabled={!isReady}>
                       <Repeat2 className="w-4 h-4" /> Repostar
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => handleDelete(job.id)}
+                    >
+                      <Trash2 className="w-4 h-4" /> Excluir
                     </Button>
                   </div>
                 </div>
