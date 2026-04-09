@@ -6,7 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Save, Loader2, Youtube, Instagram, User, Crown, Video, Download, Repeat2, Camera } from "lucide-react";
+import { Save, Loader2, Youtube, Instagram, User, Crown, Video, Download, Repeat2, Camera, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { usePlan } from "@/hooks/usePlan";
 import { formatLimitLabel, getPlanLabel } from "@/lib/plans";
@@ -138,6 +138,18 @@ const UserDashboard = () => {
 
   const handleRepost = (jobId: string) => {
     toast.message(`Repost programado para ${jobId}`);
+  };
+
+  const handleDelete = async (jobId: string) => {
+    const confirmed = window.confirm("Tem certeza que deseja excluir este vídeo?");
+    if (!confirmed) return;
+    const { error } = await supabase.from("video_jobs").delete().eq("id", jobId);
+    if (error) {
+      toast.error("Erro ao excluir vídeo");
+    } else {
+      toast.success("Vídeo excluído ✅");
+      setJobs((prev) => prev.filter((j) => j.id !== jobId));
+    }
   };
 
   const update = (key: string, value: string) =>
