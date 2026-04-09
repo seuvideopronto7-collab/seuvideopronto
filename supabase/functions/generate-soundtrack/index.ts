@@ -104,8 +104,15 @@ serve(async (req) => {
     if (!elRes.ok) {
       const errText = await elRes.text();
       console.error("[generate-soundtrack] ElevenLabs error:", elRes.status, errText);
-      return new Response(JSON.stringify({ error: `ElevenLabs Music error: ${elRes.status}`, detail: errText }), {
-        status: 502,
+      const isAuthError = elRes.status === 401;
+      return new Response(JSON.stringify({
+        ok: false,
+        error: isAuthError
+          ? "Chave da API de áudio inválida ou sem permissão para geração de música. Verifique as configurações."
+          : `Erro na geração de trilha sonora (${elRes.status})`,
+        detail: errText,
+      }), {
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
