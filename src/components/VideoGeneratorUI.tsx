@@ -801,6 +801,7 @@ const VideoGeneratorUI = () => {
     if (jobStatus === "generating_voice") return "🎙️ Sintetizando voz...";
     if (jobStatus === "generating_video") return "🎥 Gerando vídeo...";
     if (jobStatus === "processing") return "⚙️ Processando...";
+    if (jobStatus === "analyzing") return "🔍 Analisando imagem com IA (OCR + Vision)...";
     if (jobStatus === "done" || jobStatus === "completed") return "✅ Vídeo pronto para visualização";
     if (jobStatus === "failed" || jobStatus === "error") return "❌ Falha no processamento";
     if (jobStatus === "fallback") return "⚠️ Fallback aplicado automaticamente";
