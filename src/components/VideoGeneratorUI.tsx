@@ -1150,7 +1150,7 @@ const VideoGeneratorUI = () => {
             <Badge variant="secondary">Avançado</Badge>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            <Button variant="neon" onClick={startJob} disabled={isProcessing}>
+            <Button variant="neon" onClick={runAutoPipeline} disabled={isProcessing}>
               <Wand2 className="h-4 w-4" /> {isProcessing ? "Processando..." : "GERAR VÍDEO 🎬"}
             </Button>
             <Button variant="glass" onClick={renderLocalVideo} disabled={isLocalRendering}>
@@ -1176,7 +1176,7 @@ const VideoGeneratorUI = () => {
           </div>
           <div className="text-xs text-muted-foreground">{statusMessage}</div>
           {(jobStatus === "error" || jobStatus === "failed" || jobStatus === "fallback") && (
-            <Button variant="glass" onClick={startJob} disabled={isProcessing}>
+            <Button variant="glass" onClick={runAutoPipeline} disabled={isProcessing}>
               Tentar novamente
             </Button>
           )}
