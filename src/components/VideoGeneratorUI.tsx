@@ -1184,17 +1184,39 @@ const VideoGeneratorUI = () => {
           </div>
         </div>
 
+        <div className="cinema-panel p-6 space-y-4 border-2 border-primary/30 bg-primary/5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">🚀 Pipeline Automático</h2>
+              <p className="text-xs text-muted-foreground">Imagem → IA (OCR) → Roteiro → Voz → Cenas → Vídeo Final</p>
+            </div>
+            <Badge variant="default">AUTO</Badge>
+          </div>
+          <Button
+            variant="neon"
+            className="w-full text-base py-6"
+            onClick={runAutoPipeline}
+            disabled={isAutoPipeline || isProcessing || (!file && !imageUrl.trim())}
+          >
+            <Zap className="h-5 w-5" />
+            {isAutoPipeline ? "Pipeline automático rodando..." : "⚡ GERAR TUDO AUTOMATICAMENTE"}
+          </Button>
+          <p className="text-xs text-muted-foreground text-center">
+            Analisa a imagem, gera roteiro, narração, cenas e monta o vídeo — tudo em um clique
+          </p>
+        </div>
+
         <div className="cinema-panel p-6 space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-semibold">Iniciar pipeline</h2>
-              <p className="text-xs text-muted-foreground">Cria o job e executa o processamento</p>
+              <h2 className="text-lg font-semibold">Pipeline manual</h2>
+              <p className="text-xs text-muted-foreground">Controle cada etapa individualmente</p>
             </div>
-            <Badge variant="secondary">Etapa 9</Badge>
+            <Badge variant="secondary">Avançado</Badge>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             <Button variant="neon" onClick={startJob} disabled={isProcessing}>
-              <Wand2 className="h-4 w-4" /> {isProcessing ? "Processando..." : "GERAR VÍDEO AGORA 🎬🔥"}
+              <Wand2 className="h-4 w-4" /> {isProcessing ? "Processando..." : "GERAR VÍDEO 🎬"}
             </Button>
             <Button variant="glass" onClick={renderLocalVideo} disabled={isLocalRendering}>
               {isLocalRendering ? "Render local..." : "Renderizar localmente"}
