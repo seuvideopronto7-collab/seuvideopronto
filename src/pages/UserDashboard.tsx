@@ -148,7 +148,7 @@ const UserDashboard = () => {
       toast.error("Erro ao excluir vídeo");
     } else {
       toast.success("Vídeo excluído ✅");
-      setJobs((prev) => prev.filter((j) => j.id !== jobId));
+      setVideoJobs((prev) => prev.filter((j) => j.id !== jobId));
     }
   };
 
