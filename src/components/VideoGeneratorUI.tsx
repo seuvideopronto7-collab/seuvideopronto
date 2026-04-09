@@ -788,6 +788,7 @@ const VideoGeneratorUI = () => {
     if (jobStatus === "generating_script") return "Gerando roteiro";
     if (jobStatus === "generating_voice") return "Gerando voz";
     if (jobStatus === "generating_video") return "Gerando vídeo";
+    if (jobStatus === "analyzing") return "Analisando imagem";
     return jobStatus.replace(/_/g, " ");
   }, [jobStatus]);
 
