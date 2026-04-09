@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Film, Clock, CheckCircle2, AlertCircle } from "lucide-react";
+import { Film, Clock, CheckCircle2, AlertCircle, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 type VideoJob = {
   id: string;
@@ -26,6 +27,20 @@ const statusConfig: Record<string, { label: string; icon: any; color: string }> 
 const VideoSection = () => {
   const { user } = useAuth();
   const [jobs, setJobs] = useState<VideoJob[]>([]);
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  const handleDelete = async (jobId: string) => {
+    if (!confirm("Tem certeza que deseja excluir este vídeo?")) return;
+    setDeleting(jobId);
+    const { error } = await supabase.from("video_jobs").delete().eq("id", jobId);
+    if (error) {
+      toast.error("Erro ao excluir vídeo");
+    } else {
+      setJobs((prev) => prev.filter((j) => j.id !== jobId));
+      toast.success("Vídeo excluído");
+    }
+    setDeleting(null);
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -113,17 +128,26 @@ const VideoSection = () => {
                   </p>
                 </div>
 
-                {/* Download overlay */}
-                {job.video_url && (
-                  <a
-                    href={job.video_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="absolute top-2 right-2 bg-black/70 text-white text-[10px] px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                {/* Action overlays */}
+                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {job.video_url && (
+                    <a
+                      href={job.video_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="bg-black/70 text-white text-[10px] px-2 py-1 rounded-md"
+                    >
+                      ⬇ Download
+                    </a>
+                  )}
+                  <button
+                    onClick={() => handleDelete(job.id)}
+                    disabled={deleting === job.id}
+                    className="bg-red-600/80 hover:bg-red-600 text-white p-1.5 rounded-md transition-colors disabled:opacity-50"
                   >
-                    ⬇ Download
-                  </a>
-                )}
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
               </div>
             );
           })}
