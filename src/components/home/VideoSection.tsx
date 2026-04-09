@@ -27,6 +27,20 @@ const statusConfig: Record<string, { label: string; icon: any; color: string }> 
 const VideoSection = () => {
   const { user } = useAuth();
   const [jobs, setJobs] = useState<VideoJob[]>([]);
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  const handleDelete = async (jobId: string) => {
+    if (!confirm("Tem certeza que deseja excluir este vídeo?")) return;
+    setDeleting(jobId);
+    const { error } = await supabase.from("video_jobs").delete().eq("id", jobId);
+    if (error) {
+      toast.error("Erro ao excluir vídeo");
+    } else {
+      setJobs((prev) => prev.filter((j) => j.id !== jobId));
+      toast.success("Vídeo excluído");
+    }
+    setDeleting(null);
+  };
 
   useEffect(() => {
     if (!user) return;
