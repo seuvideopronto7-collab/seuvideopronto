@@ -67,7 +67,7 @@ const ViralMachine = () => {
 
     try {
       const result = await gerarVideoViral(
-        { imageBase: imagePreview, nicho, objetivo, narrar },
+        { imageBase: imagePreview, nicho, objetivo, narrar, vozIA, trilhaSonora },
         (ratio) => setProgress(Math.round(ratio * 100)),
       );
 
