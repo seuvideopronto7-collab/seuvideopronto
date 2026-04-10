@@ -297,47 +297,85 @@ const VideoGeneratorUI = () => {
   const detectNiche = async () => {
     setIsDetectingNiche(true);
     try {
+      // Try 1: analyze-content with image (if available)
       const resolvedImageUrl = await uploadToStorage();
       if (resolvedImageUrl) {
-        const { data, error } = await supabase.functions.invoke("analyze-content", {
+        try {
+          const { data, error } = await supabase.functions.invoke("analyze-content", {
+            body: {
+              fileUrl: resolvedImageUrl,
+              modo: "vendas",
+              produto: productName || productType,
+              nicho: niche || styleType,
+            },
+          });
+          if (!error && !(data as any)?.error) {
+            const tema = data?.analise?.tema || data?.novo_roteiro?.hook || "";
+            if (tema) {
+              setNiche(String(tema).trim());
+              toast.success("Nicho detectado via imagem!");
+              return;
+            }
+          }
+        } catch (e) {
+          console.warn("analyze-content falhou, tentando fallback:", e);
+        }
+      }
+
+      // Try 2: generate-viral SEO
+      try {
+        const response = await supabase.functions.invoke("generate-viral", {
           body: {
-            fileUrl: resolvedImageUrl,
-            modo: "vendas",
+            tipo: "seo",
             produto: productName || productType,
             nicho: niche || styleType,
+            publico: "Compradores premium",
+            objetivo: objective,
           },
         });
-        if (error) throw error;
-        if ((data as any)?.error) throw new Error((data as any).error);
-        const tema = data?.analise?.tema || data?.novo_roteiro?.hook || "";
-        if (tema) {
-          setNiche(String(tema).trim());
-          toast.success("Nicho detectado.");
+
+        if (!response.error) {
+          const payload = response.data || {};
+          const keyword =
+            payload?.palavras_chave?.[0] ||
+            payload?.titulos?.[0] ||
+            payload?.tags_youtube?.split(",")?.[0];
+          if (keyword) {
+            setNiche(keyword.replace(/#/g, "").trim());
+            toast.success("Nicho detectado!");
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn("generate-viral falhou, usando detecção local:", e);
+      }
+
+      // Try 3: Local keyword-based niche detection (always works)
+      const input = (productName || productType || niche || styleType || "").toLowerCase();
+      const nicheMap: Record<string, string[]> = {
+        "pet": ["pet", "cachorro", "gato", "ração", "animal", "cão", "filhote"],
+        "emagrecimento": ["emagrecer", "dieta", "peso", "gordo", "slim", "detox", "magr"],
+        "renda extra": ["renda", "dinheiro", "ganhar", "fatur", "lucro", "negócio", "investir"],
+        "beleza": ["beleza", "pele", "cabelo", "cosmético", "creme", "maquiagem", "skincare", "estética"],
+        "fitness": ["treino", "academia", "músculo", "whey", "suplemento", "exercício", "fitness"],
+        "tecnologia": ["tech", "tecnologia", "app", "software", "celular", "computador", "ia", "digital"],
+        "saúde": ["saúde", "vitamina", "natural", "remédio", "bem-estar", "suplemento"],
+      };
+
+      for (const [nicheKey, keywords] of Object.entries(nicheMap)) {
+        if (keywords.some((kw) => input.includes(kw))) {
+          setNiche(nicheKey);
+          toast.success(`Nicho detectado: ${nicheKey}`);
           return;
         }
       }
 
-      const response = await supabase.functions.invoke("generate-viral", {
-        body: {
-          tipo: "seo",
-          produto: productName || productType,
-          nicho: niche || styleType,
-          publico: "Compradores premium",
-          objetivo: objective,
-        },
-      });
-
-      if (response.error) throw response.error;
-      const payload = response.data || {};
-      const keyword =
-        payload?.palavras_chave?.[0] ||
-        payload?.titulos?.[0] ||
-        payload?.tags_youtube?.split(",")?.[0];
-      if (keyword) {
-        setNiche(keyword.replace(/#/g, "").trim());
-        toast.success("Nicho detectado.");
+      // Fallback: use product name as niche
+      if (input.trim()) {
+        setNiche(input.trim().split(" ").slice(0, 2).join(" "));
+        toast.success("Nicho definido com base no produto.");
       } else {
-        toast.error("Nao foi possivel detectar o nicho.");
+        toast.error("Digite o nome do produto para detectar o nicho.");
       }
     } catch (error) {
       console.error("Erro ao detectar nicho:", error);
