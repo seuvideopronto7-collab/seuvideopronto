@@ -496,7 +496,7 @@ Gere também 3 VARIAÇÕES de gancho alternativas no campo ganchos_alternativos 
       await updateJob(jobId, { status: "generating_audio", progress: 55 });
       let audioUrl: string | null = null;
 
-      if (ELEVENLABS_API_KEY && narration.trim()) {
+      if (ELEVENLABS_API_KEY && hasMeaningfulText(narration)) {
         try {
           const voiceId = voiceIds[voz || "masculina"] || voiceIds.masculina;
           const res = await fetch(
@@ -514,20 +514,28 @@ Gere também 3 VARIAÇÕES de gancho alternativas no campo ganchos_alternativos 
 
           if (res.ok) {
             const audioBuffer = await res.arrayBuffer();
-            const audioPath = `voiceovers/${jobId}.mp3`;
-            const { error: uploadErr } = await admin.storage
-              .from("audio")
-              .upload(audioPath, audioBuffer, { contentType: "audio/mpeg", upsert: true });
-            if (!uploadErr) {
-              const { data: urlData } = admin.storage.from("audio").getPublicUrl(audioPath);
-              audioUrl = urlData.publicUrl;
+            if (audioBuffer.byteLength >= 5000) {
+              const audioPath = `voiceovers/${jobId}.mp3`;
+              const { error: uploadErr } = await admin.storage
+                .from("audio")
+                .upload(audioPath, audioBuffer, { contentType: "audio/mpeg", upsert: true });
+              if (!uploadErr) {
+                const { data: urlData } = admin.storage.from("audio").getPublicUrl(audioPath);
+                audioUrl = urlData.publicUrl;
+              } else {
+                console.error("Audio upload error:", uploadErr);
+              }
+            } else {
+              console.error("[commercial] audio too small, discarded:", audioBuffer.byteLength);
             }
           } else {
-            console.error("ElevenLabs error:", res.status);
+            console.error("ElevenLabs error:", res.status, await res.text());
           }
         } catch (e) {
           console.error("Audio gen error:", e);
         }
+      } else {
+        console.warn("[commercial] narration skipped: no meaningful text available");
       }
 
       await updateJob(jobId, { progress: 60, audio_url: audioUrl, caption_text: narration });
