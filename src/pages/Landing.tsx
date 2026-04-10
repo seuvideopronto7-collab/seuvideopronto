@@ -374,11 +374,11 @@ const Landing = () => {
             <Clock className="w-3 h-3" /> Vagas limitadas — comece agora
           </div>
           <h2 className="text-3xl md:text-4xl font-bold leading-tight">
-            Comece hoje e gere seus primeiros vídeos{" "}
-            <span className="text-primary">em minutos</span>
+            Enquanto você dorme, seus vídeos estão{" "}
+            <span className="text-primary">vendendo por você</span>
           </h2>
-          <p className="text-muted-foreground max-w-xl mx-auto">
-            Enquanto você pensa, outros já estão vendendo com IA. Não fique para trás.
+          <p className="text-lg text-muted-foreground max-w-xl mx-auto">
+            Comece hoje e gere seus primeiros vídeos em minutos. Sem edição. Sem esforço.
           </p>
           <Button
             size="lg"
