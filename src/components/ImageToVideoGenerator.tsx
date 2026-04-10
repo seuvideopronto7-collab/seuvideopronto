@@ -432,7 +432,7 @@ const ImageToVideoGenerator = () => {
           estiloCta,
           step: "analyze",
         },
-        15000,
+        60000,
       );
 
       if (error) throw error;
@@ -495,7 +495,7 @@ const ImageToVideoGenerator = () => {
           formato,
           duracao,
         },
-        15000,
+        60000,
       );
 
       if (error) throw error;
