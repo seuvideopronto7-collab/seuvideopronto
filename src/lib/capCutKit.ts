@@ -11,6 +11,18 @@ export interface CapCutKit {
   estilo: string;
   cta: string;
   instrucoes: string[];
+  template: CapCutTemplate;
+}
+
+export interface CapCutTemplate {
+  id: string;
+  label: string;
+  nicho: string;
+  corPrincipal: string;
+  fonteSugerida: string;
+  efeitoSugerido: string;
+  musicaBase: string;
+  dicasEdicao: string[];
 }
 
 interface JobData {
@@ -68,6 +80,13 @@ const COPY_BANK: Record<string, string[]> = {
     "Quando você descobrir, vai se arrepender de não saber antes.",
     "Ative agora em 2 toques.",
   ],
+  autoridade: [
+    "As pessoas seguem quem tem autoridade.",
+    "Mas autoridade não se pede — se demonstra.",
+    "Uma dica: conteúdo consistente = confiança.",
+    "Você precisa de um método pra isso.",
+    "Clique e veja como construir sua marca.",
+  ],
 };
 
 const MUSIC_MAP: Record<string, Record<string, string>> = {
@@ -87,6 +106,108 @@ const MUSIC_MAP: Record<string, Record<string, string>> = {
   },
 };
 
+// ── TEMPLATES POR NICHO ──────────────────────────────────────
+export const CAPCUT_TEMPLATES: CapCutTemplate[] = [
+  {
+    id: "tpl-emagrecimento",
+    label: "🥗 Emagrecimento",
+    nicho: "emagrecimento",
+    corPrincipal: "#22c55e",
+    fonteSugerida: "Montserrat Bold",
+    efeitoSugerido: "Zoom In lento + Flash no CTA",
+    musicaBase: "Motivational Piano — tom inspirador, esperança",
+    dicasEdicao: [
+      "Use antes/depois com transição de deslizar",
+      "Texto grande no gancho (primeiros 2s)",
+      "Cor verde para resultados positivos",
+      "CTA com fundo vermelho urgente",
+    ],
+  },
+  {
+    id: "tpl-renda",
+    label: "💰 Renda Extra",
+    nicho: "renda_extra",
+    corPrincipal: "#f59e0b",
+    fonteSugerida: "Inter Black",
+    efeitoSugerido: "Shake + Zoom rápido nos números",
+    musicaBase: "Trap Motivacional — bass pesado, confiança",
+    dicasEdicao: [
+      "Mostre valores em R$ com animação de contagem",
+      "Use capturas de tela de resultados",
+      "Fundo escuro com texto amarelo/dourado",
+      "Urgência: 'Vagas limitadas' no final",
+    ],
+  },
+  {
+    id: "tpl-pet",
+    label: "🐶 Pet",
+    nicho: "pet",
+    corPrincipal: "#f97316",
+    fonteSugerida: "Poppins SemiBold",
+    efeitoSugerido: "Transição suave + coração animado",
+    musicaBase: "Cute Playful — ukulele + xilofone, tom leve",
+    dicasEdicao: [
+      "Comece com close do pet (gera empatia)",
+      "Use emojis de patinha 🐾 nas legendas",
+      "Tom emocional: preocupação → solução → alívio",
+      "CTA suave: 'Cuide do seu pet hoje'",
+    ],
+  },
+  {
+    id: "tpl-autoridade",
+    label: "👤 Autoridade",
+    nicho: "autoridade",
+    corPrincipal: "#7b2fff",
+    fonteSugerida: "Space Grotesk Bold",
+    efeitoSugerido: "Fade in elegante + Lower Third",
+    musicaBase: "Corporate Inspiring — orquestra suave, confiança",
+    dicasEdicao: [
+      "Use sua foto ou logo nos primeiros 2s",
+      "Fonte clean e minimalista",
+      "Fundo escuro com destaques em roxo",
+      "Finalize com 'Siga para mais conteúdo'",
+    ],
+  },
+  {
+    id: "tpl-fitness",
+    label: "🏋️ Fitness",
+    nicho: "fitness",
+    corPrincipal: "#ef4444",
+    fonteSugerida: "Bebas Neue",
+    efeitoSugerido: "Speed Ramp + Glitch no gancho",
+    musicaBase: "Power Anthem — batida forte, empoderamento",
+    dicasEdicao: [
+      "Comece com ação intensa (exercício forte)",
+      "Use câmera lenta no momento de impacto",
+      "Texto em caixa alta, fonte bold",
+      "CTA: 'Comece seu treino agora'",
+    ],
+  },
+  {
+    id: "tpl-beleza",
+    label: "💄 Estética / Beleza",
+    nicho: "beleza",
+    corPrincipal: "#ec4899",
+    fonteSugerida: "Playfair Display",
+    efeitoSugerido: "Glow suave + transição de blur",
+    musicaBase: "Soft Lo-fi — piano suave, som relaxante",
+    dicasEdicao: [
+      "Iluminação quente no rosto",
+      "Antes/depois com wipe transition",
+      "Tons rosa e dourado nas legendas",
+      "CTA: 'Descubra o segredo'",
+    ],
+  },
+];
+
+export function resolveTemplate(niche: string): CapCutTemplate {
+  const key = niche?.toLowerCase() || "";
+  return (
+    CAPCUT_TEMPLATES.find((t) => key.includes(t.nicho)) ||
+    CAPCUT_TEMPLATES.find((t) => t.nicho === "autoridade")!
+  );
+}
+
 function parseDuration(dur: string): number {
   if (dur.includes("min")) return parseInt(dur) * 60;
   return parseInt(dur) || 30;
@@ -98,7 +219,6 @@ export function generateCapCutKit(job: JobData, videoUrl: string | null): CapCut
   let lines: string[];
 
   if (job.copy_base && job.copy_base.trim().length > 20) {
-    // Use user-provided copy, split by line or period
     lines = job.copy_base
       .split(/\n|(?<=\.)\s+/)
       .map((l) => l.trim())
@@ -134,15 +254,19 @@ export function generateCapCutKit(job: JobData, videoUrl: string | null): CapCut
   };
   const estilo = estiloMap[job.platform] || "tiktok_high_conversion";
 
-  // 5. Instructions
+  // 5. Template by niche
+  const template = resolveTemplate(job.niche);
+
+  // 6. Instructions
   const instrucoes = [
     "📥 1. Importe o vídeo baixado no CapCut",
     "📝 2. Vá em 'Texto' e cole o roteiro (arquivo .txt)",
     "⏱️ 3. Sincronize com as legendas (arquivo .json)",
-    `🎵 4. Adicione música: "${musicaSugerida}"`,
-    "✨ 5. Use 'Legendas automáticas' para refinar",
-    `🎯 6. CTA final: "${job.cta || "Clique no link da bio"}"`,
-    "🚀 7. Exporte e publique!",
+    `🎵 4. Adicione música: "${template.musicaBase}"`,
+    `🎨 5. Use a fonte ${template.fonteSugerida} com cor ${template.corPrincipal}`,
+    `✨ 6. Aplique efeito: ${template.efeitoSugerido}`,
+    `🎯 7. CTA final: "${job.cta || "Clique no link da bio"}"`,
+    "🚀 8. Exporte em 1080x1920 (9:16) e publique!",
   ];
 
   return {
@@ -153,6 +277,7 @@ export function generateCapCutKit(job: JobData, videoUrl: string | null): CapCut
     estilo,
     cta: job.cta || "Clique no link da bio",
     instrucoes,
+    template,
   };
 }
 
