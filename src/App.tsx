@@ -27,6 +27,7 @@ import SvpGeradorVideoPremium from "./pages/SvpGeradorVideoPremium";
 import ImageToVideo from "./pages/ImageToVideo";
 import TransformImage from "./pages/TransformImage";
 import VideoMachine from "./pages/VideoMachine";
+import ViralMachine from "./pages/ViralMachine";
 
 const queryClient = new QueryClient();
 
