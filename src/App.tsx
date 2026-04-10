@@ -27,6 +27,7 @@ import SvpGeradorVideoPremium from "./pages/SvpGeradorVideoPremium";
 import ImageToVideo from "./pages/ImageToVideo";
 import TransformImage from "./pages/TransformImage";
 import VideoMachine from "./pages/VideoMachine";
+import ViralMachine from "./pages/ViralMachine";
 
 const queryClient = new QueryClient();
 
@@ -258,6 +259,17 @@ const App = () => (
                   "Video Machine",
                   <ProtectedRoute>
                     <VideoMachine />
+                  </ProtectedRoute>,
+                )
+              }
+            />
+            <Route
+              path="/viral-machine"
+              element={
+                wrapSafe(
+                  "Viral Machine",
+                  <ProtectedRoute>
+                    <ViralMachine />
                   </ProtectedRoute>,
                 )
               }
