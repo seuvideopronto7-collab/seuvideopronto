@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import BackButton from "@/components/BackButton";
-import { generateCapCutKit, downloadTextFile, type CapCutKit } from "@/lib/capCutKit";
+import { generateCapCutKit, downloadTextFile, resolveTemplate, CAPCUT_TEMPLATES, type CapCutKit } from "@/lib/capCutKit";
 
 type JobStage = "a_fazer" | "roteiro" | "narracao" | "imagens" | "video" | "concluido";
 type JobStatus = "aguardando" | "processando" | "concluido" | "erro" | "cancelado";
