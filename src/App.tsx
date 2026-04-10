@@ -26,6 +26,7 @@ import EditorProReal from "./pages/EditorProReal";
 import SvpGeradorVideoPremium from "./pages/SvpGeradorVideoPremium";
 import ImageToVideo from "./pages/ImageToVideo";
 import TransformImage from "./pages/TransformImage";
+import VideoMachine from "./pages/VideoMachine";
 
 const queryClient = new QueryClient();
 
@@ -246,6 +247,17 @@ const App = () => (
                   "Transformar Imagem",
                   <ProtectedRoute>
                     <TransformImage />
+                  </ProtectedRoute>,
+                )
+              }
+            />
+            <Route
+              path="/video-machine"
+              element={
+                wrapSafe(
+                  "Video Machine",
+                  <ProtectedRoute>
+                    <VideoMachine />
                   </ProtectedRoute>,
                 )
               }

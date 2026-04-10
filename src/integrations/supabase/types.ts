@@ -80,6 +80,166 @@ export type Database = {
         }
         Relationships: []
       }
+      job_assets: {
+        Row: {
+          created_at: string
+          id: string
+          job_id: string
+          meta_json: Json
+          provider: string
+          scene_index: number | null
+          type: Database["public"]["Enums"]["asset_type"]
+          url: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          job_id: string
+          meta_json?: Json
+          provider?: string
+          scene_index?: number | null
+          type: Database["public"]["Enums"]["asset_type"]
+          url?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          job_id?: string
+          meta_json?: Json
+          provider?: string
+          scene_index?: number | null
+          type?: Database["public"]["Enums"]["asset_type"]
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_assets_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_logs: {
+        Row: {
+          created_at: string
+          id: string
+          job_id: string
+          level: Database["public"]["Enums"]["log_level"]
+          message: string
+          payload_json: Json
+          stage: Database["public"]["Enums"]["job_stage"]
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          job_id: string
+          level?: Database["public"]["Enums"]["log_level"]
+          message?: string
+          payload_json?: Json
+          stage: Database["public"]["Enums"]["job_stage"]
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          job_id?: string
+          level?: Database["public"]["Enums"]["log_level"]
+          message?: string
+          payload_json?: Json
+          stage?: Database["public"]["Enums"]["job_stage"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_logs_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pipeline_jobs: {
+        Row: {
+          aspect_ratio: string
+          audience: string
+          copy_base: string
+          created_at: string
+          cta: string
+          current_stage: Database["public"]["Enums"]["job_stage"]
+          duration: string
+          error_message: string | null
+          id: string
+          input_type: Database["public"]["Enums"]["job_input_type"]
+          max_retries: number
+          niche: string
+          objective: Database["public"]["Enums"]["job_objective"]
+          platform: Database["public"]["Enums"]["job_platform"]
+          progress: number
+          reference_image_url: string | null
+          retry_count: number
+          script_mode: string
+          status: Database["public"]["Enums"]["job_status"]
+          title: string
+          updated_at: string
+          user_id: string
+          visual_style: string
+          voice: string
+        }
+        Insert: {
+          aspect_ratio?: string
+          audience?: string
+          copy_base?: string
+          created_at?: string
+          cta?: string
+          current_stage?: Database["public"]["Enums"]["job_stage"]
+          duration?: string
+          error_message?: string | null
+          id?: string
+          input_type?: Database["public"]["Enums"]["job_input_type"]
+          max_retries?: number
+          niche?: string
+          objective?: Database["public"]["Enums"]["job_objective"]
+          platform?: Database["public"]["Enums"]["job_platform"]
+          progress?: number
+          reference_image_url?: string | null
+          retry_count?: number
+          script_mode?: string
+          status?: Database["public"]["Enums"]["job_status"]
+          title?: string
+          updated_at?: string
+          user_id: string
+          visual_style?: string
+          voice?: string
+        }
+        Update: {
+          aspect_ratio?: string
+          audience?: string
+          copy_base?: string
+          created_at?: string
+          cta?: string
+          current_stage?: Database["public"]["Enums"]["job_stage"]
+          duration?: string
+          error_message?: string | null
+          id?: string
+          input_type?: Database["public"]["Enums"]["job_input_type"]
+          max_retries?: number
+          niche?: string
+          objective?: Database["public"]["Enums"]["job_objective"]
+          platform?: Database["public"]["Enums"]["job_platform"]
+          progress?: number
+          reference_image_url?: string | null
+          retry_count?: number
+          script_mode?: string
+          status?: Database["public"]["Enums"]["job_status"]
+          title?: string
+          updated_at?: string
+          user_id?: string
+          visual_style?: string
+          voice?: string
+        }
+        Relationships: []
+      }
       produtos_gerados: {
         Row: {
           created_at: string
@@ -333,6 +493,42 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "user"
+      asset_type:
+        | "script"
+        | "audio"
+        | "image"
+        | "video"
+        | "subtitle"
+        | "thumbnail"
+      job_input_type:
+        | "ideia"
+        | "imagem"
+        | "produto"
+        | "autoridade"
+        | "viral"
+        | "dark"
+      job_objective: "vendas" | "autoridade" | "engajamento"
+      job_platform:
+        | "tiktok"
+        | "reels"
+        | "shorts"
+        | "feed"
+        | "stories"
+        | "youtube"
+      job_stage:
+        | "a_fazer"
+        | "roteiro"
+        | "narracao"
+        | "imagens"
+        | "video"
+        | "concluido"
+      job_status:
+        | "aguardando"
+        | "processando"
+        | "concluido"
+        | "erro"
+        | "cancelado"
+      log_level: "info" | "warning" | "error"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -461,6 +657,40 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "user"],
+      asset_type: [
+        "script",
+        "audio",
+        "image",
+        "video",
+        "subtitle",
+        "thumbnail",
+      ],
+      job_input_type: [
+        "ideia",
+        "imagem",
+        "produto",
+        "autoridade",
+        "viral",
+        "dark",
+      ],
+      job_objective: ["vendas", "autoridade", "engajamento"],
+      job_platform: ["tiktok", "reels", "shorts", "feed", "stories", "youtube"],
+      job_stage: [
+        "a_fazer",
+        "roteiro",
+        "narracao",
+        "imagens",
+        "video",
+        "concluido",
+      ],
+      job_status: [
+        "aguardando",
+        "processando",
+        "concluido",
+        "erro",
+        "cancelado",
+      ],
+      log_level: ["info", "warning", "error"],
     },
   },
 } as const
