@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import BackButton from "@/components/BackButton";
-import { generateCapCutKit, downloadTextFile, type CapCutKit } from "@/lib/capCutKit";
+import { generateCapCutKit, downloadTextFile, resolveTemplate, CAPCUT_TEMPLATES, type CapCutKit } from "@/lib/capCutKit";
 
 type JobStage = "a_fazer" | "roteiro" | "narracao" | "imagens" | "video" | "concluido";
 type JobStatus = "aguardando" | "processando" | "concluido" | "erro" | "cancelado";
@@ -563,7 +563,23 @@ const JobCard = ({
         <span>{job.duration}</span>
         <span>•</span>
         <span>{job.objective}</span>
+        {job.status === "concluido" && (
+          <>
+            <span>•</span>
+            <Badge variant="outline" className="text-[9px] border-accent/40 text-accent px-1.5 py-0">
+              ✓ Pronto para CapCut
+            </Badge>
+          </>
+        )}
       </div>
+
+      {job.niche && (
+        <div className="mb-2">
+          <Badge variant="secondary" className="text-[9px]">
+            {resolveTemplate(job.niche).label}
+          </Badge>
+        </div>
+      )}
 
       {job.status === "processando" && (
         <div className="mb-2">
@@ -580,7 +596,7 @@ const JobCard = ({
       )}
 
       {/* Actions */}
-      <div className="flex items-center gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity flex-wrap">
+      <div className="flex items-center gap-1 mt-2 flex-wrap">
         {job.current_stage === "a_fazer" && job.status === "aguardando" && (
           <Button variant="default" size="sm" className="h-6 text-[10px] px-2" onClick={() => onProcess(job.id)}>
             ▶ Processar
@@ -597,17 +613,17 @@ const JobCard = ({
               <Eye className="w-3 h-3 mr-1" /> Ver
             </Button>
             <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={() => handleDownloadVideo(job.id, job.title)}>
-              <Download className="w-3 h-3 mr-1" /> Baixar
+              <Download className="w-3 h-3 mr-1" /> MP4
             </Button>
             <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={handleShowKit}>
               <Package className="w-3 h-3 mr-1" /> Kit
             </Button>
             <Button
               size="sm"
-              className="h-6 text-[10px] px-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0 hover:from-purple-600 hover:to-pink-600"
+              className="h-7 text-[10px] px-3 bg-accent text-accent-foreground hover:bg-accent/90 font-bold"
               onClick={() => handleCapCutProExport(job)}
             >
-              <Rocket className="w-3 h-3 mr-1" /> CapCut PRO
+              <Scissors className="w-3 h-3 mr-1" /> Editar no CapCut
             </Button>
           </>
         )}
@@ -633,10 +649,10 @@ const JobCard = ({
               </Button>
               <Button
                 size="sm"
-                className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0"
+                className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90"
                 onClick={() => handleCapCutProExport(job)}
               >
-                <Rocket className="w-4 h-4 mr-2" /> CapCut PRO
+                <Scissors className="w-4 h-4 mr-2" /> Editar no CapCut
               </Button>
             </div>
           </DialogContent>
@@ -714,6 +730,31 @@ const JobCard = ({
                 <span>• CTA: {kit.cta}</span>
               </div>
 
+              {/* Template Info */}
+              {kit.template && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <Scissors className="w-4 h-4 text-accent" />
+                    <span className="text-sm font-semibold">🎨 Template: {kit.template.label}</span>
+                  </div>
+                  <div className="bg-muted/50 rounded-lg p-3 space-y-2">
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="w-4 h-4 rounded-full" style={{ backgroundColor: kit.template.corPrincipal }} />
+                      <span>Cor: {kit.template.corPrincipal}</span>
+                      <span className="text-muted-foreground">•</span>
+                      <span>Fonte: {kit.template.fonteSugerida}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Efeito: {kit.template.efeitoSugerido}</p>
+                    <div className="space-y-1 mt-2">
+                      <p className="text-[10px] font-semibold text-primary">Dicas de edição:</p>
+                      {kit.template.dicasEdicao.map((d, i) => (
+                        <p key={i} className="text-[10px] text-muted-foreground">• {d}</p>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Instructions */}
               <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 space-y-1">
                 {kit.instrucoes.map((inst, i) => (
@@ -723,10 +764,10 @@ const JobCard = ({
 
               {/* Main CTA */}
               <Button
-                className="w-full h-12 text-sm font-bold bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 text-white border-0 hover:from-purple-600 hover:via-pink-600 hover:to-red-600"
+                className="w-full h-12 text-sm font-bold bg-accent text-accent-foreground hover:bg-accent/90"
                 onClick={() => handleCapCutProExport(job)}
               >
-                <Rocket className="w-4 h-4 mr-2" /> 🚀 Exportar Tudo + Abrir CapCut
+                <Scissors className="w-4 h-4 mr-2" /> Exportar Tudo + Editar no CapCut
               </Button>
             </div>
           </DialogContent>
