@@ -35,6 +35,27 @@ const voiceIds: Record<string, string> = {
   feminina: "EXAVITQu4vr4xnSDxMaL",     // Sarah
 };
 
+const hasMeaningfulText = (value: unknown): value is string =>
+  typeof value === "string" && value.replace(/[\s.,;:!?-]+/g, "").length >= 8;
+
+const buildNarrationText = (script: unknown, scenes: any[], produtoNome: string, nicho: string) => {
+  if (hasMeaningfulText(script)) return script.trim();
+
+  const sceneNarration = scenes
+    .flatMap((scene) => [scene?.narracao, scene?.texto_tela])
+    .filter(hasMeaningfulText)
+    .map((text) => text.trim());
+
+  if (sceneNarration.length > 0) {
+    return sceneNarration.join(". ");
+  }
+
+  const productLabel = hasMeaningfulText(produtoNome) ? produtoNome.trim() : "seu produto";
+  const nicheLabel = hasMeaningfulText(nicho) ? nicho.trim() : "seu nicho";
+
+  return `Descubra agora como ${productLabel} pode transformar seus resultados em ${nicheLabel}. Veja os benefícios, gere desejo e avance para a próxima etapa agora.`;
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
