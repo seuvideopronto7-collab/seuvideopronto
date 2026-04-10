@@ -263,6 +263,17 @@ const App = () => (
                 )
               }
             />
+            <Route
+              path="/viral-machine"
+              element={
+                wrapSafe(
+                  "Viral Machine",
+                  <ProtectedRoute>
+                    <ViralMachine />
+                  </ProtectedRoute>,
+                )
+              }
+            />
             <Route path="*" element={<Navigate to="/auth" replace />} />
           </Routes>
         </AuthProvider>
