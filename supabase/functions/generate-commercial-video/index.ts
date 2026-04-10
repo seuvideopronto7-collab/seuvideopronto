@@ -423,7 +423,7 @@ Gere também 3 VARIAÇÕES de gancho alternativas no campo ganchos_alternativos 
       if (!jobId) return json({ error: "jobId obrigatório" }, 400);
 
       // Verify ownership
-      const { data: job } = await admin.from("video_jobs").select("user_id, image_url").eq("id", jobId).maybeSingle();
+      const { data: job } = await admin.from("video_jobs").select("user_id, image_url, caption_text, prompt").eq("id", jobId).maybeSingle();
       if (!job) return json({ error: "Job não encontrado" }, 404);
       if (job.user_id !== user.id) {
         const { data: adminRole } = await admin.from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin").maybeSingle();
@@ -431,8 +431,14 @@ Gere também 3 VARIAÇÕES de gancho alternativas no campo ganchos_alternativos 
       }
 
       const sourceImage = job.image_url || imageUrl;
-      const sceneList = scenes || [];
-      const narration = script || sceneList.map((s: any) => s.narracao || s.texto_tela).join(". ");
+      const sceneList = Array.isArray(scenes) ? scenes : [];
+      const narration = buildNarrationText(script || job.caption_text, sceneList, produtoNome, nicho);
+
+      console.log("[commercial] narration prepared", {
+        jobId,
+        length: narration.length,
+        preview: narration.slice(0, 120),
+      });
 
       // ── 2a. Generate scene images ──
       await updateJob(jobId, { status: "generating_images", progress: 30 });
