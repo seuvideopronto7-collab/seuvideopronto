@@ -1,4 +1,4 @@
-import { Flame, ShoppingCart, Calendar, Compass, Camera } from "lucide-react";
+import { Flame, ShoppingCart, Calendar, Compass, Camera, Clapperboard } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 interface QuickActionsProps {
