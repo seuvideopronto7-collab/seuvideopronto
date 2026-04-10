@@ -46,17 +46,7 @@ const App = () => (
             <Route path="/landing" element={wrapSafe("Landing", <Landing />)} />
             <Route path="/auth" element={wrapSafe("Auth", <Auth />)} />
             <Route path="/login" element={wrapSafe("Login", <Auth />)} />
-            <Route
-              path="/"
-              element={
-                wrapSafe(
-                  "Index",
-                  <ProtectedRoute>
-                    <Index />
-                  </ProtectedRoute>,
-                )
-              }
-            />
+            <Route path="/" element={wrapSafe("Home", <HomeGate />)} />
             <Route
               path="/perfil"
               element={
