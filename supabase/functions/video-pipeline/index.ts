@@ -188,6 +188,45 @@ serve(async (req) => {
     await updateJob(jobId, { progress: 55, audio_url: audioUrl, caption_text: narrationText });
 
     // ═══════════════════════════════════════════════════
+    // STEP 2.5: GENERATE SOUNDTRACK (ElevenLabs Music)
+    // ═══════════════════════════════════════════════════
+    let soundtrackUrl: string | null = null;
+    if (ELEVENLABS_API_KEY) {
+      try {
+        await updateJob(jobId, { status: "generating_soundtrack", progress: 58 });
+        const musicPrompt = "Cinematic dark ambient background music for product commercial video. Dramatic, luxury feel, subtle bass, modern and professional. No vocals.";
+        const musicRes = await fetch("https://api.elevenlabs.io/v1/music", {
+          method: "POST",
+          headers: {
+            "xi-api-key": ELEVENLABS_API_KEY,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            prompt: musicPrompt,
+            duration_seconds: Math.min(120, sceneList.length * 3 + 5),
+          }),
+        });
+
+        if (musicRes.ok) {
+          const musicBuffer = await musicRes.arrayBuffer();
+          const musicPath = `soundtracks/${jobId}.mp3`;
+          const { error: upErr } = await admin.storage
+            .from("audio")
+            .upload(musicPath, musicBuffer, { contentType: "audio/mpeg", upsert: true });
+          if (!upErr) {
+            const { data: urlData } = admin.storage.from("audio").getPublicUrl(musicPath);
+            soundtrackUrl = urlData.publicUrl;
+            console.log("[pipeline] ✅ Soundtrack generated:", musicPath);
+          }
+        } else {
+          console.error("[pipeline] Music generation failed:", musicRes.status);
+        }
+      } catch (e) {
+        console.error("[pipeline] Soundtrack error:", e);
+      }
+    }
+
+    // ═══════════════════════════════════════════════════
     // STEP 3: RENDER VIDEO (Shotstack)
     // ═══════════════════════════════════════════════════
     if (!SHOTSTACK_API_KEY) {
@@ -236,11 +275,25 @@ serve(async (req) => {
       { clips: imageClips },
     ];
 
+    // Add voiceover track
     if (audioUrl) {
       tracks.push({
         clips: [
           {
             asset: { type: "audio", src: audioUrl, volume: 1 },
+            start: 0,
+            length: totalDuration,
+          },
+        ],
+      });
+    }
+
+    // Add soundtrack track (lower volume)
+    if (soundtrackUrl) {
+      tracks.push({
+        clips: [
+          {
+            asset: { type: "audio", src: soundtrackUrl, volume: 0.15 },
             start: 0,
             length: totalDuration,
           },
