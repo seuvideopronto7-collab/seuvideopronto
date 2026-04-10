@@ -437,11 +437,13 @@ const VideoMachine = () => {
 const JobCard = ({
   job,
   onRetry,
+  onProcess,
   onDuplicate,
   onDelete,
 }: {
   job: PipelineJob;
   onRetry: (id: string) => void;
+  onProcess: (id: string) => void;
   onDuplicate: (job: PipelineJob) => void;
   onDelete: (id: string) => void;
 }) => {
