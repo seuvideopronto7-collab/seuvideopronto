@@ -107,7 +107,7 @@ const ViralMachine = () => {
         {/* Header */}
         <div className="text-center space-y-3">
           <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white border-0 text-xs px-3 py-1">
-            <Zap className="w-3 h-3 mr-1" /> Zero Custo • 100% no Navegador
+            <Zap className="w-3 h-3 mr-1" /> Voz IA + Trilha Sonora + Vídeo
           </Badge>
           <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-orange-400 via-red-400 to-purple-500 bg-clip-text text-transparent">
             🔥 Viral Machine
