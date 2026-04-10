@@ -308,11 +308,54 @@ Gere também 3 VARIAÇÕES de gancho alternativas no campo ganchos_alternativos 
       });
 
       if (!aiResponse.ok) {
-        if (aiResponse.status === 429) return json({ error: "Rate limit excedido." }, 429);
-        if (aiResponse.status === 402) return json({ error: "Créditos insuficientes." }, 402);
-        const text = await aiResponse.text();
-        console.error("AI error:", aiResponse.status, text);
-        throw new Error("AI gateway error");
+        if (aiResponse.status === 429) return json({ error: "Rate limit excedido. Tente novamente em alguns segundos." }, 429);
+        const errText = await aiResponse.text();
+        console.error("AI error:", aiResponse.status, errText);
+        // Fallback: generate a basic script locally instead of blocking
+        console.warn("[generate-commercial-video] AI indisponível, usando roteiro fallback");
+        const fallbackResult = {
+          analise_imagem: { produto: "Produto Premium", cores: ["#000"], sentimento: "profissional", categoria: "geral" },
+          roteiro: {
+            gancho: "Descubra o que está revolucionando o mercado.",
+            problema: "Você está cansado de resultados mediocres?",
+            solucao: "Este produto foi feito para quem quer resultado real.",
+            prova: "Milhares de pessoas já transformaram sua rotina.",
+            cta: "Garanta o seu agora antes que acabe!",
+            texto_completo: "Descubra o que está revolucionando o mercado. Você está cansado de resultados mediocres? Este produto foi feito para quem quer resultado real. Milhares de pessoas já transformaram sua rotina. Garanta o seu agora antes que acabe!"
+          },
+          cenas: [
+            { tipo: "gancho", texto: "Descubra o que está revolucionando o mercado.", movimento: "zoom_in", duracao: "3s" },
+            { tipo: "problema", texto: "Cansado de resultados mediocres?", movimento: "pan_left", duracao: "3s" },
+            { tipo: "solucao", texto: "Resultado real para quem exige qualidade.", movimento: "zoom_out", duracao: "3s" },
+            { tipo: "cta", texto: "Garanta o seu agora!", movimento: "zoom_in", duracao: "3s" }
+          ],
+          copy: { headline: "Produto Premium", sub: "Transforme sua rotina hoje", cta_text: "Compre Agora", hashtags: ["#premium", "#resultado"] },
+          config_video: { aspect_ratio: formato === "tiktok" || formato === "reels" ? "9:16" : "1:1", resolucao: "1080p", duracao_total: duracao, estilo_edicao: "cinematografico", voz_sugerida: "masculina" }
+        };
+
+        // Create job with fallback data
+        const { data: fjob, error: fjobErr } = await admin
+          .from("video_jobs")
+          .insert({
+            user_id: user.id,
+            status: "script_ready",
+            progress: 25,
+            image_url: imageUrl,
+            prompt: JSON.stringify({ objetivo, formato, duracao }),
+            scenes: fallbackResult.cenas,
+            caption_text: fallbackResult.roteiro.texto_completo,
+          })
+          .select("id")
+          .single();
+
+        if (fjobErr) throw fjobErr;
+
+        return json({
+          success: true,
+          jobId: fjob.id,
+          ...fallbackResult,
+          provider: "fallback",
+        });
       }
 
       const aiData = await aiResponse.json();
