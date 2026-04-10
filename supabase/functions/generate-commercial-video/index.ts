@@ -476,7 +476,7 @@ Gere também 3 VARIAÇÕES de gancho alternativas no campo ganchos_alternativos 
             },
             body: JSON.stringify({
               prompt: musicPrompt,
-              duration_seconds: Math.min(120, totalDuration + 5),
+              duration_seconds: Math.min(120, (parseInt(duracao) || 60) + 5),
             }),
           });
 
