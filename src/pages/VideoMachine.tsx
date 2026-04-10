@@ -434,6 +434,79 @@ const VideoMachine = () => {
   );
 };
 
+const resolveVideoUrl = async (jobId: string): Promise<string | null> => {
+  // Check job_assets for final video
+  const { data } = await supabase
+    .from("job_assets")
+    .select("url")
+    .eq("job_id", jobId)
+    .eq("type", "video")
+    .order("created_at", { ascending: false })
+    .limit(1);
+  return data?.[0]?.url || null;
+};
+
+const handleDownloadVideo = async (jobId: string, title: string) => {
+  const url = await resolveVideoUrl(jobId);
+  if (!url) {
+    toast.error("Vídeo ainda não disponível para download");
+    return;
+  }
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = `${title || "video"}.mp4`;
+    a.click();
+    URL.revokeObjectURL(blobUrl);
+  } catch {
+    // Fallback: native anchor
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${title || "video"}.mp4`;
+    a.target = "_blank";
+    a.click();
+  }
+};
+
+const handleCapCutExport = async (job: PipelineJob) => {
+  // 1. Download the video
+  await handleDownloadVideo(job.id, job.title);
+
+  // 2. Generate kit JSON
+  const kit = {
+    video: `${job.title}.mp4`,
+    roteiro: job.copy_base || "Roteiro gerado automaticamente",
+    nicho: job.niche,
+    objetivo: job.objective,
+    cta: job.cta || "Clique no link da bio",
+    plataforma: job.platform,
+    duracao: job.duration,
+    musica_sugerida: job.objective === "vendas" ? "cinematic emotional" : job.objective === "autoridade" ? "corporate inspiring" : "upbeat trendy",
+  };
+
+  // Download kit as JSON
+  const kitBlob = new Blob([JSON.stringify(kit, null, 2)], { type: "application/json" });
+  const kitUrl = URL.createObjectURL(kitBlob);
+  const a = document.createElement("a");
+  a.href = kitUrl;
+  a.download = `kit-capcut-${job.title || "video"}.json`;
+  a.click();
+  URL.revokeObjectURL(kitUrl);
+
+  // 3. Open CapCut
+  toast.success("📦 Kit exportado! Abrindo CapCut...", {
+    description: "1. Importe o vídeo baixado\n2. Use o kit JSON como guia\n3. Finalize e publique!",
+    duration: 8000,
+  });
+
+  setTimeout(() => {
+    window.open("https://www.capcut.com/editor", "_blank");
+  }, 1500);
+};
+
 const JobCard = ({
   job,
   onRetry,
@@ -447,6 +520,19 @@ const JobCard = ({
   onDuplicate: (job: PipelineJob) => void;
   onDelete: (id: string) => void;
 }) => {
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
+
+  const handleVer = async () => {
+    const url = await resolveVideoUrl(job.id);
+    if (!url) {
+      toast.error("Vídeo ainda não disponível");
+      return;
+    }
+    setPreviewUrl(url);
+    setShowPreview(true);
+  };
+
   const statusLabel: Record<JobStatus, string> = {
     aguardando: "Aguardando",
     processando: "Processando...",
@@ -487,7 +573,7 @@ const JobCard = ({
       )}
 
       {/* Actions */}
-      <div className="flex items-center gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="flex items-center gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity flex-wrap">
         {job.current_stage === "a_fazer" && job.status === "aguardando" && (
           <Button variant="default" size="sm" className="h-6 text-[10px] px-2" onClick={() => onProcess(job.id)}>
             ▶ Processar
@@ -500,11 +586,14 @@ const JobCard = ({
         )}
         {job.status === "concluido" && (
           <>
-            <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2">
+            <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={handleVer}>
               <Eye className="w-3 h-3 mr-1" /> Ver
             </Button>
-            <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2">
+            <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={() => handleDownloadVideo(job.id, job.title)}>
               <Download className="w-3 h-3 mr-1" /> Baixar
+            </Button>
+            <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={() => handleCapCutExport(job)}>
+              <Scissors className="w-3 h-3 mr-1" /> CapCut
             </Button>
           </>
         )}
@@ -515,6 +604,26 @@ const JobCard = ({
           ✕
         </Button>
       </div>
+
+      {/* Video Preview Dialog */}
+      {showPreview && previewUrl && (
+        <Dialog open={showPreview} onOpenChange={setShowPreview}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>{job.title || "Preview do Vídeo"}</DialogTitle>
+            </DialogHeader>
+            <video src={previewUrl} controls autoPlay className="w-full rounded-lg aspect-video bg-black" />
+            <div className="flex gap-2 mt-2">
+              <Button variant="outline" size="sm" className="flex-1" onClick={() => handleDownloadVideo(job.id, job.title)}>
+                <Download className="w-4 h-4 mr-2" /> Baixar MP4
+              </Button>
+              <Button variant="outline" size="sm" className="flex-1" onClick={() => handleCapCutExport(job)}>
+                <Scissors className="w-4 h-4 mr-2" /> Editar no CapCut
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };
