@@ -189,7 +189,8 @@ export const usePlan = () => {
         if (!user) return;
         const limitMap: Record<PlanId, number | null> = {
           free: 2,
-          pro: 20,
+          start: 10,
+          pro: 50,
           premium: null,
         };
         const { data, error } = await (supabase
