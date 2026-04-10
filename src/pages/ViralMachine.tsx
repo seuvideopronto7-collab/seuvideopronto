@@ -90,7 +90,7 @@ const ViralMachine = () => {
     } finally {
       setLoading(false);
     }
-  }, [imagePreview, nicho, objetivo, narrar, user]);
+  }, [imagePreview, nicho, objetivo, narrar, vozIA, trilhaSonora, user]);
 
   const handleReset = () => {
     setImagePreview(null);
