@@ -649,10 +649,10 @@ const JobCard = ({
               </Button>
               <Button
                 size="sm"
-                className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0"
+                className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90"
                 onClick={() => handleCapCutProExport(job)}
               >
-                <Rocket className="w-4 h-4 mr-2" /> CapCut PRO
+                <Scissors className="w-4 h-4 mr-2" /> Editar no CapCut
               </Button>
             </div>
           </DialogContent>
