@@ -76,8 +76,8 @@ const Landing = () => {
       <section className="relative pt-28 sm:pt-36 pb-20 px-4">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,hsl(var(--primary)/0.18),transparent_60%)]" />
         <div className="container max-w-4xl mx-auto text-center relative z-10 space-y-7">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-xs text-primary font-medium">
-            <Zap className="w-3 h-3" /> +5.000 vídeos já criados com IA
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-xs text-primary font-medium animate-pulse">
+            <Zap className="w-3 h-3" /> +3.217 vídeos gerados hoje
           </div>
 
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold leading-[1.1] tracking-tight">
