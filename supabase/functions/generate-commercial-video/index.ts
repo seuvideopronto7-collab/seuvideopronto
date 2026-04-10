@@ -462,6 +462,43 @@ Gere também 3 VARIAÇÕES de gancho alternativas no campo ganchos_alternativos 
 
       await updateJob(jobId, { progress: 60, audio_url: audioUrl, caption_text: narration });
 
+      // ── 2b2. Generate Soundtrack (ElevenLabs Music) ──
+      let soundtrackUrl: string | null = null;
+      if (ELEVENLABS_API_KEY) {
+        try {
+          await updateJob(jobId, { status: "generating_soundtrack", progress: 62 });
+          const musicPrompt = "Cinematic dark ambient background music for product commercial video. Dramatic, luxury feel, subtle bass, modern and professional. No vocals.";
+          const musicRes = await fetch("https://api.elevenlabs.io/v1/music", {
+            method: "POST",
+            headers: {
+              "xi-api-key": ELEVENLABS_API_KEY,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              prompt: musicPrompt,
+              duration_seconds: Math.min(120, (parseInt(duracao) || 60) + 5),
+            }),
+          });
+
+          if (musicRes.ok) {
+            const musicBuffer = await musicRes.arrayBuffer();
+            const musicPath = `soundtracks/${jobId}.mp3`;
+            const { error: upErr } = await admin.storage
+              .from("audio")
+              .upload(musicPath, musicBuffer, { contentType: "audio/mpeg", upsert: true });
+            if (!upErr) {
+              const { data: urlData } = admin.storage.from("audio").getPublicUrl(musicPath);
+              soundtrackUrl = urlData.publicUrl;
+              console.log("[commercial] ✅ Soundtrack generated");
+            }
+          } else {
+            console.error("[commercial] Music gen failed:", musicRes.status);
+          }
+        } catch (e) {
+          console.error("[commercial] Soundtrack error:", e);
+        }
+      }
+
       // ── 2c. Render video with Shotstack ──
       if (!SHOTSTACK_API_KEY) {
         await updateJob(jobId, {
@@ -478,7 +515,7 @@ Gere também 3 VARIAÇÕES de gancho alternativas no campo ganchos_alternativos 
         (parseInt(duracao) || 60) / sceneList.length
       ));
 
-      const totalDuration = sceneList.length * sceneDuration;
+      const totalDurationCalc = sceneList.length * sceneDuration;
 
       const imageClips = imageUrls.map((url: string, i: number) => ({
         asset: { type: "image", src: url },
@@ -507,12 +544,24 @@ Gere também 3 VARIAÇÕES de gancho alternativas no campo ganchos_alternativos 
         { clips: imageClips },
       ];
 
+      // Add voiceover
       if (audioUrl) {
         tracks.push({
           clips: [{
             asset: { type: "audio", src: audioUrl, volume: 1 },
             start: 0,
-            length: totalDuration,
+            length: totalDurationCalc,
+          }],
+        });
+      }
+
+      // Add soundtrack (lower volume behind voice)
+      if (soundtrackUrl) {
+        tracks.push({
+          clips: [{
+            asset: { type: "audio", src: soundtrackUrl, volume: 0.15 },
+            start: 0,
+            length: totalDurationCalc,
           }],
         });
       }
