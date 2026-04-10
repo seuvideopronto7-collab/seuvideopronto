@@ -522,6 +522,20 @@ const JobCard = ({
   const [showPreview, setShowPreview] = useState(false);
   const [showKit, setShowKit] = useState(false);
   const [kit, setKit] = useState<CapCutKit | null>(null);
+  const [autoOpened, setAutoOpened] = useState(false);
+
+  // Auto-abrir kit CapCut quando job finaliza
+  useEffect(() => {
+    if (job.status === "concluido" && !autoOpened) {
+      setAutoOpened(true);
+      (async () => {
+        const videoUrl = await resolveVideoUrl(job.id);
+        const generatedKit = generateCapCutKit(job, videoUrl);
+        setKit(generatedKit);
+        setShowKit(true);
+      })();
+    }
+  }, [job.status, job.id, autoOpened]);
 
   const handleVer = async () => {
     const url = await resolveVideoUrl(job.id);
