@@ -26,6 +26,7 @@ import EditorProReal from "./pages/EditorProReal";
 import SvpGeradorVideoPremium from "./pages/SvpGeradorVideoPremium";
 import ImageToVideo from "./pages/ImageToVideo";
 import TransformImage from "./pages/TransformImage";
+import VideoMachine from "./pages/VideoMachine";
 
 const queryClient = new QueryClient();
 
