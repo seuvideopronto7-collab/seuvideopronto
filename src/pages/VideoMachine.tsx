@@ -151,14 +151,31 @@ const VideoMachine = () => {
     }
   };
 
+  const handleProcess = async (jobId: string) => {
+    toast.info("Iniciando pipeline...");
+    try {
+      const { data, error } = await supabase.functions.invoke("orchestrate-pipeline", {
+        body: { jobId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success("Pipeline em execução!");
+      fetchJobs();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao iniciar pipeline");
+    }
+  };
+
   const handleRetry = async (jobId: string) => {
     const { error } = await supabase
       .from("pipeline_jobs")
-      .update({ status: "aguardando" as any, error_message: null } as any)
+      .update({ status: "aguardando" as any, error_message: null, current_stage: "a_fazer" as any, progress: 0 } as any)
       .eq("id", jobId);
 
-    if (error) toast.error("Erro ao reprocessar");
-    else { toast.success("Reprocessando..."); fetchJobs(); }
+    if (error) { toast.error("Erro ao reprocessar"); return; }
+    toast.success("Reprocessando...");
+    fetchJobs();
+    handleProcess(jobId);
   };
 
   const handleDuplicate = async (job: PipelineJob) => {
