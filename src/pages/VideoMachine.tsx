@@ -472,40 +472,37 @@ const handleDownloadVideo = async (jobId: string, title: string) => {
   }
 };
 
-const handleCapCutExport = async (job: PipelineJob) => {
-  // 1. Download the video
-  await handleDownloadVideo(job.id, job.title);
+const handleCapCutProExport = async (job: PipelineJob) => {
+  const videoUrl = await resolveVideoUrl(job.id);
+  const kit = generateCapCutKit(job, videoUrl);
 
-  // 2. Generate kit JSON
-  const kit = {
-    video: `${job.title}.mp4`,
-    roteiro: job.copy_base || "Roteiro gerado automaticamente",
-    nicho: job.niche,
-    objetivo: job.objective,
-    cta: job.cta || "Clique no link da bio",
-    plataforma: job.platform,
-    duracao: job.duration,
-    musica_sugerida: job.objective === "vendas" ? "cinematic emotional" : job.objective === "autoridade" ? "corporate inspiring" : "upbeat trendy",
-  };
+  // 1. Download video
+  if (videoUrl) {
+    await handleDownloadVideo(job.id, job.title);
+  }
 
-  // Download kit as JSON
-  const kitBlob = new Blob([JSON.stringify(kit, null, 2)], { type: "application/json" });
-  const kitUrl = URL.createObjectURL(kitBlob);
-  const a = document.createElement("a");
-  a.href = kitUrl;
-  a.download = `kit-capcut-${job.title || "video"}.json`;
-  a.click();
-  URL.revokeObjectURL(kitUrl);
+  // 2. Download roteiro.txt
+  downloadTextFile(kit.roteiro, `roteiro-${job.title || "video"}.txt`);
 
-  // 3. Open CapCut
-  toast.success("📦 Kit exportado! Abrindo CapCut...", {
-    description: "1. Importe o vídeo baixado\n2. Use o kit JSON como guia\n3. Finalize e publique!",
-    duration: 8000,
+  // 3. Download legendas.json
+  downloadTextFile(
+    JSON.stringify(kit.legendas, null, 2),
+    `legendas-${job.title || "video"}.json`,
+    "application/json"
+  );
+
+  // 4. Toast with instructions
+  toast.success("🚀 Kit CapCut PRO exportado!", {
+    description: kit.instrucoes.slice(0, 3).join("\n"),
+    duration: 10000,
   });
 
+  // 5. Open CapCut after short delay
   setTimeout(() => {
     window.open("https://www.capcut.com/editor", "_blank");
-  }, 1500);
+  }, 2000);
+
+  return kit;
 };
 
 const JobCard = ({
@@ -523,6 +520,8 @@ const JobCard = ({
 }) => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [showKit, setShowKit] = useState(false);
+  const [kit, setKit] = useState<CapCutKit | null>(null);
 
   const handleVer = async () => {
     const url = await resolveVideoUrl(job.id);
@@ -532,6 +531,13 @@ const JobCard = ({
     }
     setPreviewUrl(url);
     setShowPreview(true);
+  };
+
+  const handleShowKit = async () => {
+    const videoUrl = await resolveVideoUrl(job.id);
+    const generatedKit = generateCapCutKit(job, videoUrl);
+    setKit(generatedKit);
+    setShowKit(true);
   };
 
   const statusLabel: Record<JobStatus, string> = {
@@ -593,8 +599,15 @@ const JobCard = ({
             <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={() => handleDownloadVideo(job.id, job.title)}>
               <Download className="w-3 h-3 mr-1" /> Baixar
             </Button>
-            <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={() => handleCapCutExport(job)}>
-              <Scissors className="w-3 h-3 mr-1" /> CapCut
+            <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={handleShowKit}>
+              <Package className="w-3 h-3 mr-1" /> Kit
+            </Button>
+            <Button
+              size="sm"
+              className="h-6 text-[10px] px-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0 hover:from-purple-600 hover:to-pink-600"
+              onClick={() => handleCapCutProExport(job)}
+            >
+              <Rocket className="w-3 h-3 mr-1" /> CapCut PRO
             </Button>
           </>
         )}
@@ -618,8 +631,102 @@ const JobCard = ({
               <Button variant="outline" size="sm" className="flex-1" onClick={() => handleDownloadVideo(job.id, job.title)}>
                 <Download className="w-4 h-4 mr-2" /> Baixar MP4
               </Button>
-              <Button variant="outline" size="sm" className="flex-1" onClick={() => handleCapCutExport(job)}>
-                <Scissors className="w-4 h-4 mr-2" /> Editar no CapCut
+              <Button
+                size="sm"
+                className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0"
+                onClick={() => handleCapCutProExport(job)}
+              >
+                <Rocket className="w-4 h-4 mr-2" /> CapCut PRO
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* CapCut Kit Dialog */}
+      {showKit && kit && (
+        <Dialog open={showKit} onOpenChange={setShowKit}>
+          <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Package className="w-5 h-5" /> Kit CapCut PRO
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4 mt-2">
+              {/* Script */}
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-semibold">📝 Roteiro</span>
+                </div>
+                <div className="bg-muted/50 rounded-lg p-3 text-sm whitespace-pre-line">
+                  {kit.roteiro}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => downloadTextFile(kit.roteiro, `roteiro-${job.title}.txt`)}
+                >
+                  <Download className="w-3 h-3 mr-1" /> Baixar Roteiro (.txt)
+                </Button>
+              </div>
+
+              {/* Subtitles */}
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-semibold">⏱️ Legendas Sincronizadas</span>
+                </div>
+                <div className="bg-muted/50 rounded-lg p-3 space-y-1">
+                  {kit.legendas.map((l, i) => (
+                    <div key={i} className="flex items-start gap-2 text-xs">
+                      <Badge variant="secondary" className="text-[10px] shrink-0">{l.start}s—{l.end}s</Badge>
+                      <span>{l.text}</span>
+                    </div>
+                  ))}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => downloadTextFile(JSON.stringify(kit.legendas, null, 2), `legendas-${job.title}.json`, "application/json")}
+                >
+                  <Download className="w-3 h-3 mr-1" /> Baixar Legendas (.json)
+                </Button>
+              </div>
+
+              {/* Music */}
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <Music className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-semibold">🎵 Música Sugerida</span>
+                </div>
+                <div className="bg-muted/50 rounded-lg p-3 text-sm">
+                  {kit.musicaSugerida}
+                </div>
+              </div>
+
+              {/* Style */}
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Badge variant="outline">{kit.estilo}</Badge>
+                <span>• CTA: {kit.cta}</span>
+              </div>
+
+              {/* Instructions */}
+              <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 space-y-1">
+                {kit.instrucoes.map((inst, i) => (
+                  <p key={i} className="text-xs">{inst}</p>
+                ))}
+              </div>
+
+              {/* Main CTA */}
+              <Button
+                className="w-full h-12 text-sm font-bold bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 text-white border-0 hover:from-purple-600 hover:via-pink-600 hover:to-red-600"
+                onClick={() => handleCapCutProExport(job)}
+              >
+                <Rocket className="w-4 h-4 mr-2" /> 🚀 Exportar Tudo + Abrir CapCut
               </Button>
             </div>
           </DialogContent>
