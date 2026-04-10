@@ -183,15 +183,49 @@ const ViralMachine = () => {
               </div>
             </div>
 
-            <label className="flex items-center gap-2 cursor-pointer text-sm">
-              <input
-                type="checkbox"
-                checked={narrar}
-                onChange={(e) => setNarrar(e.target.checked)}
-                className="rounded border-border"
-              />
-              <span className="text-muted-foreground">🎙️ Narrar com voz do navegador</span>
-            </label>
+            {/* Audio Options */}
+            <div className="space-y-2 rounded-lg border border-border/30 bg-card/30 p-3">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                <Mic className="w-3 h-3" /> Áudio do Vídeo
+              </p>
+              <label className="flex items-center gap-2 cursor-pointer text-sm">
+                <input
+                  type="checkbox"
+                  checked={vozIA}
+                  onChange={(e) => {
+                    setVozIA(e.target.checked);
+                    if (e.target.checked) setNarrar(false);
+                  }}
+                  className="rounded border-border"
+                />
+                <span className="text-muted-foreground">🎙️ Voz profissional (IA)</span>
+                <Badge variant="secondary" className="text-[9px] ml-auto">PRO</Badge>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer text-sm">
+                <input
+                  type="checkbox"
+                  checked={trilhaSonora}
+                  onChange={(e) => setTrilhaSonora(e.target.checked)}
+                  className="rounded border-border"
+                />
+                <span className="text-muted-foreground flex items-center gap-1">
+                  <Music className="w-3 h-3" /> Trilha sonora por nicho
+                </span>
+                <Badge variant="secondary" className="text-[9px] ml-auto">PRO</Badge>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer text-sm">
+                <input
+                  type="checkbox"
+                  checked={narrar && !vozIA}
+                  onChange={(e) => {
+                    setNarrar(e.target.checked);
+                    if (e.target.checked) setVozIA(false);
+                  }}
+                  className="rounded border-border"
+                />
+                <span className="text-muted-foreground">🔊 Voz do navegador (grátis)</span>
+              </label>
+            </div>
 
             {/* Generate Button */}
             <Button
