@@ -61,6 +61,18 @@ const ViralMachine = () => {
       return;
     }
 
+    // Pre-create utterance SYNCHRONOUSLY in gesture context (before any await)
+    let preCreatedUtterance: SpeechSynthesisUtterance | null = null;
+    if ((narrar && !vozIA) && "speechSynthesis" in window) {
+      preCreatedUtterance = new SpeechSynthesisUtterance("");
+      preCreatedUtterance.lang = "pt-BR";
+      preCreatedUtterance.rate = 0.9;
+      // Pre-load voices
+      const voices = speechSynthesis.getVoices();
+      const ptVoice = voices.find((v) => v.lang.startsWith("pt"));
+      if (ptVoice) preCreatedUtterance.voice = ptVoice;
+    }
+
     setLoading(true);
     setProgress(0);
     setVideoUrl(null);
@@ -69,6 +81,7 @@ const ViralMachine = () => {
       const result = await gerarVideoViral(
         { imageBase: imagePreview, nicho, objetivo, narrar, vozIA, trilhaSonora },
         (ratio) => setProgress(Math.round(ratio * 100)),
+        preCreatedUtterance,
       );
 
       const url = URL.createObjectURL(result.blob);
