@@ -251,6 +251,17 @@ const App = () => (
                 )
               }
             />
+            <Route
+              path="/video-machine"
+              element={
+                wrapSafe(
+                  "Video Machine",
+                  <ProtectedRoute>
+                    <VideoMachine />
+                  </ProtectedRoute>,
+                )
+              }
+            />
             <Route path="*" element={<Navigate to="/auth" replace />} />
           </Routes>
         </AuthProvider>
