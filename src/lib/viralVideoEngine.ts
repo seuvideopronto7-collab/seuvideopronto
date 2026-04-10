@@ -166,6 +166,7 @@ export async function renderViralVideo(
     vozUrl?: string | null;
     trilhaUrl?: string | null;
     narrarLocal?: boolean;
+    preCreatedUtterance?: SpeechSynthesisUtterance | null;
   },
   onProgress?: (ratio: number) => void,
 ): Promise<Blob> {
@@ -186,6 +187,7 @@ export async function renderViralVideo(
 
   // Load and connect audio sources
   const audioSources: MediaElementAudioSourceNode[] = [];
+  let hasAudioTrack = false;
 
   if (options?.vozUrl) {
     try {
@@ -196,6 +198,7 @@ export async function renderViralVideo(
       source.connect(gainNode).connect(destination);
       audioSources.push(source);
       vozAudio.play().catch(() => {});
+      hasAudioTrack = true;
     } catch (e) {
       console.warn("[render] Voz IA não carregou:", e);
     }
@@ -210,15 +213,28 @@ export async function renderViralVideo(
       source.connect(gainNode).connect(destination);
       audioSources.push(source);
       trilhaAudio.play().catch(() => {});
+      hasAudioTrack = true;
     } catch (e) {
       console.warn("[render] Trilha não carregou:", e);
     }
   }
 
+  // For local narration: generate a silent audio track so MediaRecorder has audio,
+  // then play speech separately (Web Speech API audio can't be captured by MediaRecorder)
+  if (!hasAudioTrack && options?.narrarLocal) {
+    // Create a silent oscillator so the stream has an audio track
+    const osc = audioCtx.createOscillator();
+    const silentGain = audioCtx.createGain();
+    silentGain.gain.value = 0; // completely silent
+    osc.connect(silentGain).connect(destination);
+    osc.start();
+    hasAudioTrack = true;
+  }
+
   // Combine video + audio streams
   const combinedStream = new MediaStream([
     ...videoStream.getVideoTracks(),
-    ...(audioSources.length > 0 ? destination.stream.getAudioTracks() : []),
+    ...(hasAudioTrack ? destination.stream.getAudioTracks() : []),
   ]);
 
   const recorder = new MediaRecorder(combinedStream, {
@@ -243,8 +259,18 @@ export async function renderViralVideo(
 
   recorder.start();
 
-  // Start local narration if no AI voice
-  if (!options?.vozUrl && options?.narrarLocal && "speechSynthesis" in window) {
+  // Start local narration using pre-created utterance (preserves gesture context)
+  if (!options?.vozUrl && options?.narrarLocal && options?.preCreatedUtterance) {
+    const utterance = options.preCreatedUtterance;
+    utterance.text = timeline.map((s) => s.texto).join(". ");
+    utterance.lang = "pt-BR";
+    utterance.rate = 0.9;
+    const voices = speechSynthesis.getVoices();
+    const ptVoice = voices.find((v) => v.lang.startsWith("pt"));
+    if (ptVoice) utterance.voice = ptVoice;
+    speechSynthesis.speak(utterance);
+  } else if (!options?.vozUrl && options?.narrarLocal && "speechSynthesis" in window) {
+    // Fallback: try anyway (may be muted in some browsers without gesture)
     const fullText = timeline.map((s) => s.texto).join(". ");
     const utterance = new SpeechSynthesisUtterance(fullText);
     utterance.lang = "pt-BR";
