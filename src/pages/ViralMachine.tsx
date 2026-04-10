@@ -6,7 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Upload, Flame, Download, Play, Sparkles, Zap, RotateCcw } from "lucide-react";
+import { Upload, Flame, Download, Play, Sparkles, Zap, RotateCcw, Mic, Music } from "lucide-react";
 import { gerarVideoViral, type ViralVideoInput } from "@/lib/viralVideoEngine";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
