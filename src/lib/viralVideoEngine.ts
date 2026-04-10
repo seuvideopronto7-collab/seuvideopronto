@@ -1,18 +1,22 @@
 /**
- * Viral Video Engine — Zero-cost, browser-only video generation
- * Uses Canvas + MediaRecorder (no external APIs needed)
+ * Viral Video Engine — Browser-based video generation
+ * Supports: Web Speech (free) + ElevenLabs (pro) voice & soundtrack
  */
 
+import { supabase } from "@/integrations/supabase/client";
+
 export interface ViralVideoInput {
-  imageBase: string; // data URL or blob URL of the product image
+  imageBase: string;
   nicho: string;
   objetivo: "vendas" | "autoridade" | "engajamento";
   narrar?: boolean;
+  vozIA?: boolean;       // use ElevenLabs TTS
+  trilhaSonora?: boolean; // generate soundtrack
 }
 
 export interface ViralScene {
   texto: string;
-  duracao: number; // seconds
+  duracao: number;
 }
 
 // ─── Copy Engine by Niche ───────────────────────────────────────
@@ -91,27 +95,42 @@ export function gerarTimeline(copy: string[]): ViralScene[] {
   }));
 }
 
-// ─── Narration (Web Speech API — free) ──────────────────────────
+// ─── ElevenLabs Voice (Edge Function) ───────────────────────────
 
-export async function gerarNarracaoBlob(textos: string[]): Promise<Blob | null> {
-  if (!("speechSynthesis" in window)) return null;
-
-  return new Promise((resolve) => {
+export async function gerarVozIA(textos: string[]): Promise<string | null> {
+  try {
     const fullText = textos.join(". ");
-    const utterance = new SpeechSynthesisUtterance(fullText);
-    utterance.lang = "pt-BR";
-    utterance.rate = 0.95;
-    utterance.pitch = 1.0;
+    const { data, error } = await supabase.functions.invoke("generate-voiceover", {
+      body: { text: fullText },
+    });
+    if (error) throw error;
+    return data?.audioUrl || null;
+  } catch (e) {
+    console.warn("[viralEngine] Voz IA falhou, usando fallback:", e);
+    return null;
+  }
+}
 
-    // Try to find a PT-BR voice
-    const voices = speechSynthesis.getVoices();
-    const ptVoice = voices.find((v) => v.lang.startsWith("pt"));
-    if (ptVoice) utterance.voice = ptVoice;
+// ─── ElevenLabs Soundtrack (Edge Function) ──────────────────────
 
-    // Web Speech API doesn't produce a Blob directly — we just speak it during render
-    // Return null and handle inline during canvas render
-    resolve(null);
-  });
+export async function gerarTrilhaSonora(
+  objetivo: string,
+  duracaoSec: number,
+): Promise<string | null> {
+  try {
+    const { data, error } = await supabase.functions.invoke("generate-soundtrack", {
+      body: { objective: objetivo, duration: duracaoSec },
+    });
+    if (error) throw error;
+    if (data?.error) {
+      console.warn("[viralEngine] Trilha erro:", data.error);
+      return null;
+    }
+    return data?.audioUrl || null;
+  } catch (e) {
+    console.warn("[viralEngine] Trilha falhou:", e);
+    return null;
+  }
 }
 
 // ─── Image loader ───────────────────────────────────────────────
@@ -126,11 +145,28 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
+// ─── Audio loader ───────────────────────────────────────────────
+
+async function loadAudio(url: string): Promise<HTMLAudioElement> {
+  return new Promise((resolve, reject) => {
+    const audio = new Audio();
+    audio.crossOrigin = "anonymous";
+    audio.oncanplaythrough = () => resolve(audio);
+    audio.onerror = () => reject(new Error("Falha ao carregar áudio"));
+    audio.src = url;
+  });
+}
+
 // ─── Canvas Render Engine ───────────────────────────────────────
 
 export async function renderViralVideo(
   imageBase: string,
   timeline: ViralScene[],
+  options?: {
+    vozUrl?: string | null;
+    trilhaUrl?: string | null;
+    narrarLocal?: boolean;
+  },
   onProgress?: (ratio: number) => void,
 ): Promise<Blob> {
   const W = 1080;
@@ -141,11 +177,56 @@ export async function renderViralVideo(
   canvas.height = H;
   const ctx = canvas.getContext("2d")!;
 
-  const stream = canvas.captureStream(30);
-  const recorder = new MediaRecorder(stream, {
-    mimeType: MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
-      ? "video/webm;codecs=vp9"
-      : "video/webm",
+  // Set up audio context for mixing
+  const audioCtx = new AudioContext();
+  const destination = audioCtx.createMediaStreamDestination();
+
+  // Canvas video stream
+  const videoStream = canvas.captureStream(30);
+
+  // Load and connect audio sources
+  const audioSources: MediaElementAudioSourceNode[] = [];
+
+  if (options?.vozUrl) {
+    try {
+      const vozAudio = await loadAudio(options.vozUrl);
+      const source = audioCtx.createMediaElementSource(vozAudio);
+      const gainNode = audioCtx.createGain();
+      gainNode.gain.value = 1.0;
+      source.connect(gainNode).connect(destination);
+      audioSources.push(source);
+      vozAudio.play().catch(() => {});
+    } catch (e) {
+      console.warn("[render] Voz IA não carregou:", e);
+    }
+  }
+
+  if (options?.trilhaUrl) {
+    try {
+      const trilhaAudio = await loadAudio(options.trilhaUrl);
+      const source = audioCtx.createMediaElementSource(trilhaAudio);
+      const gainNode = audioCtx.createGain();
+      gainNode.gain.value = 0.15; // baixo volume
+      source.connect(gainNode).connect(destination);
+      audioSources.push(source);
+      trilhaAudio.play().catch(() => {});
+    } catch (e) {
+      console.warn("[render] Trilha não carregou:", e);
+    }
+  }
+
+  // Combine video + audio streams
+  const combinedStream = new MediaStream([
+    ...videoStream.getVideoTracks(),
+    ...(audioSources.length > 0 ? destination.stream.getAudioTracks() : []),
+  ]);
+
+  const recorder = new MediaRecorder(combinedStream, {
+    mimeType: MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
+      ? "video/webm;codecs=vp9,opus"
+      : MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")
+        ? "video/webm;codecs=vp8,opus"
+        : "video/webm",
   });
 
   const chunks: Blob[] = [];
@@ -154,17 +235,31 @@ export async function renderViralVideo(
   };
 
   const done = new Promise<Blob>((resolve) => {
-    recorder.onstop = () => resolve(new Blob(chunks, { type: "video/webm" }));
+    recorder.onstop = () => {
+      audioCtx.close().catch(() => {});
+      resolve(new Blob(chunks, { type: "video/webm" }));
+    };
   });
 
   recorder.start();
 
-  let img: HTMLImageElement;
+  // Start local narration if no AI voice
+  if (!options?.vozUrl && options?.narrarLocal && "speechSynthesis" in window) {
+    const fullText = timeline.map((s) => s.texto).join(". ");
+    const utterance = new SpeechSynthesisUtterance(fullText);
+    utterance.lang = "pt-BR";
+    utterance.rate = 0.9;
+    const voices = speechSynthesis.getVoices();
+    const ptVoice = voices.find((v) => v.lang.startsWith("pt"));
+    if (ptVoice) utterance.voice = ptVoice;
+    speechSynthesis.speak(utterance);
+  }
+
+  let img: HTMLImageElement | null = null;
   try {
     img = await loadImage(imageBase);
   } catch {
-    // fallback: solid gradient if image fails
-    img = null as any;
+    img = null;
   }
 
   const totalDuration = timeline.reduce((s, t) => s + t.duracao, 0);
@@ -173,33 +268,32 @@ export async function renderViralVideo(
   for (let i = 0; i < timeline.length; i++) {
     const scene = timeline[i];
     const sceneDurationMs = scene.duracao * 1000;
-    const frameMs = 33; // ~30fps
+    const frameMs = 33;
     let sceneElapsed = 0;
 
     while (sceneElapsed < sceneDurationMs) {
       const progress = sceneElapsed / sceneDurationMs;
 
-      // Background
+      // Background gradient
       const grad = ctx.createLinearGradient(0, 0, 0, H);
       grad.addColorStop(0, "#0a0a1a");
       grad.addColorStop(1, "#1a0a2e");
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, W, H);
 
-      // Image with ken burns effect
+      // Image with ken burns
       if (img) {
         const zoom = 1.0 + progress * 0.12;
         const imgW = W * zoom;
         const imgH = H * zoom;
         const dx = (W - imgW) / 2 + Math.sin(progress * Math.PI) * 20;
         const dy = (H - imgH) / 2;
-
         ctx.globalAlpha = 0.7;
         ctx.drawImage(img, dx, dy, imgW, imgH);
         ctx.globalAlpha = 1;
       }
 
-      // Dark overlay (stronger at bottom for text)
+      // Dark overlay
       const overlay = ctx.createLinearGradient(0, H * 0.4, 0, H);
       overlay.addColorStop(0, "rgba(0,0,0,0.2)");
       overlay.addColorStop(1, "rgba(0,0,0,0.85)");
@@ -210,7 +304,7 @@ export async function renderViralVideo(
       ctx.fillStyle = "#7c3aed";
       ctx.fillRect(0, 0, W, 6);
 
-      // Scene text with animation
+      // Text animation
       const textAlpha = progress < 0.15
         ? progress / 0.15
         : progress > 0.85
@@ -222,8 +316,6 @@ export async function renderViralVideo(
       ctx.font = `bold ${fontSize}px "Segoe UI", sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-
-      // Text shadow
       ctx.shadowColor = "rgba(0,0,0,0.8)";
       ctx.shadowBlur = 20;
       ctx.shadowOffsetX = 0;
@@ -251,12 +343,11 @@ export async function renderViralVideo(
         ctx.fillText(line, W / 2, textY + (li - (lines.length - 1) / 2) * lineHeight);
       });
 
-      // Reset shadow
       ctx.shadowColor = "transparent";
       ctx.shadowBlur = 0;
       ctx.globalAlpha = 1;
 
-      // Scene indicator dots
+      // Scene dots
       const dotY = H * 0.92;
       timeline.forEach((_, di) => {
         ctx.beginPath();
@@ -273,6 +364,7 @@ export async function renderViralVideo(
     onProgress?.(elapsed / totalDuration);
   }
 
+  if ("speechSynthesis" in window) speechSynthesis.cancel();
   recorder.stop();
   return done;
 }
@@ -282,27 +374,43 @@ export async function renderViralVideo(
 export async function gerarVideoViral(
   input: ViralVideoInput,
   onProgress?: (ratio: number) => void,
-): Promise<{ blob: Blob; copy: string[]; timeline: ViralScene[] }> {
+): Promise<{ blob: Blob; copy: string[]; timeline: ViralScene[]; vozUrl?: string | null; trilhaUrl?: string | null }> {
   const copy = gerarCopyViral(input.nicho, input.objetivo);
   const timeline = gerarTimeline(copy);
+  const totalDuration = timeline.reduce((s, t) => s + t.duracao, 0);
 
-  // Start narration in background if enabled
-  if (input.narrar && "speechSynthesis" in window) {
-    const fullText = copy.join(". ");
-    const utterance = new SpeechSynthesisUtterance(fullText);
-    utterance.lang = "pt-BR";
-    utterance.rate = 0.9;
-    const voices = speechSynthesis.getVoices();
-    const ptVoice = voices.find((v) => v.lang.startsWith("pt"));
-    if (ptVoice) utterance.voice = ptVoice;
-    speechSynthesis.speak(utterance);
+  let vozUrl: string | null = null;
+  let trilhaUrl: string | null = null;
+
+  // Generate AI voice + soundtrack in parallel if requested
+  const promises: Promise<void>[] = [];
+
+  if (input.vozIA) {
+    promises.push(
+      gerarVozIA(copy).then((url) => { vozUrl = url; }),
+    );
   }
 
-  const blob = await renderViralVideo(input.imageBase, timeline, onProgress);
-
-  if ("speechSynthesis" in window) {
-    speechSynthesis.cancel();
+  if (input.trilhaSonora) {
+    promises.push(
+      gerarTrilhaSonora(input.objetivo, totalDuration).then((url) => { trilhaUrl = url; }),
+    );
   }
 
-  return { blob, copy, timeline };
+  if (promises.length > 0) {
+    await Promise.allSettled(promises);
+  }
+
+  const blob = await renderViralVideo(
+    input.imageBase,
+    timeline,
+    {
+      vozUrl,
+      trilhaUrl,
+      narrarLocal: input.narrar && !vozUrl, // fallback to browser voice if AI failed
+    },
+    onProgress,
+  );
+
+  return { blob, copy, timeline, vozUrl, trilhaUrl };
 }
