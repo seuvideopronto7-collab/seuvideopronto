@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import { Plus, RefreshCw, Download, Eye, Copy, RotateCcw, Loader2, AlertTriangle, CheckCircle2, Clock, Clapperboard, Scissors, FileText, Music, ExternalLink } from "lucide-react";
+import { Plus, RefreshCw, Download, Eye, Copy, RotateCcw, Loader2, AlertTriangle, CheckCircle2, Clock, Clapperboard, Scissors, FileText, Music, ExternalLink, Rocket, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import BackButton from "@/components/BackButton";
+import { generateCapCutKit, downloadTextFile, type CapCutKit } from "@/lib/capCutKit";
 
 type JobStage = "a_fazer" | "roteiro" | "narracao" | "imagens" | "video" | "concluido";
 type JobStatus = "aguardando" | "processando" | "concluido" | "erro" | "cancelado";
