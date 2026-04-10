@@ -34,6 +34,8 @@ const ViralMachine = () => {
   const [nicho, setNicho] = useState("geral");
   const [objetivo, setObjetivo] = useState<ViralVideoInput["objetivo"]>("vendas");
   const [narrar, setNarrar] = useState(true);
+  const [vozIA, setVozIA] = useState(false);
+  const [trilhaSonora, setTrilhaSonora] = useState(false);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
