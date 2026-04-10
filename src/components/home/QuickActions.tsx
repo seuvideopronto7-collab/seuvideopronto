@@ -6,6 +6,7 @@ interface QuickActionsProps {
 }
 
 const actions = [
+  { id: "video-machine", icon: Clapperboard, label: "Máquina de Vídeo", desc: "Pipeline completo", color: "from-cyan-600 to-blue-600", route: "/video-machine" },
   { id: "imagem-video", icon: Camera, label: "Imagem → Vídeo", desc: "Vídeo comercial com IA", color: "from-pink-600 to-rose-600", route: "/imagem-para-video" },
   { id: "darkflow", icon: Flame, label: "Dark Flow", desc: "Gatilhos virais", color: "from-orange-600 to-red-600" },
   { id: "sales", icon: ShoppingCart, label: "Máquina de Vendas", desc: "Automação comercial", color: "from-emerald-600 to-green-600" },
