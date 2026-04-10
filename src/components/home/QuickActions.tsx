@@ -21,7 +21,7 @@ const QuickActions = ({ onSelect }: QuickActionsProps) => {
     <section className="px-4">
       <div className="max-w-5xl mx-auto">
         <h2 className="text-xl font-bold text-foreground mb-4">🚀 Ferramentas</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {actions.map((a) => {
             const Icon = a.icon;
             return (
