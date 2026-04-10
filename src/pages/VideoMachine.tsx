@@ -140,10 +140,12 @@ const VideoMachine = () => {
       });
 
       if (error) throw error;
-      toast.success("Job criado com sucesso!");
+      const { data: newJobs } = await supabase.from("pipeline_jobs").select("id").order("created_at", { ascending: false }).limit(1);
+      toast.success("Job criado! Iniciando pipeline...");
       setShowCreate(false);
       setForm({ title: "", input_type: "ideia", platform: "reels", duration: "30s", objective: "vendas", niche: "", audience: "", voice: "feminina", cta: "", copy_base: "", visual_style: "premium_escuro", script_mode: "comercial", aspect_ratio: "9:16" });
       fetchJobs();
+      if (newJobs?.[0]?.id) handleProcess(newJobs[0].id);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao criar job");
     } finally {
