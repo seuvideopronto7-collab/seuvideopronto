@@ -400,7 +400,48 @@ export async function renderViralVideo(
 export async function gerarVideoViral(
   input: ViralVideoInput,
   onProgress?: (ratio: number) => void,
+  preCreatedUtterance?: SpeechSynthesisUtterance | null,
 ): Promise<{ blob: Blob; copy: string[]; timeline: ViralScene[]; vozUrl?: string | null; trilhaUrl?: string | null }> {
+  const copy = gerarCopyViral(input.nicho, input.objetivo);
+  const timeline = gerarTimeline(copy);
+  const totalDuration = timeline.reduce((s, t) => s + t.duracao, 0);
+
+  let vozUrl: string | null = null;
+  let trilhaUrl: string | null = null;
+
+  // Generate AI voice + soundtrack in parallel if requested
+  const promises: Promise<void>[] = [];
+
+  if (input.vozIA) {
+    promises.push(
+      gerarVozIA(copy).then((url) => { vozUrl = url; }),
+    );
+  }
+
+  if (input.trilhaSonora) {
+    promises.push(
+      gerarTrilhaSonora(input.objetivo, totalDuration).then((url) => { trilhaUrl = url; }),
+    );
+  }
+
+  if (promises.length > 0) {
+    await Promise.allSettled(promises);
+  }
+
+  const blob = await renderViralVideo(
+    input.imageBase,
+    timeline,
+    {
+      vozUrl,
+      trilhaUrl,
+      narrarLocal: input.narrar && !vozUrl, // fallback to browser voice if AI failed
+      preCreatedUtterance,
+    },
+    onProgress,
+  );
+
+  return { blob, copy, timeline, vozUrl, trilhaUrl };
+}
   const copy = gerarCopyViral(input.nicho, input.objetivo);
   const timeline = gerarTimeline(copy);
   const totalDuration = timeline.reduce((s, t) => s + t.duracao, 0);
