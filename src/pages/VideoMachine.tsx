@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import { Plus, RefreshCw, Download, Eye, Copy, RotateCcw, Loader2, AlertTriangle, CheckCircle2, Clock, Clapperboard } from "lucide-react";
+import { Plus, RefreshCw, Download, Eye, Copy, RotateCcw, Loader2, AlertTriangle, CheckCircle2, Clock, Clapperboard, Scissors, FileText, Music, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
