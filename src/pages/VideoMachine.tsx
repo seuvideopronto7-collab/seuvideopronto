@@ -522,6 +522,25 @@ const JobCard = ({
   const [showPreview, setShowPreview] = useState(false);
   const [showKit, setShowKit] = useState(false);
   const [kit, setKit] = useState<CapCutKit | null>(null);
+  const [autoOpened, setAutoOpened] = useState(false);
+
+  // Auto-abrir kit CapCut quando job acabou de finalizar (últimos 60s)
+  useEffect(() => {
+    if (job.status === "concluido" && !autoOpened) {
+      const updatedAt = job.updated_at ? new Date(job.updated_at).getTime() : 0;
+      const isRecent = Date.now() - updatedAt < 60_000; // finalizado há menos de 1 min
+      if (isRecent) {
+        setAutoOpened(true);
+        (async () => {
+          const videoUrl = await resolveVideoUrl(job.id);
+          const generatedKit = generateCapCutKit(job, videoUrl);
+          setKit(generatedKit);
+          setShowKit(true);
+          toast.success("🎬 Vídeo concluído! Kit CapCut pronto.", { duration: 5000 });
+        })();
+      }
+    }
+  }, [job.status, job.id, job.updated_at, autoOpened]);
 
   const handleVer = async () => {
     const url = await resolveVideoUrl(job.id);
