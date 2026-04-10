@@ -419,6 +419,7 @@ const VideoMachine = () => {
                       key={job.id}
                       job={job}
                       onRetry={handleRetry}
+                      onProcess={handleProcess}
                       onDuplicate={handleDuplicate}
                       onDelete={handleDelete}
                     />
