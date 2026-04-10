@@ -35,6 +35,27 @@ const voiceIds: Record<string, string> = {
   feminina: "EXAVITQu4vr4xnSDxMaL",     // Sarah
 };
 
+const hasMeaningfulText = (value: unknown): value is string =>
+  typeof value === "string" && value.replace(/[\s.,;:!?-]+/g, "").length >= 8;
+
+const buildNarrationText = (script: unknown, scenes: any[], produtoNome: string, nicho: string) => {
+  if (hasMeaningfulText(script)) return script.trim();
+
+  const sceneNarration = scenes
+    .flatMap((scene) => [scene?.narracao, scene?.texto_tela])
+    .filter(hasMeaningfulText)
+    .map((text) => text.trim());
+
+  if (sceneNarration.length > 0) {
+    return sceneNarration.join(". ");
+  }
+
+  const productLabel = hasMeaningfulText(produtoNome) ? produtoNome.trim() : "seu produto";
+  const nicheLabel = hasMeaningfulText(nicho) ? nicho.trim() : "seu nicho";
+
+  return `Descubra agora como ${productLabel} pode transformar seus resultados em ${nicheLabel}. Veja os benefícios, gere desejo e avance para a próxima etapa agora.`;
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
@@ -402,7 +423,7 @@ Gere também 3 VARIAÇÕES de gancho alternativas no campo ganchos_alternativos 
       if (!jobId) return json({ error: "jobId obrigatório" }, 400);
 
       // Verify ownership
-      const { data: job } = await admin.from("video_jobs").select("user_id, image_url").eq("id", jobId).maybeSingle();
+      const { data: job } = await admin.from("video_jobs").select("user_id, image_url, caption_text, prompt").eq("id", jobId).maybeSingle();
       if (!job) return json({ error: "Job não encontrado" }, 404);
       if (job.user_id !== user.id) {
         const { data: adminRole } = await admin.from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin").maybeSingle();
@@ -410,8 +431,14 @@ Gere também 3 VARIAÇÕES de gancho alternativas no campo ganchos_alternativos 
       }
 
       const sourceImage = job.image_url || imageUrl;
-      const sceneList = scenes || [];
-      const narration = script || sceneList.map((s: any) => s.narracao || s.texto_tela).join(". ");
+      const sceneList = Array.isArray(scenes) ? scenes : [];
+      const narration = buildNarrationText(script || job.caption_text, sceneList, produtoNome, nicho);
+
+      console.log("[commercial] narration prepared", {
+        jobId,
+        length: narration.length,
+        preview: narration.slice(0, 120),
+      });
 
       // ── 2a. Generate scene images ──
       await updateJob(jobId, { status: "generating_images", progress: 30 });
@@ -469,7 +496,7 @@ Gere também 3 VARIAÇÕES de gancho alternativas no campo ganchos_alternativos 
       await updateJob(jobId, { status: "generating_audio", progress: 55 });
       let audioUrl: string | null = null;
 
-      if (ELEVENLABS_API_KEY && narration.trim()) {
+      if (ELEVENLABS_API_KEY && hasMeaningfulText(narration)) {
         try {
           const voiceId = voiceIds[voz || "masculina"] || voiceIds.masculina;
           const res = await fetch(
@@ -487,20 +514,28 @@ Gere também 3 VARIAÇÕES de gancho alternativas no campo ganchos_alternativos 
 
           if (res.ok) {
             const audioBuffer = await res.arrayBuffer();
-            const audioPath = `voiceovers/${jobId}.mp3`;
-            const { error: uploadErr } = await admin.storage
-              .from("audio")
-              .upload(audioPath, audioBuffer, { contentType: "audio/mpeg", upsert: true });
-            if (!uploadErr) {
-              const { data: urlData } = admin.storage.from("audio").getPublicUrl(audioPath);
-              audioUrl = urlData.publicUrl;
+            if (audioBuffer.byteLength >= 5000) {
+              const audioPath = `voiceovers/${jobId}.mp3`;
+              const { error: uploadErr } = await admin.storage
+                .from("audio")
+                .upload(audioPath, audioBuffer, { contentType: "audio/mpeg", upsert: true });
+              if (!uploadErr) {
+                const { data: urlData } = admin.storage.from("audio").getPublicUrl(audioPath);
+                audioUrl = urlData.publicUrl;
+              } else {
+                console.error("Audio upload error:", uploadErr);
+              }
+            } else {
+              console.error("[commercial] audio too small, discarded:", audioBuffer.byteLength);
             }
           } else {
-            console.error("ElevenLabs error:", res.status);
+            console.error("ElevenLabs error:", res.status, await res.text());
           }
         } catch (e) {
           console.error("Audio gen error:", e);
         }
+      } else {
+        console.warn("[commercial] narration skipped: no meaningful text available");
       }
 
       await updateJob(jobId, { progress: 60, audio_url: audioUrl, caption_text: narration });
