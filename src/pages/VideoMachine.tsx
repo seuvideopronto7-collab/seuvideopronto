@@ -488,6 +488,11 @@ const JobCard = ({
 
       {/* Actions */}
       <div className="flex items-center gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+        {job.current_stage === "a_fazer" && job.status === "aguardando" && (
+          <Button variant="default" size="sm" className="h-6 text-[10px] px-2" onClick={() => onProcess(job.id)}>
+            ▶ Processar
+          </Button>
+        )}
         {job.status === "erro" && (
           <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={() => onRetry(job.id)}>
             <RotateCcw className="w-3 h-3 mr-1" /> Retry
