@@ -42,6 +42,7 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <Routes>
+            <Route path="/landing" element={wrapSafe("Landing", <Landing />)} />
             <Route path="/auth" element={wrapSafe("Auth", <Auth />)} />
             <Route path="/login" element={wrapSafe("Login", <Auth />)} />
             <Route
