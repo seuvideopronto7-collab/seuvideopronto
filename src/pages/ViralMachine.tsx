@@ -6,7 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Upload, Flame, Download, Play, Sparkles, Zap, RotateCcw } from "lucide-react";
+import { Upload, Flame, Download, Play, Sparkles, Zap, RotateCcw, Mic, Music } from "lucide-react";
 import { gerarVideoViral, type ViralVideoInput } from "@/lib/viralVideoEngine";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -34,6 +34,8 @@ const ViralMachine = () => {
   const [nicho, setNicho] = useState("geral");
   const [objetivo, setObjetivo] = useState<ViralVideoInput["objetivo"]>("vendas");
   const [narrar, setNarrar] = useState(true);
+  const [vozIA, setVozIA] = useState(false);
+  const [trilhaSonora, setTrilhaSonora] = useState(false);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -65,7 +67,7 @@ const ViralMachine = () => {
 
     try {
       const result = await gerarVideoViral(
-        { imageBase: imagePreview, nicho, objetivo, narrar },
+        { imageBase: imagePreview, nicho, objetivo, narrar, vozIA, trilhaSonora },
         (ratio) => setProgress(Math.round(ratio * 100)),
       );
 
@@ -88,7 +90,7 @@ const ViralMachine = () => {
     } finally {
       setLoading(false);
     }
-  }, [imagePreview, nicho, objetivo, narrar, user]);
+  }, [imagePreview, nicho, objetivo, narrar, vozIA, trilhaSonora, user]);
 
   const handleReset = () => {
     setImagePreview(null);
@@ -105,7 +107,7 @@ const ViralMachine = () => {
         {/* Header */}
         <div className="text-center space-y-3">
           <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white border-0 text-xs px-3 py-1">
-            <Zap className="w-3 h-3 mr-1" /> Zero Custo • 100% no Navegador
+            <Zap className="w-3 h-3 mr-1" /> Voz IA + Trilha Sonora + Vídeo
           </Badge>
           <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-orange-400 via-red-400 to-purple-500 bg-clip-text text-transparent">
             🔥 Viral Machine
@@ -181,15 +183,49 @@ const ViralMachine = () => {
               </div>
             </div>
 
-            <label className="flex items-center gap-2 cursor-pointer text-sm">
-              <input
-                type="checkbox"
-                checked={narrar}
-                onChange={(e) => setNarrar(e.target.checked)}
-                className="rounded border-border"
-              />
-              <span className="text-muted-foreground">🎙️ Narrar com voz do navegador</span>
-            </label>
+            {/* Audio Options */}
+            <div className="space-y-2 rounded-lg border border-border/30 bg-card/30 p-3">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                <Mic className="w-3 h-3" /> Áudio do Vídeo
+              </p>
+              <label className="flex items-center gap-2 cursor-pointer text-sm">
+                <input
+                  type="checkbox"
+                  checked={vozIA}
+                  onChange={(e) => {
+                    setVozIA(e.target.checked);
+                    if (e.target.checked) setNarrar(false);
+                  }}
+                  className="rounded border-border"
+                />
+                <span className="text-muted-foreground">🎙️ Voz profissional (IA)</span>
+                <Badge variant="secondary" className="text-[9px] ml-auto">PRO</Badge>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer text-sm">
+                <input
+                  type="checkbox"
+                  checked={trilhaSonora}
+                  onChange={(e) => setTrilhaSonora(e.target.checked)}
+                  className="rounded border-border"
+                />
+                <span className="text-muted-foreground flex items-center gap-1">
+                  <Music className="w-3 h-3" /> Trilha sonora por nicho
+                </span>
+                <Badge variant="secondary" className="text-[9px] ml-auto">PRO</Badge>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer text-sm">
+                <input
+                  type="checkbox"
+                  checked={narrar && !vozIA}
+                  onChange={(e) => {
+                    setNarrar(e.target.checked);
+                    if (e.target.checked) setVozIA(false);
+                  }}
+                  className="rounded border-border"
+                />
+                <span className="text-muted-foreground">🔊 Voz do navegador (grátis)</span>
+              </label>
+            </div>
 
             {/* Generate Button */}
             <Button
