@@ -10,18 +10,6 @@ export async function resolveStorageUrl(
   expiresIn = 3600
 ): Promise<string | null> {
   try {
-    const { data: publicData } = supabase.storage.from(bucket).getPublicUrl(path);
-    if (publicData?.publicUrl) {
-      // Test if accessible
-      const res = await fetch(publicData.publicUrl, { method: "HEAD" });
-      if (res.ok) return publicData.publicUrl;
-      console.warn(`[Storage] Public URL 403 for ${bucket}/${path}, trying signed URL...`);
-    }
-  } catch (err) {
-    console.warn(`[Storage] Public URL check failed for ${bucket}/${path}:`, err);
-  }
-
-  try {
     const { data, error } = await supabase.storage
       .from(bucket)
       .createSignedUrl(path, expiresIn);

@@ -385,12 +385,10 @@ const ImageToVideoGenerator = () => {
   // ── Upload to storage ──
   const uploadImage = async (): Promise<string> => {
     if (!file) throw new Error("Nenhuma imagem");
+    const { secureUpload } = await import("@/lib/secureStorage");
     const ext = file.name.split(".").pop() || "jpg";
-    const path = `commercial/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-    const { error } = await supabase.storage.from("media-uploads").upload(path, file);
-    if (error) throw error;
-    const { data } = supabase.storage.from("media-uploads").getPublicUrl(path);
-    return data.publicUrl;
+    const subpath = `commercial/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    return secureUpload("media-uploads", subpath, file);
   };
 
   // ── Step 1: Analyze + Generate Script ──

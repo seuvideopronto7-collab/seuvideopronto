@@ -80,12 +80,7 @@ async function resolveDownloadVideo(urlOrPath: string): Promise<string> {
 
   if (!urlOrPath.startsWith("http")) {
     const { data, error } = await supabase.storage.from("videos").createSignedUrl(urlOrPath, 3600);
-
     if (!error && data?.signedUrl) return data.signedUrl;
-
-    const { data: publicData } = supabase.storage.from("videos").getPublicUrl(urlOrPath);
-    if (publicData?.publicUrl) return publicData.publicUrl;
-
     throw new Error("VIDEO_DOWNLOAD_UNAVAILABLE");
   }
 
@@ -131,12 +126,10 @@ export async function resolveVideo(urlOrPath: string): Promise<string> {
     return urlOrPath;
   }
 
-  // If it's a storage path (not a full URL), generate a public URL
+  // If it's a storage path (not a full URL), generate a signed URL
   if (!urlOrPath.startsWith("http")) {
-    const { data } = supabase.storage.from("videos").getPublicUrl(urlOrPath);
-    if (data?.publicUrl) {
-      return getSecureVideoUrl(data.publicUrl);
-    }
+    const { data, error } = await supabase.storage.from("videos").createSignedUrl(urlOrPath, 3600);
+    if (!error && data?.signedUrl) return data.signedUrl;
     return VIDEO_FALLBACK;
   }
 

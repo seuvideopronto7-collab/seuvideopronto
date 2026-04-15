@@ -407,12 +407,10 @@ const VideoGeneratorUI = () => {
 
   const uploadToStorage = async () => {
     if (!file) return imageUrl.trim();
+    const { secureUpload } = await import("@/lib/secureStorage");
     const ext = file.name.split(".").pop() || "jpg";
-    const path = `admin-generator/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-    const { error } = await supabase.storage.from("media-uploads").upload(path, file);
-    if (error) throw error;
-    const { data: urlData } = supabase.storage.from("media-uploads").getPublicUrl(path);
-    return urlData.publicUrl;
+    const subpath = `admin-generator/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    return secureUpload("media-uploads", subpath, file);
   };
 
   const cinematicPrompt = useMemo(

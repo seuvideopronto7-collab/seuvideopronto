@@ -103,17 +103,10 @@ const ImportContent = ({ produto, nicho, publico, dor, beneficio, link, onResult
       let analyzeUrl = "";
 
       if (file) {
+        const { secureUpload } = await import("@/lib/secureStorage");
         const ext = file.name.split(".").pop();
-        const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-        const { error: uploadError } = await supabase.storage
-          .from("media-uploads")
-          .upload(path, file);
-        if (uploadError) throw uploadError;
-
-        const { data: urlData } = supabase.storage
-          .from("media-uploads")
-          .getPublicUrl(path);
-        fileUrl = urlData.publicUrl;
+        const subpath = `imports/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+        fileUrl = await secureUpload("media-uploads", subpath, file);
         if (file.type.startsWith("image/")) {
           try {
             const { videoUrl, fallback } = await generateVideoObrigatorio(fileUrl);
