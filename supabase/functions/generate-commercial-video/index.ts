@@ -733,6 +733,10 @@ Gere também 3 VARIAÇÕES de gancho alternativas no campo ganchos_alternativos 
       }
 
       await updateJob(jobId, { status: "completed", progress: 100, video_url: finalVideoUrl, error: null });
+
+      // ── Increment videos_used ──
+      await admin.rpc("increment_videos_used", { _user_id: user.id }).maybeSingle();
+
       return json({ jobId, status: "completed", message: "Vídeo renderizado com sucesso", videoUrl: finalVideoUrl, audioUrl, images: imageUrls });
     }
 

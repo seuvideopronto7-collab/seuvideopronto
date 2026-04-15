@@ -450,6 +450,12 @@ serve(async (req) => {
       });
     }
 
+    // ── Increment videos_used ──
+    if (callerUserId !== "service_role") {
+      const adminInc = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
+      await adminInc.rpc("increment_videos_used", { _user_id: callerUserId }).maybeSingle();
+    }
+
     return json({ videoUrl, audioUrl, script, provider: "runway", jobId });
   } catch (e) {
     console.error("Error:", e);
