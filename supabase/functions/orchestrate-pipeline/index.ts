@@ -9,6 +9,7 @@ const corsHeaders = {
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
 
 const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
 
@@ -36,12 +37,26 @@ serve(async (req) => {
     });
   }
 
+  const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" };
+
+  // ====== AUTH CHECK ======
+  const authHeader = req.headers.get("Authorization") || "";
+  if (!authHeader.startsWith("Bearer ")) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: jsonHeaders });
+  }
+
+  const authClient = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const { data: { user }, error: authError } = await authClient.auth.getUser();
+  if (authError || !user) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: jsonHeaders });
+  }
+
   try {
     const { jobId } = await req.json();
     if (!jobId) {
-      return new Response(JSON.stringify({ error: "jobId obrigatório" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(JSON.stringify({ error: "jobId obrigatório" }), { status: 400, headers: jsonHeaders });
     }
 
     // Fetch job
@@ -52,24 +67,30 @@ serve(async (req) => {
       .maybeSingle();
 
     if (jobErr || !job) {
-      return new Response(JSON.stringify({ error: "Job não encontrado" }), {
-        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(JSON.stringify({ error: "Job não encontrado" }), { status: 404, headers: jsonHeaders });
+    }
+
+    // Verify ownership: user must own this job or be admin
+    if (job.user_id !== user.id) {
+      // Check admin role
+      const { data: isAdmin } = await admin.rpc("has_role", { _user_id: user.id, _role: "admin" });
+      if (!isAdmin) {
+        return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: jsonHeaders });
+      }
     }
 
     // Idempotência: não reprocessar jobs já concluídos
     if (job.current_stage === "concluido" && job.status === "concluido") {
-      return new Response(JSON.stringify({ ok: true, message: "Job já concluído" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(JSON.stringify({ ok: true, message: "Job já concluído" }), { headers: jsonHeaders });
     }
+
+    const userId = job.user_id;
 
     // ====== ETAPA 1: ROTEIRO ======
     await updateJob(jobId, { current_stage: "roteiro", status: "processando", progress: 10 });
     await log(jobId, "roteiro", "info", "Iniciando geração de roteiro");
 
     try {
-      // Motor interno de roteiro (sem API paga)
       const modeTemplates: Record<string, any> = {
         comercial: {
           hook: `Você ainda não conhece ${job.title}? Isso pode mudar tudo.`,
@@ -114,7 +135,6 @@ serve(async (req) => {
         duracao: "5s",
       }));
 
-      // Salvar roteiro como asset
       await admin.from("job_assets").insert({
         job_id: jobId,
         type: "script",
@@ -128,9 +148,7 @@ serve(async (req) => {
       const msg = e instanceof Error ? e.message : "Erro desconhecido no roteiro";
       await log(jobId, "roteiro", "error", msg);
       await updateJob(jobId, { status: "erro", error_message: msg, progress: 10 });
-      return new Response(JSON.stringify({ ok: false, error: msg, stage: "roteiro" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(JSON.stringify({ ok: false, error: msg, stage: "roteiro" }), { headers: jsonHeaders });
     }
 
     // ====== ETAPA 2: NARRAÇÃO ======
@@ -139,7 +157,6 @@ serve(async (req) => {
       await log(jobId, "narracao", "info", "Iniciando narração");
 
       try {
-        // Buscar roteiro gerado
         const { data: scriptAsset } = await admin
           .from("job_assets")
           .select("meta_json")
@@ -167,14 +184,18 @@ serve(async (req) => {
 
             if (ttsRes.ok) {
               const audioBuffer = await ttsRes.arrayBuffer();
-              const path = `voiceovers/${jobId}/${Date.now()}.mp3`;
+              // Store under user-scoped path for RLS compatibility
+              const path = `${userId}/voiceovers/${jobId}/${Date.now()}.mp3`;
               const { error: upErr } = await admin.storage
                 .from("audio")
                 .upload(path, audioBuffer, { contentType: "audio/mpeg", upsert: true });
 
               if (!upErr) {
-                const { data: urlData } = admin.storage.from("audio").getPublicUrl(path);
-                audioUrl = urlData.publicUrl;
+                // Use signed URL instead of public URL (bucket is private)
+                const { data: signedData } = await admin.storage
+                  .from("audio")
+                  .createSignedUrl(path, 86400); // 24h
+                audioUrl = signedData?.signedUrl || null;
               }
             }
           } catch (ttsErr) {
@@ -198,9 +219,7 @@ serve(async (req) => {
         const msg = e instanceof Error ? e.message : "Erro na narração";
         await log(jobId, "narracao", "error", msg);
         await updateJob(jobId, { status: "erro", error_message: msg, progress: 30 });
-        return new Response(JSON.stringify({ ok: false, error: msg, stage: "narracao" }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return new Response(JSON.stringify({ ok: false, error: msg, stage: "narracao" }), { headers: jsonHeaders });
       }
     } else {
       await updateJob(jobId, { current_stage: "narracao", status: "concluido", progress: 45 });
@@ -212,7 +231,6 @@ serve(async (req) => {
     await log(jobId, "imagens", "info", "Gerando imagens para cenas");
 
     try {
-      // Fallback: usar imagem de referência ou placeholder
       const imageUrl = job.reference_image_url || null;
 
       const { data: scriptAsset } = await admin
@@ -241,9 +259,7 @@ serve(async (req) => {
       const msg = e instanceof Error ? e.message : "Erro nas imagens";
       await log(jobId, "imagens", "error", msg);
       await updateJob(jobId, { status: "erro", error_message: msg, progress: 55 });
-      return new Response(JSON.stringify({ ok: false, error: msg, stage: "imagens" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(JSON.stringify({ ok: false, error: msg, stage: "imagens" }), { headers: jsonHeaders });
     }
 
     // ====== ETAPA 4: VÍDEO ======
@@ -251,18 +267,14 @@ serve(async (req) => {
     await log(jobId, "video", "info", "Iniciando renderização");
 
     try {
-      // Tentar Shotstack se disponível
       const shotstackKey = Deno.env.get("SHOTSTACK_API_KEY");
       let videoUrl: string | null = null;
 
       if (shotstackKey) {
         await log(jobId, "video", "info", "Tentando render via Shotstack");
-        // Simplified: real Shotstack integration would go here
-        // For now, mark as needing client-side Canvas fallback
         await log(jobId, "video", "warning", "Shotstack render: aguardando implementação completa — usando fallback canvas no cliente");
       }
 
-      // Se não tiver videoUrl, marcar para fallback no cliente
       if (!videoUrl) {
         await admin.from("job_assets").insert({
           job_id: jobId,
@@ -278,17 +290,13 @@ serve(async (req) => {
       const msg = e instanceof Error ? e.message : "Erro no render";
       await log(jobId, "video", "error", msg);
       await updateJob(jobId, { status: "erro", error_message: msg, progress: 80 });
-      return new Response(JSON.stringify({ ok: false, error: msg, stage: "video" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(JSON.stringify({ ok: false, error: msg, stage: "video" }), { headers: jsonHeaders });
     }
 
-    return new Response(JSON.stringify({ ok: true, jobId, status: "concluido" }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(JSON.stringify({ ok: true, jobId, status: "concluido" }), { headers: jsonHeaders });
   } catch (e) {
     console.error("Pipeline error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Erro desconhecido" }), {
+    return new Response(JSON.stringify({ error: "Erro interno no pipeline" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
