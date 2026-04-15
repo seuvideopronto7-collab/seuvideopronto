@@ -87,6 +87,18 @@ serve(async (req) => {
     if (authError || !user) return json({ error: "Unauthorized", message: "Usuário não autenticado." }, 401);
     if (isRateLimited(user.id)) return json({ error: "Rate limit excedido. Tente novamente em 1 minuto.", message: "Muitas tentativas em sequência." }, 429);
 
+    // ── Device fraud check ──
+    const deviceFp = req.headers.get("x-device-fingerprint") || "";
+    if (deviceFp) {
+      const { data: deviceCheck } = await admin.rpc("check_device_limit", {
+        _user_id: user.id,
+        _fingerprint: deviceFp,
+      });
+      if (deviceCheck && !deviceCheck.allowed) {
+        return json({ error: "DEVICE_BLOCKED", message: "Dispositivo não autorizado." }, 403);
+      }
+    }
+
     // ── Subscription limit check ──
     const { data: sub } = await admin.from("subscriptions").select("videos_used, videos_limit, plan").eq("user_id", user.id).maybeSingle();
     if (sub && sub.videos_limit !== null && sub.videos_used >= sub.videos_limit) {
