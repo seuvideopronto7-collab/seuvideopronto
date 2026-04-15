@@ -87,6 +87,12 @@ serve(async (req) => {
     if (authError || !user) return json({ error: "Unauthorized", message: "Usuário não autenticado." }, 401);
     if (isRateLimited(user.id)) return json({ error: "Rate limit excedido. Tente novamente em 1 minuto.", message: "Muitas tentativas em sequência." }, 429);
 
+    // ── Subscription limit check ──
+    const { data: sub } = await admin.from("subscriptions").select("videos_used, videos_limit, plan").eq("user_id", user.id).maybeSingle();
+    if (sub && sub.videos_limit !== null && sub.videos_used >= sub.videos_limit) {
+      return json({ error: "LIMIT_REACHED", message: `Você atingiu o limite de ${sub.videos_limit} vídeos do plano ${sub.plan}. Faça upgrade para continuar.` }, 403);
+    }
+
     let body: Record<string, any> = {};
     try {
       body = await req.json();
@@ -727,6 +733,10 @@ Gere também 3 VARIAÇÕES de gancho alternativas no campo ganchos_alternativos 
       }
 
       await updateJob(jobId, { status: "completed", progress: 100, video_url: finalVideoUrl, error: null });
+
+      // ── Increment videos_used ──
+      await admin.rpc("increment_videos_used", { _user_id: user.id }).maybeSingle();
+
       return json({ jobId, status: "completed", message: "Vídeo renderizado com sucesso", videoUrl: finalVideoUrl, audioUrl, images: imageUrls });
     }
 

@@ -244,6 +244,13 @@ serve(async (req) => {
       if (isRateLimited(callerUserId)) {
         return json({ error: "Rate limit excedido. Tente novamente em 1 minuto." }, 429);
       }
+
+      // ── Subscription limit check ──
+      const adminClient = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
+      const { data: sub } = await adminClient.from("subscriptions").select("videos_used, videos_limit, plan").eq("user_id", callerUserId).maybeSingle();
+      if (sub && sub.videos_limit !== null && sub.videos_used >= sub.videos_limit) {
+        return json({ error: "LIMIT_REACHED", message: `Limite de ${sub.videos_limit} vídeos do plano ${sub.plan} atingido. Faça upgrade.` }, 403);
+      }
     }
 
     let body: Record<string, any> = {};
@@ -441,6 +448,12 @@ serve(async (req) => {
         caption_text: script,
         error: null,
       });
+    }
+
+    // ── Increment videos_used ──
+    if (callerUserId !== "service_role") {
+      const adminInc = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
+      await adminInc.rpc("increment_videos_used", { _user_id: callerUserId }).maybeSingle();
     }
 
     return json({ videoUrl, audioUrl, script, provider: "runway", jobId });
