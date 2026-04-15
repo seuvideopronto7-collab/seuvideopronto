@@ -97,16 +97,11 @@ const canvasRenderProvider: Provider<RenderInput, RenderOutput> = {
       recorder.stop();
       const blob = await done;
 
-      // Upload para storage
-      const path = `generated/${input.jobId}-canvas.webm`;
-      const { error: uploadError } = await supabase.storage
-        .from("videos")
-        .upload(path, blob, { contentType: "video/webm", upsert: true });
-
-      if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage.from("videos").getPublicUrl(path);
-      return { ok: true, data: { videoUrl: urlData.publicUrl }, provider: "canvas" };
+      // Upload para storage com path owner-scoped
+      const { secureUpload } = await import("@/lib/secureStorage");
+      const subpath = `generated/${input.jobId}-canvas.webm`;
+      const videoUrl = await secureUpload("videos", subpath, blob, { contentType: "video/webm", upsert: true });
+      return { ok: true, data: { videoUrl }, provider: "canvas" };
     } catch (e) {
       return { ok: false, error: e instanceof Error ? e.message : "Erro no render canvas", provider: "canvas" };
     }

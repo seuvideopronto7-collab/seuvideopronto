@@ -90,10 +90,9 @@ const ViralMachine = () => {
 
       // Persist to Supabase storage
       if (user?.id) {
-        const path = `generated/viral-${Date.now()}.webm`;
-        await supabase.storage
-          .from("videos")
-          .upload(path, result.blob, { contentType: "video/webm", upsert: true });
+        const { secureUpload } = await import("@/lib/secureStorage");
+        const subpath = `generated/viral-${Date.now()}.webm`;
+        await secureUpload("videos", subpath, result.blob, { contentType: "video/webm", upsert: true });
       }
 
       toast.success("🔥 Vídeo viral gerado com sucesso!");
