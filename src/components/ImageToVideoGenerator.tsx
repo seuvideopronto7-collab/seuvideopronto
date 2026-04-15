@@ -239,9 +239,19 @@ const ImageToVideoGenerator = () => {
   const invokeWithTimeout = useCallback(
     async <T,>(functionName: string, body: Record<string, unknown>, timeoutMs = 15000) => {
       let timeoutId: number | undefined;
+      // Generate device fingerprint for anti-fraud
+      const fp = (() => {
+        const raw = [navigator.userAgent, navigator.language, screen.width, screen.height, screen.colorDepth, new Date().getTimezoneOffset(), navigator.hardwareConcurrency ?? "?"].join("|");
+        let h = 0;
+        for (let i = 0; i < raw.length; i++) { h = (h << 5) - h + raw.charCodeAt(i); h |= 0; }
+        return "fp_" + Math.abs(h).toString(36);
+      })();
       try {
         return await Promise.race([
-          supabase.functions.invoke(functionName, { body }) as Promise<{ data: T | null; error: any }>,
+          supabase.functions.invoke(functionName, {
+            body,
+            headers: { "x-device-fingerprint": fp },
+          }) as Promise<{ data: T | null; error: any }>,
           new Promise<never>((_, reject) => {
             timeoutId = window.setTimeout(() => {
               reject(new Error("Tempo limite atingido. Tente novamente."));

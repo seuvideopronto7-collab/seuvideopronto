@@ -38,6 +38,39 @@ export type Database = {
         }
         Relationships: []
       }
+      device_sessions: {
+        Row: {
+          created_at: string
+          device_fingerprint: string
+          device_label: string
+          id: string
+          ip_address: string | null
+          is_blocked: boolean
+          last_active_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          device_fingerprint: string
+          device_label?: string
+          id?: string
+          ip_address?: string | null
+          is_blocked?: boolean
+          last_active_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          device_fingerprint?: string
+          device_label?: string
+          id?: string
+          ip_address?: string | null
+          is_blocked?: boolean
+          last_active_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       integrations: {
         Row: {
           access_token: string | null
@@ -412,6 +445,7 @@ export type Database = {
           updated_at: string | null
           user_id: string | null
           video_url: string | null
+          watermark_text: string | null
         }
         Insert: {
           audio_url?: string | null
@@ -428,6 +462,7 @@ export type Database = {
           updated_at?: string | null
           user_id?: string | null
           video_url?: string | null
+          watermark_text?: string | null
         }
         Update: {
           audio_url?: string | null
@@ -444,6 +479,7 @@ export type Database = {
           updated_at?: string | null
           user_id?: string | null
           video_url?: string | null
+          watermark_text?: string | null
         }
         Relationships: []
       }
@@ -482,6 +518,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_device_limit: {
+        Args: { _fingerprint: string; _user_id: string }
+        Returns: Json
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
