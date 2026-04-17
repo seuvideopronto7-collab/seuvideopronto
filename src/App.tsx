@@ -30,6 +30,7 @@ import ImageToVideo from "./pages/ImageToVideo";
 import TransformImage from "./pages/TransformImage";
 import VideoMachine from "./pages/VideoMachine";
 import ViralMachine from "./pages/ViralMachine";
+import MetricsDashboard from "./pages/MetricsDashboard";
 
 const queryClient = new QueryClient();
 
@@ -263,6 +264,17 @@ const App = () => (
                   "Viral Machine",
                   <ProtectedRoute>
                     <ViralMachine />
+                  </ProtectedRoute>,
+                )
+              }
+            />
+            <Route
+              path="/dashboard/metrics"
+              element={
+                wrapSafe(
+                  "Metrics Dashboard",
+                  <ProtectedRoute>
+                    <MetricsDashboard />
                   </ProtectedRoute>,
                 )
               }

@@ -1,6 +1,7 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Play, Sparkles } from "lucide-react";
+import { BarChart3, Play, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import PipelineV2Button from "./PipelineV2Button";
@@ -11,6 +12,7 @@ interface HeroSectionProps {
 
 const HeroSection = ({ onOpenGenerator }: HeroSectionProps) => {
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
   const handleQuickGenerate = async () => {
     try {
@@ -91,6 +93,16 @@ const HeroSection = ({ onOpenGenerator }: HeroSectionProps) => {
             className="w-full sm:w-auto border-border/50 text-muted-foreground hover:text-foreground px-8 py-6 rounded-xl"
           >
             {loading ? "⏳ Gerando..." : "🚀 Teste Rápido"}
+          </Button>
+
+          <Button
+            size="lg"
+            variant="outline"
+            onClick={() => navigate("/dashboard/metrics")}
+            className="w-full sm:w-auto border-border/50 text-muted-foreground hover:text-foreground px-8 py-6 rounded-xl"
+          >
+            <BarChart3 className="w-4 h-4 mr-2" />
+            Performance
           </Button>
         </div>
       </div>
