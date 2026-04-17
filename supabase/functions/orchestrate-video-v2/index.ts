@@ -67,34 +67,33 @@ Deno.serve(async (req) => {
       attempts.copy_fallback = true;
     }
 
-    // 2) VOZ V2 (3 camadas: ElevenLabs → OpenAI → fallback local MP3)
-    let audioUrl = "/audio/voz-padrao.mp3";
-    let voiceProvider = "fallback_local";
+    // 2) VOZ PRO (3 camadas: ElevenLabs → OpenAI → erro)
+    // Nova função generate-voice retorna áudio persistido em bucket público.
+    let audioUrl = "";
+    let voiceProvider = "none";
     try {
-      const voiceRes = await admin.functions.invoke("generate-voiceover-v2", {
-        body: { text: script, jobId: `orch-${userId}-${Date.now()}` },
+      const voiceRes = await admin.functions.invoke("generate-voice", {
+        body: { text: script, persist: true, jobId: `orch-${userId}-${Date.now()}` },
       });
       if (voiceRes.error) throw voiceRes.error;
       const vd = voiceRes.data as any;
-      if (vd?.ok && vd.audioUrl && vd.audioUrl !== "__browser_tts__") {
+      if (vd?.ok && vd.audioUrl) {
         audioUrl = vd.audioUrl;
         voiceProvider = vd.provider ?? "unknown";
+        attempts.voice = { ok: true, provider: voiceProvider, bytes: vd.bytes };
       } else {
-        audioUrl = "/audio/voz-padrao.mp3";
-        voiceProvider = "fallback_local";
+        throw new Error(vd?.error || "voice_no_url");
       }
-      attempts.voice = { ok: true, provider: voiceProvider };
     } catch (e) {
-      audioUrl = "/audio/voz-padrao.mp3";
-      voiceProvider = "fallback_local";
+      voiceProvider = "failed";
       attempts.voice = { ok: false, error: (e as Error).message };
     }
 
-    // 3) TRILHA — local pré-gravada por objetivo
+    // 3) TRILHA — CDN online (Pixabay), sem MP3 local
     const trilhaMap: Record<string, string> = {
-      vendas: "/audio/trilha-vendas.mp3",
-      autoridade: "/audio/trilha-autoridade.mp3",
-      viral: "/audio/trilha-viral.mp3",
+      vendas: "https://cdn.pixabay.com/download/audio/2022/03/15/audio_115b9b6c4c.mp3",
+      autoridade: "https://cdn.pixabay.com/download/audio/2022/10/25/audio_946f5e7c6e.mp3",
+      viral: "https://cdn.pixabay.com/download/audio/2023/03/20/audio_5f1b64fcb7.mp3",
     };
     const trilha = trilhaMap[objetivo] ?? trilhaMap.vendas;
 
