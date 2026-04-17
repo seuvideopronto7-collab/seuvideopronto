@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Play, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import PipelineV2Button from "./PipelineV2Button";
 
 interface HeroSectionProps {
   onOpenGenerator: () => void;
@@ -80,6 +81,8 @@ const HeroSection = ({ onOpenGenerator }: HeroSectionProps) => {
             Gerar Vídeo Cinematográfico
           </Button>
 
+          <PipelineV2Button />
+
           <Button
             size="lg"
             variant="outline"
@@ -87,7 +90,7 @@ const HeroSection = ({ onOpenGenerator }: HeroSectionProps) => {
             disabled={loading}
             className="w-full sm:w-auto border-border/50 text-muted-foreground hover:text-foreground px-8 py-6 rounded-xl"
           >
-            {loading ? "⏳ Gerando..." : "🚀 Gerar Teste Rápido"}
+            {loading ? "⏳ Gerando..." : "🚀 Teste Rápido"}
           </Button>
         </div>
       </div>
