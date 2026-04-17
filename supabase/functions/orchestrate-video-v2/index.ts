@@ -67,21 +67,26 @@ Deno.serve(async (req) => {
       attempts.copy_fallback = true;
     }
 
-    // 2) VOZ V2 (3 camadas: ElevenLabs → OpenAI → browser)
-    let audioUrl = "__browser_tts__";
-    let voiceProvider = "browser";
+    // 2) VOZ V2 (3 camadas: ElevenLabs → OpenAI → fallback local MP3)
+    let audioUrl = "/audio/voz-padrao.mp3";
+    let voiceProvider = "fallback_local";
     try {
       const voiceRes = await admin.functions.invoke("generate-voiceover-v2", {
         body: { text: script, jobId: `orch-${userId}-${Date.now()}` },
       });
       if (voiceRes.error) throw voiceRes.error;
       const vd = voiceRes.data as any;
-      if (vd?.ok && vd.audioUrl) {
+      if (vd?.ok && vd.audioUrl && vd.audioUrl !== "__browser_tts__") {
         audioUrl = vd.audioUrl;
         voiceProvider = vd.provider ?? "unknown";
+      } else {
+        audioUrl = "/audio/voz-padrao.mp3";
+        voiceProvider = "fallback_local";
       }
       attempts.voice = { ok: true, provider: voiceProvider };
     } catch (e) {
+      audioUrl = "/audio/voz-padrao.mp3";
+      voiceProvider = "fallback_local";
       attempts.voice = { ok: false, error: (e as Error).message };
     }
 

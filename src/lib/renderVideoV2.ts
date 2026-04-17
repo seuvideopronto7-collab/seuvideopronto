@@ -1,6 +1,5 @@
 // Render no front: Canvas + MediaRecorder + mix de áudio (voz + trilha)
-// + fallback de TTS browser quando a edge devolve "__browser_tts__".
-import { isBrowserTTS, falarNoBrowser } from "./voiceEngineV2";
+// SEMPRE usa áudio real (voz-padrao.mp3 ou voz gerada). Browser TTS removido.
 
 export interface RenderV2Input {
   script: string;
@@ -66,9 +65,8 @@ export async function renderVideoV2(input: RenderV2Input): Promise<RenderV2Resul
   canvas.height = height;
   const ctx = canvas.getContext("2d")!;
 
-  // Áudio (voz + trilha) com mix via WebAudio
-  const usingBrowserTTS = isBrowserTTS(input.audioUrl);
-  const voiceEl = usingBrowserTTS ? null : await loadAudio(input.audioUrl);
+  // Áudio (voz + trilha) com mix via WebAudio — sempre tenta carregar voz real
+  const voiceEl = await loadAudio(input.audioUrl);
   const musicEl = await loadAudio(input.trilha);
 
   const AC: typeof AudioContext =
@@ -124,10 +122,7 @@ export async function renderVideoV2(input: RenderV2Input): Promise<RenderV2Resul
   if (musicEl) {
     try { await musicEl.play(); } catch { /* ignore */ }
   }
-  if (usingBrowserTTS) {
-    // dispara TTS browser em paralelo (sem bloquear)
-    falarNoBrowser(input.script).catch(() => {});
-  }
+  // Browser TTS removido — sempre usamos áudio real (voz-padrao.mp3 fallback)
 
   // Loop de animação
   let frame = 0;
