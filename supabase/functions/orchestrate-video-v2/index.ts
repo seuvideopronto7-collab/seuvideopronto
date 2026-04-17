@@ -73,7 +73,12 @@ Deno.serve(async (req) => {
     let voiceProvider = "none";
     try {
       const voiceRes = await admin.functions.invoke("generate-voice", {
-        body: { text: script, persist: true, jobId: `orch-${userId}-${Date.now()}` },
+        body: {
+          text: script,
+          persist: true,
+          jobId: `orch-${userId}-${Date.now()}`,
+          emotion: objetivo, // vendas | autoridade | viral
+        },
       });
       if (voiceRes.error) throw voiceRes.error;
       const vd = voiceRes.data as any;
