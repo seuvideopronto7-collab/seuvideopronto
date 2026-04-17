@@ -1,29 +1,37 @@
-// Fallback de trilha sonora — quando a API de música falha (402/429/timeout),
-// retorna uma URL de trilha local pré-gravada por objetivo.
-// As trilhas vivem em /public/audio/ — se o arquivo não existir, retorna null
-// e o consumidor decide se renderiza sem música (após avisar o usuário).
+// Trilhas online (CDN Pixabay) — sem MP3 local. Sempre disponíveis.
+// Mapa por OBJETIVO e por NICHO comum.
 
 export type ObjetivoTrilha = "vendas" | "autoridade" | "viral";
 
-const TRILHAS_LOCAIS: Record<ObjetivoTrilha, string> = {
-  vendas: "/audio/trilha-vendas.mp3",
-  autoridade: "/audio/trilha-autoridade.mp3",
-  viral: "/audio/trilha-viral.mp3",
+const TRILHAS_CDN: Record<ObjetivoTrilha, string> = {
+  vendas: "https://cdn.pixabay.com/download/audio/2022/03/15/audio_115b9b6c4c.mp3",
+  autoridade: "https://cdn.pixabay.com/download/audio/2022/10/25/audio_946f5e7c6e.mp3",
+  viral: "https://cdn.pixabay.com/download/audio/2023/03/20/audio_5f1b64fcb7.mp3",
 };
 
-/**
- * Retorna a URL de trilha local para o objetivo informado.
- * Usuário deve garantir que esses arquivos existam em /public/audio/
- * (ou substituir pelo seu próprio acervo).
- */
+const TRILHAS_BY_NICHO: Record<string, string> = {
+  saude: TRILHAS_CDN.autoridade,
+  pet: TRILHAS_CDN.viral,
+  emagrecimento: TRILHAS_CDN.vendas,
+  beleza: TRILHAS_CDN.viral,
+  fitness: TRILHAS_CDN.vendas,
+  financas: TRILHAS_CDN.autoridade,
+};
+
+/** Retorna URL de trilha CDN (sempre disponível) por objetivo. */
 export function getTrilhaLocal(objetivo: ObjetivoTrilha = "vendas"): string {
-  return TRILHAS_LOCAIS[objetivo] || TRILHAS_LOCAIS.vendas;
+  return TRILHAS_CDN[objetivo] || TRILHAS_CDN.vendas;
 }
 
-/**
- * Verifica se a trilha local está acessível antes de tentar usá-la.
- * Útil pra evitar 404 no render.
- */
+/** Retorna trilha CDN considerando nicho > objetivo. */
+export function pickTrilha(objetivo?: string, nicho?: string): string {
+  if (nicho && TRILHAS_BY_NICHO[nicho.toLowerCase()]) {
+    return TRILHAS_BY_NICHO[nicho.toLowerCase()];
+  }
+  return getTrilhaLocal((objetivo as ObjetivoTrilha) ?? "vendas");
+}
+
+/** Verifica acessibilidade (HEAD request) — útil pra evitar 404 silencioso. */
 export async function trilhaLocalDisponivel(objetivo: ObjetivoTrilha = "vendas"): Promise<boolean> {
   try {
     const res = await fetch(getTrilhaLocal(objetivo), { method: "HEAD" });
