@@ -59,7 +59,7 @@ export default function PipelineV2Button() {
         size="lg"
         onClick={run}
         disabled={loading}
-        className="w-full sm:w-auto bg-gradient-to-r from-primary to-red-600 hover:opacity-90 text-primary-foreground text-lg px-8 py-6 rounded-xl shadow-[0_0_30px_-5px_hsl(var(--primary)/0.5)]"
+        className="w-full sm:w-auto bg-gradient-to-r from-primary to-destructive hover:opacity-90 text-primary-foreground text-lg px-8 py-6 rounded-xl shadow-[0_0_30px_-5px_hsl(var(--primary)/0.5)]"
       >
         <Zap className="w-5 h-5 mr-2" />
         {loading ? `Gerando... ${progress}%` : "⚡ Modo Máquina V2"}
