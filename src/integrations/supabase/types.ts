@@ -192,6 +192,62 @@ export type Database = {
           },
         ]
       }
+      job_steps: {
+        Row: {
+          attempt_count: number
+          created_at: string
+          error_message: string | null
+          fallback_used: boolean
+          finished_at: string | null
+          id: string
+          job_id: string
+          meta_json: Json
+          provider: string | null
+          started_at: string | null
+          status: Database["public"]["Enums"]["job_step_status"]
+          step: Database["public"]["Enums"]["job_step_name"]
+          updated_at: string
+        }
+        Insert: {
+          attempt_count?: number
+          created_at?: string
+          error_message?: string | null
+          fallback_used?: boolean
+          finished_at?: string | null
+          id?: string
+          job_id: string
+          meta_json?: Json
+          provider?: string | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["job_step_status"]
+          step: Database["public"]["Enums"]["job_step_name"]
+          updated_at?: string
+        }
+        Update: {
+          attempt_count?: number
+          created_at?: string
+          error_message?: string | null
+          fallback_used?: boolean
+          finished_at?: string | null
+          id?: string
+          job_id?: string
+          meta_json?: Json
+          provider?: string | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["job_step_status"]
+          step?: Database["public"]["Enums"]["job_step_name"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_steps_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pipeline_jobs: {
         Row: {
           aspect_ratio: string
@@ -569,6 +625,15 @@ export type Database = {
         | "concluido"
         | "erro"
         | "cancelado"
+      job_step_name:
+        | "script"
+        | "voice"
+        | "scenes"
+        | "motion"
+        | "sound"
+        | "render"
+        | "delivery"
+      job_step_status: "pending" | "running" | "done" | "error" | "skipped"
       log_level: "info" | "warning" | "error"
     }
     CompositeTypes: {
@@ -731,6 +796,16 @@ export const Constants = {
         "erro",
         "cancelado",
       ],
+      job_step_name: [
+        "script",
+        "voice",
+        "scenes",
+        "motion",
+        "sound",
+        "render",
+        "delivery",
+      ],
+      job_step_status: ["pending", "running", "done", "error", "skipped"],
       log_level: ["info", "warning", "error"],
     },
   },
