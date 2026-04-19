@@ -49,8 +49,19 @@ const pricingPlans: { key: PlanId; cta: string }[] = [
 
 const Landing = () => {
   const navigate = useNavigate();
-  const handleCTA = () => navigate("/auth");
-  const scrollToPlanos = () => document.getElementById("planos")?.scrollIntoView({ behavior: "smooth" });
+
+  useEffect(() => {
+    track("landing_view");
+  }, []);
+
+  const handleCTA = (location = "unknown") => {
+    track("cta_clicked", { location, target: "/auth" });
+    navigate("/auth");
+  };
+  const scrollToPlanos = (location = "unknown") => {
+    track("cta_clicked", { location, target: "planos" });
+    document.getElementById("planos")?.scrollIntoView({ behavior: "smooth" });
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
