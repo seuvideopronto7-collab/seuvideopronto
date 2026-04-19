@@ -6,6 +6,8 @@ import { toast } from "sonner";
 import { Eye, EyeOff, Loader2, LogIn, UserPlus, Zap, Shield, Video } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { track } from "@/lib/analytics";
+import { getStoredUTM, clearUTM } from "@/lib/utm";
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -36,9 +38,12 @@ const Auth = () => {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
+        track("error_shown", { step: "login", message: error.message });
         toast.error(error.message === "Invalid login credentials"
           ? "Email ou senha inválidos."
           : error.message);
+      } else {
+        track("login_completed", { method: "email" });
       }
       // Navigation handled by useEffect watching user state
     } catch (err) {
@@ -59,19 +64,24 @@ const Auth = () => {
       return;
     }
 
+    track("signup_started", { method: "email" });
     setLoading(true);
     try {
+      const utm = getStoredUTM();
       const { error } = await supabase.auth.signUp({
         email: form.email,
         password: form.password,
         options: {
-          data: { full_name: form.fullName, whatsapp: form.whatsapp },
+          data: { full_name: form.fullName, whatsapp: form.whatsapp, ...utm },
           emailRedirectTo: window.location.origin,
         },
       });
       if (error) {
+        track("error_shown", { step: "signup", message: error.message });
         toast.error(error.message);
       } else {
+        track("signup_completed", { method: "email", ...utm });
+        clearUTM();
         toast.success("Conta criada! Verifique seu e-mail para confirmar.");
       }
     } catch (err) {
