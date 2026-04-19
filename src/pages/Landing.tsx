@@ -1,6 +1,8 @@
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { PLAN_DEFS, type PlanId } from "@/lib/plans";
+import { track } from "@/lib/analytics";
 import {
   Rocket,
   Zap,
