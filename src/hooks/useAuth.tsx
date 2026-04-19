@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
+import { identifyUser, resetUser, track } from "@/lib/analytics";
 
 interface Profile {
   id: string;
@@ -109,6 +110,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setSession(session);
           setUser(session?.user ?? null);
           if (session?.user) {
+            identifyUser(session.user.id, { email: session.user.email });
             setTimeout(() => fetchProfile(session.user.id, session.user.email), 0);
           } else {
             setProfile(null);
@@ -154,6 +156,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signOut = async () => {
     try {
+      track("logout");
       await supabase.auth.signOut();
     } catch (error) {
       console.error("PDG AUTH ERROR: signOut", error);
@@ -163,6 +166,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setProfile(null);
       setIsAdmin(false);
       setIsFounder(false);
+      resetUser();
     }
   };
 

@@ -1,6 +1,8 @@
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { PLAN_DEFS, type PlanId } from "@/lib/plans";
+import { track } from "@/lib/analytics";
 import {
   Rocket,
   Zap,
@@ -47,8 +49,19 @@ const pricingPlans: { key: PlanId; cta: string }[] = [
 
 const Landing = () => {
   const navigate = useNavigate();
-  const handleCTA = () => navigate("/auth");
-  const scrollToPlanos = () => document.getElementById("planos")?.scrollIntoView({ behavior: "smooth" });
+
+  useEffect(() => {
+    track("landing_view");
+  }, []);
+
+  const handleCTA = (location = "unknown") => {
+    track("cta_clicked", { location, target: "/auth" });
+    navigate("/auth");
+  };
+  const scrollToPlanos = (location = "unknown") => {
+    track("cta_clicked", { location, target: "planos" });
+    document.getElementById("planos")?.scrollIntoView({ behavior: "smooth" });
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
@@ -65,7 +78,7 @@ const Landing = () => {
             <Button variant="ghost" size="sm" onClick={() => navigate("/auth")}>
               Entrar
             </Button>
-            <Button size="sm" onClick={scrollToPlanos} className="bg-primary hover:bg-primary/90">
+            <Button size="sm" onClick={() => scrollToPlanos("button")} className="bg-primary hover:bg-primary/90">
               Ver planos
             </Button>
           </div>
@@ -95,13 +108,13 @@ const Landing = () => {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
             <Button
               size="lg"
-              onClick={scrollToPlanos}
+              onClick={() => scrollToPlanos("button")}
               className="text-lg px-8 py-6 bg-primary hover:bg-primary/90 shadow-[0_0_40px_-8px_hsl(var(--primary)/0.5)] transition-all hover:scale-105"
             >
               <Rocket className="w-5 h-5 mr-2" />
               Começar agora por R$29/mês
             </Button>
-            <Button variant="outline" size="lg" onClick={handleCTA} className="text-base px-6 py-5 border-border/40">
+            <Button variant="outline" size="lg" onClick={() => handleCTA("button")} className="text-base px-6 py-5 border-border/40">
               <Play className="w-4 h-4 mr-2" />
               Ver exemplo
             </Button>
@@ -173,7 +186,7 @@ const Landing = () => {
           </div>
 
           <div className="text-center">
-            <Button onClick={scrollToPlanos} variant="outline" className="border-primary/30 text-primary hover:bg-primary/10">
+            <Button onClick={() => scrollToPlanos("button")} variant="outline" className="border-primary/30 text-primary hover:bg-primary/10">
               <Wand2 className="w-4 h-4 mr-2" /> Quero transformar meus produtos
             </Button>
           </div>
@@ -305,7 +318,7 @@ const Landing = () => {
                   <Button
                     className={`w-full h-11 font-semibold ${plan.highlight ? "bg-primary hover:bg-primary/90 shadow-lg" : ""}`}
                     variant={plan.highlight ? "default" : "secondary"}
-                    onClick={handleCTA}
+                    onClick={() => handleCTA("button")}
                   >
                     {cta.includes("Começar") ? cta : `Assinar ${plan.label}`}
                     <ArrowRight className="w-4 h-4 ml-1" />
@@ -382,7 +395,7 @@ const Landing = () => {
           </p>
           <Button
             size="lg"
-            onClick={scrollToPlanos}
+            onClick={() => scrollToPlanos("button")}
             className="text-lg px-10 py-7 bg-primary hover:bg-primary/90 shadow-[0_0_50px_-8px_hsl(var(--primary)/0.5)] transition-all hover:scale-105"
           >
             <Rocket className="w-5 h-5 mr-2" />
