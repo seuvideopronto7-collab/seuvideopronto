@@ -15,6 +15,8 @@ import { Sparkles, Zap, Download, Flame, Mic2, Video, Palette, Link2, Loader2 } 
 import { buildFallbackDarkFlow, createDarkFlowGenerator, type DarkFlowResult } from "@/lib/darkFlow";
 import { buildVideoStructure, buildTimeline, generateVisualPrompt, type VideoTimeline, type VideoScene, type GenerationStage, STAGE_LABELS } from "@/lib/videoPipeline";
 import VideoPreview from "@/components/VideoPreview";
+import { generateVideoWithFallback, ENGINE_LABELS } from "@/lib/videoFallbackEngine";
+import { generatePosterImage } from "@/lib/posterImage";
 
 const DarkFlowEngine = () => {
   const [form, setForm] = useState({
