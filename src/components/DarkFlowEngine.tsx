@@ -340,12 +340,86 @@ const DarkFlowEngine = () => {
 
       {/* Video Preview */}
       {videoTimeline && videoTimeline.cenas.length > 0 && (
-        <VideoPreview
-          timeline={videoTimeline}
-          onGenerateVideo={() => {
-            toast.message("Motor de exportação MP4 em preparação. Estrutura do vídeo está pronta!");
-          }}
-        />
+        <>
+          <VideoPreview
+            timeline={videoTimeline}
+            isGenerating={exportingVideo}
+            onGenerateVideo={async () => {
+              if (exportingVideo) return;
+              setExportingVideo(true);
+              setExportProgress(0);
+              setExportedVideoUrl(null);
+              try {
+                const poster = await generatePosterImage({
+                  background: result?.design?.fundo,
+                  textColor: result?.design?.texto,
+                  accent: result?.design?.destaque,
+                  brand: form.marca || form.produto,
+                  headline: result?.hook || videoTimeline.titulo,
+                  subhead: result?.contexto || result?.solucao,
+                  cta: result?.cta || videoTimeline.cta,
+                });
+                const out = await generateVideoWithFallback(
+                  {
+                    imageUrl: poster,
+                    duration: 8,
+                    format: "9:16",
+                    animation: "kenburns",
+                    headline: result?.hook,
+                    subhead: result?.contexto,
+                    cta: result?.cta,
+                    productType: form.produto,
+                    style: form.objetivo,
+                    prompt: result?.imagem?.prompt,
+                  },
+                  {
+                    enableAI: true,
+                    onProgress: (r) => setExportProgress(Math.round(r * 100)),
+                    onEngineChange: (_e, label) => setExportEngine(label),
+                  },
+                );
+                if (out.videoUrl) {
+                  setExportedVideoUrl(out.videoUrl);
+                  if (out.engine === "ai") {
+                    toast.success("🎬 Vídeo gerado com IA Premium");
+                  } else {
+                    toast.success(`🎬 Vídeo gerado (${ENGINE_LABELS[out.engine!]})`);
+                  }
+                } else {
+                  toast.error("Falha ao gerar vídeo");
+                }
+              } catch (err: any) {
+                console.error(err);
+                toast.error(err?.message || "Erro ao exportar vídeo");
+              } finally {
+                setExportingVideo(false);
+              }
+            }}
+          />
+          {exportingVideo && (
+            <div className="text-xs text-muted-foreground">
+              {exportEngine || "Iniciando"} • {exportProgress}%
+            </div>
+          )}
+          {exportedVideoUrl && (
+            <div className="space-y-2">
+              <video src={exportedVideoUrl} controls className="w-full rounded-xl border border-border/40" />
+              <div className="flex gap-2">
+                <Button variant="viral" size="sm" onClick={() => {
+                  const a = document.createElement("a");
+                  a.href = exportedVideoUrl;
+                  a.download = "dark-flow-video.mp4";
+                  a.click();
+                }}>
+                  <Download className="w-3 h-3" /> Baixar MP4
+                </Button>
+                <span className="text-xs text-muted-foreground self-center">
+                  {exportEngine === ENGINE_LABELS.ai ? "Gerado com IA" : "Gerado no modo gratuito"}
+                </span>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {result && (
