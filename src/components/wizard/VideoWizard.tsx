@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { usePlan } from "@/hooks/usePlan";
 import { getVideoDailyKey } from "@/lib/plans";
 import { renderVideoFromImage } from "@/lib/videoRender";
+import { generateVideoWithFallback } from "@/lib/videoFallbackEngine";
 import PlanBlockedDialog from "@/components/PlanBlockedDialog";
 import { addSystemLog } from "@/lib/systemLog";
 import Stepper from "./Stepper";
@@ -123,44 +124,23 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
     return /\.(mp4|webm|mov|m4v)$/.test(clean);
   };
 
-  const generateVideoFromImage = async (imageUrl: string) => {
-    try {
-        const { data, error } = await supabase.functions.invoke("generate-video", {
-          body: {
-            imageUrl,
-            prompt: "Vídeo cinematográfico a partir da imagem",
-            productType: "Outro",
-            style: "Luxo",
-            createJob: false,
-            duration: 5,
-            format: "16:9",
-          },
-        });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      if (data?.videoUrl) return data.videoUrl as string;
-    } catch (err) {
-      console.warn("Provedor externo indisponivel, usando motor local.", err);
-    }
-    return renderVideoFromImage(imageUrl, { durationSec: 5, fps: 30 });
-  };
-
   const generateVideoObrigatorio = async (fallbackImageUrl: string) => {
-    let attempts = 0;
-    let lastError: unknown;
-
-    while (attempts < 3) {
-      try {
-        const generatedUrl = await generateVideoFromImage(fallbackImageUrl);
-        return { videoUrl: generatedUrl, error: null };
-      } catch (err) {
-        lastError = err;
-        attempts += 1;
-      }
-    }
-
-    console.warn("Falha ao gerar video apos 3 tentativas", lastError);
-    return { videoUrl: null, error: lastError };
+    const out = await generateVideoWithFallback(
+      {
+        imageUrl: fallbackImageUrl,
+        duration: 5,
+        format: "9:16",
+        animation: "kenburns",
+        productType: "Outro",
+        style: "Luxo",
+      },
+      { enableAI: true },
+    );
+    return {
+      videoUrl: out.videoUrl,
+      error: out.status === "failed" ? new Error(out.errors.join(" | ")) : null,
+      engine: out.engine,
+    };
   };
 
   const persistProduto = async (override?: { status?: "rascunho" | "finalizado" | "publicado"; formData?: Partial<typeof formData> }) => {
@@ -399,19 +379,23 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
           if (isImageUpload) {
             setImageUrl(fileUrl);
             try {
-              const { videoUrl: generatedUrl, error } = await generateVideoObrigatorio(fileUrl);
+              const { videoUrl: generatedUrl, error, engine } = await generateVideoObrigatorio(fileUrl);
               analyzeUrl = generatedUrl || fileUrl;
               setVideoUrl(generatedUrl);
               void handleGenerateViralPack({ imageUrl: fileUrl, videoUrl: generatedUrl || undefined, formData: resolvedFormData });
-                if (error) {
-                  toast.warning("Render local aplicado para gerar MP4 real.");
+                if (engine === "local") {
+                  toast.message("API indisponível, usando modo gratuito local 🎬");
+                } else if (engine === "ai") {
+                  toast.success("🎬 Vídeo gerado com IA Premium");
+                } else if (error) {
+                  toast.warning("Render aplicado em modo de fallback.");
                 }
               } catch (err) {
                 console.error(err);
                 analyzeUrl = fileUrl;
                 setVideoUrl(null);
                 void handleGenerateViralPack({ imageUrl: fileUrl, formData: resolvedFormData });
-                toast.error("Falha ao renderizar MP4 real. Tente novamente.");
+                toast.error("Falha ao gerar vídeo. Tente novamente.");
               }
           } else {
             analyzeUrl = fileUrl;

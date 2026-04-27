@@ -8,6 +8,7 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { renderVideoFromImage } from "@/lib/videoRender";
+import { generateVideoWithFallback, ENGINE_LABELS } from "@/lib/videoFallbackEngine";
 import { gerarConteudoIA } from "@/lib/aiEngine";
 import { buildCinematicPrompt } from "@/lib/buildCinematicPrompt";
 import { Film, Loader2, Mic2, Music2, Pause, Play, Sparkles, Upload, Wand2 } from "lucide-react";
@@ -189,22 +190,31 @@ const EditorProReal = () => {
         image: string;
         prompt: string;
       }) => {
-        void prompt;
-        return renderVideoFromImage(image, {
-          durationSec: duration,
-          fps: 30,
-          width: ratio.width,
-          height: ratio.height,
-          animation: enableZoom ? (animation as any) : "none",
-          fadeInSec: fadeIn,
-          fadeOutSec: fadeOut,
-          narrationUrl,
-          musicUrl,
-          narrationVolume: narrationVolume / 100,
-          musicVolume: musicVolume / 100,
-          enableDucking: true,
-          onProgress: (ratio) => setRenderProgress(Math.round(ratio * 100)),
-        });
+        const out = await generateVideoWithFallback(
+          {
+            imageUrl: image,
+            duration,
+            format: ratio.id as any,
+            animation: enableZoom ? (animation as any) : "none",
+            headline,
+            subhead,
+            cta,
+            narrationUrl: narrationUrl || undefined,
+            musicUrl: musicUrl || undefined,
+            prompt,
+          },
+          {
+            enableAI: true,
+            onProgress: (r) => setRenderProgress(Math.round(r * 100)),
+            onEngineChange: (_e, label) => {
+              if (label === ENGINE_LABELS.local) {
+                toast.message("API indisponível, usando modo gratuito local 🎬");
+              }
+            },
+          },
+        );
+        if (!out.videoUrl) throw new Error(out.errors.join(" | ") || "Falha ao gerar vídeo");
+        return out.videoUrl;
       };
 
       const gerarNarracao = async (roteiro: any) => {

@@ -726,20 +726,29 @@ const VideoGeneratorUI = () => {
 
       // ── STEP 5+6: Pipeline (imagens → voz → render → storage) ──
       toast.info("🎬 Etapa 5-6/6: Gerando cenas, narração e montando vídeo...");
-      startVideoPipeline({
-        jobId: id,
-        imageUrl: resolvedImageUrl,
-        script: narration,
-        scenes: scenesFromAnalysis,
-      }).catch((err) => {
-        console.error("[auto-pipeline] pipeline error:", err);
-      });
-
-      toast.success("🚀 Pipeline automático iniciado! Acompanhe o progresso →");
+      try {
+        await startVideoPipeline({
+          jobId: id,
+          imageUrl: resolvedImageUrl,
+          script: narration,
+          scenes: scenesFromAnalysis,
+        });
+        toast.success("🚀 Pipeline iniciado! Acompanhe o progresso →");
+      } catch (pipelineErr) {
+        console.error("[auto-pipeline] startVideoPipeline falhou — caindo para render local:", pipelineErr);
+        toast.message("API indisponível, usando modo gratuito local 🎬");
+        await renderLocalVideo();
+      }
     } catch (error: any) {
       console.error("[auto-pipeline] error:", error);
-      toast.error(error?.message || "Falha no pipeline automático.");
-      setJobStatus("error");
+      toast.message("API indisponível, tentando render local gratuito...");
+      try {
+        await renderLocalVideo();
+      } catch (localErr) {
+        console.error("[auto-pipeline] render local também falhou:", localErr);
+        toast.error(error?.message || "Falha no pipeline automático.");
+        setJobStatus("error");
+      }
     } finally {
       setIsAutoPipeline(false);
     }

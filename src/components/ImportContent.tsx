@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Upload, Link2, ShoppingCart, Flame, Award, Loader2, FileVideo, FileAudio, ImageIcon, X } from "lucide-react";
 import { renderVideoFromImage } from "@/lib/videoRender";
+import { generateVideoWithFallback } from "@/lib/videoFallbackEngine";
 
 interface ImportContentProps {
   produto: string;
@@ -25,43 +26,23 @@ const ImportContent = ({ produto, nicho, publico, dor, beneficio, link, onResult
   const [modo, setModo] = useState<string>("viral");
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const generateVideoFromImage = async (imageUrl: string) => {
-    try {
-      const { data, error } = await supabase.functions.invoke("generate-video", {
-        body: {
-          imageUrl,
-          prompt: "Vídeo cinematográfico a partir da imagem",
-          productType: "Outro",
-          style: "Luxo",
-          createJob: false,
-          duration: 5,
-          format: "16:9",
-        },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      if (data?.videoUrl) return data.videoUrl as string;
-    } catch (err) {
-      console.warn("Provedor externo indisponivel, usando motor local.", err);
-    }
-    return renderVideoFromImage(imageUrl, { durationSec: 5, fps: 30 });
-  };
-
   const generateVideoObrigatorio = async (imageUrl: string) => {
-    let attempts = 0;
-    while (attempts < 3) {
-      try {
-        const videoUrl = await generateVideoFromImage(imageUrl);
-        return { videoUrl, fallback: false };
-      } catch (err) {
-        attempts += 1;
-        if (attempts >= 3) {
-          console.warn("Falha ao gerar video apos 3 tentativas", err);
-          return { videoUrl: null, fallback: true };
-        }
-      }
-    }
-    return { videoUrl: null, fallback: true };
+    const result = await generateVideoWithFallback(
+      {
+        imageUrl,
+        duration: 5,
+        format: "9:16",
+        animation: "kenburns",
+        productType: "Outro",
+        style: "Luxo",
+      },
+      { enableAI: true },
+    );
+    return {
+      videoUrl: result.videoUrl,
+      fallback: result.fallbackUsed,
+      engine: result.engine,
+    };
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -109,15 +90,17 @@ const ImportContent = ({ produto, nicho, publico, dor, beneficio, link, onResult
         fileUrl = await secureUpload("media-uploads", subpath, file);
         if (file.type.startsWith("image/")) {
           try {
-            const { videoUrl, fallback } = await generateVideoObrigatorio(fileUrl);
+            const { videoUrl, fallback, engine } = await generateVideoObrigatorio(fileUrl);
             analyzeUrl = videoUrl || fileUrl;
-            if (fallback) {
-              toast.warning("Motor de video indisponivel. Seguimos com a imagem.");
+            if (fallback && engine === "local") {
+              toast.message("API indisponível, usando modo gratuito local 🎬");
+            } else if (videoUrl) {
+              toast.success("Vídeo gerado com sucesso");
             }
           } catch (err) {
             console.error(err);
             analyzeUrl = fileUrl;
-            toast.warning("Motor de video indisponivel. Seguimos com a imagem.");
+            toast.warning("API indisponível, usando modo gratuito local");
           }
         } else {
           analyzeUrl = fileUrl;
