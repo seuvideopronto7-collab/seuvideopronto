@@ -36,6 +36,10 @@ const DarkFlowEngine = () => {
   const [videoTimeline, setVideoTimeline] = useState<VideoTimeline | null>(null);
   const [niches, setNiches] = useState<string[]>([]);
   const [themes, setThemes] = useState<string[]>([]);
+  const [exportingVideo, setExportingVideo] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
+  const [exportedVideoUrl, setExportedVideoUrl] = useState<string | null>(null);
+  const [exportEngine, setExportEngine] = useState<string | null>(null);
 
   const update = (key: string, value: string) => setForm((p) => ({ ...p, [key]: value }));
 
