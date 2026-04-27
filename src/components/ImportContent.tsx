@@ -90,15 +90,17 @@ const ImportContent = ({ produto, nicho, publico, dor, beneficio, link, onResult
         fileUrl = await secureUpload("media-uploads", subpath, file);
         if (file.type.startsWith("image/")) {
           try {
-            const { videoUrl, fallback } = await generateVideoObrigatorio(fileUrl);
+            const { videoUrl, fallback, engine } = await generateVideoObrigatorio(fileUrl);
             analyzeUrl = videoUrl || fileUrl;
-            if (fallback) {
-              toast.warning("Motor de video indisponivel. Seguimos com a imagem.");
+            if (fallback && engine === "local") {
+              toast.message("API indisponível, usando modo gratuito local 🎬");
+            } else if (videoUrl) {
+              toast.success("Vídeo gerado com sucesso");
             }
           } catch (err) {
             console.error(err);
             analyzeUrl = fileUrl;
-            toast.warning("Motor de video indisponivel. Seguimos com a imagem.");
+            toast.warning("API indisponível, usando modo gratuito local");
           }
         } else {
           analyzeUrl = fileUrl;
