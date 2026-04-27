@@ -379,19 +379,23 @@ const VideoWizard = ({ initialProduto, autoStart }: VideoWizardProps) => {
           if (isImageUpload) {
             setImageUrl(fileUrl);
             try {
-              const { videoUrl: generatedUrl, error } = await generateVideoObrigatorio(fileUrl);
+              const { videoUrl: generatedUrl, error, engine } = await generateVideoObrigatorio(fileUrl);
               analyzeUrl = generatedUrl || fileUrl;
               setVideoUrl(generatedUrl);
               void handleGenerateViralPack({ imageUrl: fileUrl, videoUrl: generatedUrl || undefined, formData: resolvedFormData });
-                if (error) {
-                  toast.warning("Render local aplicado para gerar MP4 real.");
+                if (engine === "local") {
+                  toast.message("API indisponível, usando modo gratuito local 🎬");
+                } else if (engine === "ai") {
+                  toast.success("🎬 Vídeo gerado com IA Premium");
+                } else if (error) {
+                  toast.warning("Render aplicado em modo de fallback.");
                 }
               } catch (err) {
                 console.error(err);
                 analyzeUrl = fileUrl;
                 setVideoUrl(null);
                 void handleGenerateViralPack({ imageUrl: fileUrl, formData: resolvedFormData });
-                toast.error("Falha ao renderizar MP4 real. Tente novamente.");
+                toast.error("Falha ao gerar vídeo. Tente novamente.");
               }
           } else {
             analyzeUrl = fileUrl;
