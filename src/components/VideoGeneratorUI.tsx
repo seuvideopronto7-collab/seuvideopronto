@@ -741,8 +741,14 @@ const VideoGeneratorUI = () => {
       }
     } catch (error: any) {
       console.error("[auto-pipeline] error:", error);
-      toast.error(error?.message || "Falha no pipeline automático.");
-      setJobStatus("error");
+      toast.message("API indisponível, tentando render local gratuito...");
+      try {
+        await renderLocalVideo();
+      } catch (localErr) {
+        console.error("[auto-pipeline] render local também falhou:", localErr);
+        toast.error(error?.message || "Falha no pipeline automático.");
+        setJobStatus("error");
+      }
     } finally {
       setIsAutoPipeline(false);
     }
