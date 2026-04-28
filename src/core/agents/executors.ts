@@ -27,7 +27,14 @@ async function callAIAgent(agentId: AgentId, input: CoreInput): Promise<AgentRun
       durationMs: performance.now() - t0,
     };
   } catch (err) {
-    // Fallback estático: agente devolve estrutura mínima previsível
+    const msg = err instanceof Error ? err.message : "ai_unavailable";
+    const lower = msg.toLowerCase();
+    const errorType =
+      lower.includes("402") || lower.includes("payment") || lower.includes("credit")
+        ? "custo_alto"
+        : lower.includes("429") || lower.includes("rate")
+        ? "performance"
+        : "ia_indisponivel";
     return {
       ok: true,
       usedFallback: true,
@@ -38,7 +45,8 @@ async function callAIAgent(agentId: AgentId, input: CoreInput): Promise<AgentRun
         echo: input.payload,
       },
       durationMs: performance.now() - t0,
-      error: err instanceof Error ? err.message : "ai_unavailable",
+      error: msg,
+      errorType,
     };
   }
 }
