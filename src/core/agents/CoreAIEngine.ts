@@ -39,8 +39,42 @@ export function resolveFixAgent(problema: AuditProblem): AgentId {
   return FIXER_MAP[problema.tipo] ?? "SUPERVISOR";
 }
 
+// Valida saída do VIDEO_EDITOR: precisa ter videoUrl válido
+function extractVideoUrl(result: AgentRunResult): string | null {
+  const out = result.output as { videoUrl?: unknown } | undefined;
+  const url = out?.videoUrl;
+  if (typeof url !== "string" || url.length < 8) return null;
+  const ok = /^https?:\/\//i.test(url) || url.startsWith("blob:") || url.startsWith("data:video");
+  return ok ? url : null;
+}
+
 // Classifica erro a partir do resultado de um agente
 function classifyError(agentId: AgentId, result: AgentRunResult): AuditProblem | null {
+  // VIDEO_EDITOR: regra crítica — sem videoUrl válido = video_falhou
+  if (agentId === "VIDEO_EDITOR") {
+    const url = extractVideoUrl(result);
+    if (!url) {
+      return {
+        agente: agentId,
+        tipo: "video_falhou",
+        descricao: result.error ?? "VIDEO_EDITOR não retornou videoUrl válido",
+        impacto: "critico",
+        acao_recomendada: "Reexecutar VIDEO_EDITOR (3 camadas)",
+      };
+    }
+    // ok mesmo com fallback browser — só registra como baixo se browser
+    if (result.usedFallback) {
+      return {
+        agente: agentId,
+        tipo: "ia_indisponivel",
+        descricao: "Vídeo gerado por fallback local (browser)",
+        impacto: "baixo",
+        acao_recomendada: "Monitorar APIs PRO/IA",
+      };
+    }
+    return null;
+  }
+
   if (result.ok && !result.usedFallback) return null;
 
   const def = AGENT_REGISTRY[agentId];
@@ -52,9 +86,6 @@ function classifyError(agentId: AgentId, result: AgentRunResult): AuditProblem |
   } else if (result.usedFallback) {
     tipo = "ia_indisponivel";
     impacto = "baixo";
-  } else if (def.group === "criativo" && agentId === "VIDEO_EDITOR") {
-    tipo = "video_falhou";
-    impacto = "critico";
   } else if (def.group === "automacao") {
     tipo = "automacao_falhou";
   } else if (def.group === "tecnologia") {
