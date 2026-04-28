@@ -3,7 +3,9 @@
 // Loop obrigatório: até 3 tentativas e nunca finaliza sem videoUrl válido.
 import { supabase } from "@/integrations/supabase/client";
 import { renderProvider, canvasRenderProvider } from "@/lib/providers";
-import type { RenderInput, Scene } from "@/lib/providers/types";
+import type { RenderInput } from "@/lib/providers/types";
+
+type Scene = RenderInput["scenes"][number];
 
 export type VideoProvider = "shotstack" | "ia" | "browser";
 
