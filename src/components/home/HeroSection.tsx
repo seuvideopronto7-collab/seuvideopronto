@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { BarChart3, Play, Sparkles } from "lucide-react";
+import { BarChart3, Loader2, Play, Sparkles, Zap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import PipelineV2Button from "./PipelineV2Button";
