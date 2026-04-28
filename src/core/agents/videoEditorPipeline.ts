@@ -11,10 +11,24 @@ type Scene = RenderInput["scenes"][number];
 
 export type VideoProvider = "shotstack" | "ia" | "browser";
 
+// Tag de qualidade por camada — usada na UI para exibir status real ao usuário
+// premium  → API premium (Shotstack/FFmpeg)         🟢
+// fallback → render IA (segunda linha)              🟡
+// browser  → canvas + MediaRecorder local           🔵
+// forced   → fallback emergencial pós-falha total   ⚠️
+export type VideoQuality = "premium" | "fallback" | "browser" | "forced";
+
+const PROVIDER_TO_QUALITY: Record<VideoProvider, VideoQuality> = {
+  shotstack: "premium",
+  ia: "fallback",
+  browser: "browser",
+};
+
 export interface VideoEditorOutput {
   videoUrl: string;
-  status: "success" | "fallback";
+  status: "success" | "fallback" | "forced_fallback";
   provider: VideoProvider;
+  quality: VideoQuality;
   durationMs: number;
   attempts: number;
   errors?: string[];
@@ -213,6 +227,7 @@ export async function runVideoEditorPipeline(payload: Record<string, unknown>): 
   const payloadHash = JSON.stringify(payload);
 
   console.group(`[VIDEO_EDITOR] job=${jobId} scenes=${scenes.length} ratio=${aspectRatio}`);
+  console.info("[VIDEO_PIPELINE]", { jobId, scenes: scenes.length, aspectRatio });
 
   let attempts = 0;
   let lastUrl: string | undefined;
@@ -269,8 +284,9 @@ export async function runVideoEditorPipeline(payload: Record<string, unknown>): 
         console.groupEnd();
         return {
           videoUrl: forcedUrl,
-          status: "fallback",
+          status: "forced_fallback",
           provider: "browser",
+          quality: "forced",
           durationMs: totalMs,
           attempts,
           errors: [...errors, "forced_fallback_used"],
@@ -287,13 +303,16 @@ export async function runVideoEditorPipeline(payload: Record<string, unknown>): 
   }
 
   await persistFinal(jobId, lastUrl, usedProvider, attempts, durationMs, payloadHash);
-  console.log(`[VIDEO_EDITOR] ✅ provider=${usedProvider} attempts=${attempts} duration=${durationMs.toFixed(0)}ms`);
+  const quality = PROVIDER_TO_QUALITY[usedProvider];
+  console.info("[VIDEO_PIPELINE]", { jobId, provider: usedProvider, quality, attempts, durationMs: Math.round(durationMs) });
+  console.log(`[VIDEO_EDITOR] ✅ provider=${usedProvider} quality=${quality} attempts=${attempts} duration=${durationMs.toFixed(0)}ms`);
   console.groupEnd();
 
   return {
     videoUrl: lastUrl,
     status: usedProvider === "browser" ? "fallback" : "success",
     provider: usedProvider,
+    quality,
     durationMs,
     attempts,
     errors: errors.length ? errors : undefined,
