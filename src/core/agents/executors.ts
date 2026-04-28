@@ -53,7 +53,19 @@ async function callAIAgent(agentId: AgentId, input: CoreInput): Promise<AgentRun
 
 // Orquestradores: agentes que coordenam features reais do projeto (sem chamar IA diretamente)
 const ORCHESTRATOR_HANDLERS: Partial<Record<AgentId, (input: CoreInput) => Promise<unknown>>> = {
-  VIDEO_EDITOR: async (input) => ({ action: "render_pipeline", ref: input.payload }),
+  VIDEO_EDITOR: async (input) => {
+    const { runVideoEditorPipeline } = await import("./videoEditorPipeline");
+    const out = await runVideoEditorPipeline(input.payload);
+    return {
+      action: "render_pipeline",
+      videoUrl: out.videoUrl,
+      status: out.status,
+      provider: out.provider,
+      attempts: out.attempts,
+      durationMs: out.durationMs,
+      errors: out.errors,
+    };
+  },
   DESIGNER_AI: async () => ({ action: "apply_design_tokens" }),
   API_INTEGRATOR: async () => ({ action: "verify_integrations" }),
   MAKE_ENGINEER: async () => ({ action: "make_webhook_ready", configured: false }),
@@ -78,7 +90,7 @@ async function runOrchestrator(agentId: AgentId, input: CoreInput): Promise<Agen
     return { ok: true, output, durationMs: performance.now() - t0 };
   } catch (err) {
     const def = AGENT_REGISTRY[agentId];
-    const errorType =
+    let errorType: import("./types").AuditProblemType =
       def.group === "tecnologia"
         ? agentId === "FRONTEND_DEV"
           ? "ui_bug"
@@ -86,6 +98,8 @@ async function runOrchestrator(agentId: AgentId, input: CoreInput): Promise<Agen
         : def.group === "automacao"
         ? "automacao_falhou"
         : "desconhecido";
+    // VIDEO_EDITOR é crítico — qualquer falha vira video_falhou
+    if (agentId === "VIDEO_EDITOR") errorType = "video_falhou";
     return {
       ok: false,
       error: err instanceof Error ? err.message : "orchestrator_error",
