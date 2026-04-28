@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { BarChart3, Play, Sparkles } from "lucide-react";
+import { BarChart3, Loader2, Play, Sparkles, Zap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import PipelineV2Button from "./PipelineV2Button";
@@ -73,37 +72,79 @@ const HeroSection = ({ onOpenGenerator }: HeroSectionProps) => {
           Vídeos cinematográficos com IA em segundos. Upload da imagem, roteiro automático, voz profissional e vídeo pronto.
         </p>
 
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-          <Button
-            size="lg"
-            onClick={onOpenGenerator}
-            className="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white text-lg px-8 py-6 rounded-xl shadow-[0_0_30px_-5px_rgba(239,68,68,0.5)] transition-all hover:shadow-[0_0_40px_-5px_rgba(239,68,68,0.7)] hover:scale-105"
-          >
-            <Play className="w-5 h-5 mr-2" />
-            Gerar Vídeo Cinematográfico
-          </Button>
+        {/* ═══════════════════════════════════════════════════
+            BUTTON SYSTEM — 3-Tier Premium Hierarchy
+            ═══════════════════════════════════════════════════ */}
+        <div className="flex flex-col items-center gap-3.5 pt-2">
 
-          <PipelineV2Button />
+          {/* ── TIER 1: PRIMARY ── Core conversion actions */}
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            {/* Main CTA — Dominant visual weight */}
+            <button
+              onClick={onOpenGenerator}
+              className="group relative inline-flex items-center justify-center gap-2.5
+                h-[52px] px-8 rounded-[14px]
+                font-semibold text-[15px] text-white
+                bg-gradient-to-r from-[#ff3b3b] via-[#ff7a00] to-[#f59e0b]
+                shadow-[0_0_24px_-6px_rgba(255,100,0,0.35)]
+                transition-all duration-250 ease-[cubic-bezier(0.4,0,0.2,1)]
+                hover:shadow-[0_0_36px_-4px_rgba(255,100,0,0.55)] hover:-translate-y-[2px] hover:scale-[1.03]
+                active:scale-[0.97] active:shadow-[0_0_14px_-3px_rgba(255,100,0,0.3)]
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            >
+              <span className="relative flex items-center justify-center w-5 h-5">
+                <Play className="w-[18px] h-[18px] transition-all duration-200 group-hover:scale-110 group-hover:drop-shadow-[0_0_4px_rgba(255,255,255,0.4)]" />
+              </span>
+              <span>Gerar Vídeo Cinematográfico</span>
+            </button>
 
-          <Button
-            size="lg"
-            variant="outline"
-            onClick={handleQuickGenerate}
-            disabled={loading}
-            className="w-full sm:w-auto border-border/50 text-muted-foreground hover:text-foreground px-8 py-6 rounded-xl"
-          >
-            {loading ? "⏳ Gerando..." : "🚀 Teste Rápido"}
-          </Button>
+            {/* Pipeline V2 — Secondary premium */}
+            <PipelineV2Button />
+          </div>
 
-          <Button
-            size="lg"
-            variant="outline"
-            onClick={() => navigate("/dashboard/metrics")}
-            className="w-full sm:w-auto border-border/50 text-muted-foreground hover:text-foreground px-8 py-6 rounded-xl"
-          >
-            <BarChart3 className="w-4 h-4 mr-2" />
-            Performance
-          </Button>
+          {/* ── TIER 2: SECONDARY ── Auxiliary tools */}
+          <div className="flex flex-wrap items-center justify-center gap-2.5">
+            <button
+              onClick={handleQuickGenerate}
+              disabled={loading}
+              className="inline-flex items-center justify-center gap-2
+                h-10 px-5 rounded-xl
+                font-medium text-[13px] text-muted-foreground
+                bg-white/[0.04] border border-white/[0.08]
+                transition-all duration-200 ease-[cubic-bezier(0.4,0,0.2,1)]
+                hover:bg-white/[0.08] hover:text-foreground hover:border-white/[0.15] hover:-translate-y-[2px]
+                active:scale-[0.97]
+                disabled:opacity-40 disabled:pointer-events-none
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Gerando...</span>
+                </>
+              ) : (
+                <>
+                  <Zap className="w-3.5 h-3.5" />
+                  <span>Teste Rápido</span>
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={() => navigate("/dashboard/metrics")}
+              className="inline-flex items-center justify-center gap-2
+                h-10 px-5 rounded-xl
+                font-medium text-[13px] text-muted-foreground
+                bg-white/[0.04] border border-white/[0.08]
+                transition-all duration-200 ease-[cubic-bezier(0.4,0,0.2,1)]
+                hover:bg-white/[0.08] hover:text-foreground hover:border-white/[0.15] hover:-translate-y-[2px]
+                active:scale-[0.97]
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+            >
+              <BarChart3 className="w-3.5 h-3.5" />
+              <span>Performance</span>
+            </button>
+          </div>
         </div>
       </div>
     </section>
