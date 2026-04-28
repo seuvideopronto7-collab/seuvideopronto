@@ -303,13 +303,16 @@ export async function runVideoEditorPipeline(payload: Record<string, unknown>): 
   }
 
   await persistFinal(jobId, lastUrl, usedProvider, attempts, durationMs, payloadHash);
-  console.log(`[VIDEO_EDITOR] ✅ provider=${usedProvider} attempts=${attempts} duration=${durationMs.toFixed(0)}ms`);
+  const quality = PROVIDER_TO_QUALITY[usedProvider];
+  console.info("[VIDEO_PIPELINE]", { jobId, provider: usedProvider, quality, attempts, durationMs: Math.round(durationMs) });
+  console.log(`[VIDEO_EDITOR] ✅ provider=${usedProvider} quality=${quality} attempts=${attempts} duration=${durationMs.toFixed(0)}ms`);
   console.groupEnd();
 
   return {
     videoUrl: lastUrl,
     status: usedProvider === "browser" ? "fallback" : "success",
     provider: usedProvider,
+    quality,
     durationMs,
     attempts,
     errors: errors.length ? errors : undefined,
