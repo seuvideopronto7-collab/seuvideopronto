@@ -257,9 +257,32 @@ export async function runVideoEditorPipeline(payload: Record<string, unknown>): 
   const durationMs = performance.now() - t0;
 
   if (!lastUrl || !usedProvider) {
+    console.warn("[VIDEO_EDITOR] ⚠️ Falha total nas 3 camadas — disparando fallback FORÇADO (canvas)");
+    try {
+      const forced = await canvasRenderProvider.generate(renderInput);
+      if (forced.ok && forced.data?.videoUrl) {
+        const forcedUrl = forced.data.videoUrl;
+        const totalMs = performance.now() - t0;
+        await logLayer(jobId, "browser", "success", "forced_fallback", totalMs);
+        await persistFinal(jobId, forcedUrl, "browser", attempts, totalMs, payloadHash);
+        console.log(`[VIDEO_EDITOR] ✅ FORCED fallback ok (${totalMs.toFixed(0)}ms)`);
+        console.groupEnd();
+        return {
+          videoUrl: forcedUrl,
+          status: "fallback",
+          provider: "browser",
+          durationMs: totalMs,
+          attempts,
+          errors: [...errors, "forced_fallback_used"],
+        };
+      }
+      errors.push(`[forced_fallback] ${forced.ok ? "no_url" : forced.error}`);
+    } catch (e) {
+      errors.push(`[forced_fallback] ${e instanceof Error ? e.message : "exception"}`);
+    }
     console.groupEnd();
     throw new Error(
-      `VIDEO_EDITOR_CRITICAL: falha total após ${attempts} tentativas | camadas: ${errors.join(" | ")}`,
+      `VIDEO_EDITOR_CRITICAL_TOTAL_FAIL: ${attempts} tentativas | camadas: ${errors.join(" | ")}`,
     );
   }
 
