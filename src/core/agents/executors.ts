@@ -77,9 +77,19 @@ async function runOrchestrator(agentId: AgentId, input: CoreInput): Promise<Agen
     const output = handler ? await handler(input) : { action: "noop", agent: agentId };
     return { ok: true, output, durationMs: performance.now() - t0 };
   } catch (err) {
+    const def = AGENT_REGISTRY[agentId];
+    const errorType =
+      def.group === "tecnologia"
+        ? agentId === "FRONTEND_DEV"
+          ? "ui_bug"
+          : "backend_erro"
+        : def.group === "automacao"
+        ? "automacao_falhou"
+        : "desconhecido";
     return {
       ok: false,
       error: err instanceof Error ? err.message : "orchestrator_error",
+      errorType,
       durationMs: performance.now() - t0,
       usedFallback: true,
       output: { fallback: true, agent: agentId },
