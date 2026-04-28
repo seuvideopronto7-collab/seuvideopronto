@@ -284,8 +284,9 @@ export async function runVideoEditorPipeline(payload: Record<string, unknown>): 
         console.groupEnd();
         return {
           videoUrl: forcedUrl,
-          status: "fallback",
+          status: "forced_fallback",
           provider: "browser",
+          quality: "forced",
           durationMs: totalMs,
           attempts,
           errors: [...errors, "forced_fallback_used"],
