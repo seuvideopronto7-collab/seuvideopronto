@@ -1,7 +1,6 @@
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Zap, Download, Flame } from "lucide-react";
+import { Zap, Download, Flame, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { renderVideoV2 } from "@/lib/renderVideoV2";
@@ -11,9 +10,7 @@ import CapCutButton from "@/components/CapCutButton";
 
 /**
  * Botão "modo máquina": orquestra Copy → Voz → Trilha → Render.
- * - FREE/START: Render no browser (Canvas + MediaRecorder)
- * - PRO/PREMIUM: Render via Shotstack (edge function)
- * - PREMIUM: Modo Viral 10x (10 variações de hook)
+ * Estilo: Secondary Premium (roxo/azul frio) — hierarquia abaixo do CTA principal.
  */
 export default function PipelineV2Button() {
   const { planId } = usePlan();
@@ -56,7 +53,6 @@ export default function PipelineV2Button() {
     if (error) throw error;
     if (!data?.ok) throw new Error(data?.error || "shotstack failed");
     toast.success(`🎬 Render PRO iniciado (id: ${data.renderId?.slice(0, 8)})`);
-    // Shotstack é assíncrono — fallback: usa render browser como prévia
     return await renderBrowser(script, audioUrl, trilha);
   };
 
@@ -118,43 +114,69 @@ export default function PipelineV2Button() {
   };
 
   return (
-    <div className="w-full sm:w-auto flex flex-col items-center gap-2">
-      <Button
-        size="lg"
+    <div className="flex flex-col items-center gap-2 w-full sm:w-auto">
+      {/* ── PRIMARY: Pipeline V2 (PRO) ── */}
+      <button
         onClick={run}
         disabled={loading}
-        className="w-full sm:w-auto bg-gradient-to-r from-primary to-destructive hover:opacity-90 text-primary-foreground text-lg px-8 py-6 rounded-xl shadow-[0_0_30px_-5px_hsl(var(--primary)/0.5)]"
+        className="group relative inline-flex items-center justify-center gap-2.5
+          h-[48px] px-7 rounded-[14px]
+          font-semibold text-[14px] text-white
+          bg-gradient-to-r from-[#6a5cff] via-[#7c3aed] to-[#8b5cf6]
+          shadow-[0_0_18px_-5px_rgba(124,58,237,0.35)]
+          transition-all duration-250 ease-[cubic-bezier(0.4,0,0.2,1)]
+          hover:shadow-[0_0_28px_-4px_rgba(124,58,237,0.55)] hover:-translate-y-[2px] hover:scale-[1.03]
+          active:scale-[0.97] active:shadow-[0_0_12px_-3px_rgba(124,58,237,0.3)]
+          disabled:opacity-40 disabled:pointer-events-none
+          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       >
-        <Zap className="w-5 h-5 mr-2" />
-        {loading ? `Gerando... ${progress}%` : `⚡ Modo Máquina V2 ${isPro ? "(PRO)" : ""}`}
-      </Button>
+        {loading ? (
+          <>
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span>Gerando... {progress > 0 ? `${progress}%` : ""}</span>
+          </>
+        ) : (
+          <>
+            <Zap className="w-[18px] h-[18px] transition-transform duration-200 group-hover:scale-110" />
+            <span>Modo Máquina V2 {isPro ? "(PRO)" : ""}</span>
+          </>
+        )}
+      </button>
 
+      {/* ── TERTIARY: Viral 10x (Premium only) ── */}
       {isPremium && (
-        <Button
-          size="sm"
+        <button
           onClick={runViral}
           disabled={loading}
-          variant="outline"
-          className="w-full sm:w-auto border-destructive/50 text-destructive hover:bg-destructive/10"
+          className="inline-flex items-center justify-center gap-2
+            h-9 px-4 rounded-lg
+            font-medium text-[12px] text-rose-400
+            bg-rose-500/[0.06] border border-rose-500/[0.12]
+            transition-all duration-200 ease-[cubic-bezier(0.4,0,0.2,1)]
+            hover:bg-rose-500/[0.12] hover:text-rose-300 hover:border-rose-500/[0.2] hover:-translate-y-[1px]
+            active:scale-[0.97]
+            disabled:opacity-40 disabled:pointer-events-none"
         >
-          <Flame className="w-4 h-4 mr-2" />
-          🔥 Modo Viral 10x (Premium)
-        </Button>
+          <Flame className="w-3.5 h-3.5" />
+          <span>Modo Viral 10x (Premium)</span>
+        </button>
       )}
 
+      {/* Progress bar */}
       {loading && (
-        <div className="w-full sm:w-64">
-          <Progress value={progress} className="h-2" />
+        <div className="w-full max-w-[16rem] mt-1">
+          <Progress value={progress} className="h-1.5" />
         </div>
       )}
 
+      {/* Results */}
       {videoUrl && !variations.length && (
         <div className="flex flex-col gap-2 mt-1 items-center">
           <a href={videoUrl} download="seu-video-pronto.webm">
-            <Button variant="outline" size="sm">
-              <Download className="w-4 h-4 mr-2" />
+            <button className="inline-flex items-center gap-2 h-9 px-4 rounded-lg font-medium text-[13px] text-foreground bg-white/[0.06] border border-white/[0.1] hover:bg-white/[0.1] transition-all">
+              <Download className="w-4 h-4" />
               Baixar vídeo
-            </Button>
+            </button>
           </a>
           <CapCutButton videoUrl={videoUrl} />
         </div>
@@ -164,10 +186,10 @@ export default function PipelineV2Button() {
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-2">
           {variations.map((u, i) => (
             <a key={i} href={u} download={`viral-${i + 1}.webm`}>
-              <Button variant="outline" size="sm" className="w-full">
-                <Download className="w-3 h-3 mr-1" />
+              <button className="inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-lg font-medium text-[12px] text-foreground bg-white/[0.06] border border-white/[0.1] hover:bg-white/[0.1] transition-all w-full">
+                <Download className="w-3 h-3" />
                 #{i + 1}
-              </Button>
+              </button>
             </a>
           ))}
         </div>
