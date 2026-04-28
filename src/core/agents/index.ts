@@ -1,4 +1,4 @@
 export * from "./types";
 export * from "./registry";
-export { CoreAIEngine } from "./CoreAIEngine";
+export { CoreAIEngine, resolveFixAgent } from "./CoreAIEngine";
 export { runAgent } from "./executors";
