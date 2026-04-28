@@ -11,10 +11,24 @@ type Scene = RenderInput["scenes"][number];
 
 export type VideoProvider = "shotstack" | "ia" | "browser";
 
+// Tag de qualidade por camada — usada na UI para exibir status real ao usuário
+// premium  → API premium (Shotstack/FFmpeg)         🟢
+// fallback → render IA (segunda linha)              🟡
+// browser  → canvas + MediaRecorder local           🔵
+// forced   → fallback emergencial pós-falha total   ⚠️
+export type VideoQuality = "premium" | "fallback" | "browser" | "forced";
+
+const PROVIDER_TO_QUALITY: Record<VideoProvider, VideoQuality> = {
+  shotstack: "premium",
+  ia: "fallback",
+  browser: "browser",
+};
+
 export interface VideoEditorOutput {
   videoUrl: string;
-  status: "success" | "fallback";
+  status: "success" | "fallback" | "forced_fallback";
   provider: VideoProvider;
+  quality: VideoQuality;
   durationMs: number;
   attempts: number;
   errors?: string[];
