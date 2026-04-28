@@ -145,8 +145,10 @@ async function layerIA(input: RenderInput): Promise<{ url?: string; error?: stri
 // Bloqueada para vídeos pesados (proteger CPU/RAM do usuário)
 async function layerBrowser(input: RenderInput): Promise<{ url?: string; error?: string }> {
   try {
+    // Fallback nunca bloqueia — garante vídeo em qualquer cenário.
+    // Se houver muitas cenas, apenas avisa no log e segue.
     if (input.scenes.length > FALLBACK_MAX_SCENES) {
-      return { error: "fallback_blocked_large_video" };
+      console.warn(`[VIDEO_EDITOR][browser] vídeo grande (${input.scenes.length} cenas) — seguindo mesmo assim`);
     }
     if (typeof document === "undefined" || typeof MediaRecorder === "undefined") {
       return { error: "browser_unavailable" };
