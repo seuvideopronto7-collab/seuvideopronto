@@ -32,9 +32,56 @@ export interface AgentRunResult {
   ok: boolean;
   output?: unknown;
   error?: string;
+  errorType?: AuditProblemType;
   usedFallback?: boolean;
   durationMs: number;
   validatedBy?: AgentId;
+}
+
+// ─── Auditoria & Auto-correção ────────────────────────────────
+export type AuditSeverity = "critico" | "medio" | "baixo";
+
+export type AuditProblemType =
+  | "video_falhou"
+  | "api_falhou"
+  | "automacao_falhou"
+  | "ui_bug"
+  | "backend_erro"
+  | "performance"
+  | "custo_alto"
+  | "ia_indisponivel"
+  | "saida_invalida"
+  | "desconhecido";
+
+export interface AuditProblem {
+  agente: AgentId;
+  tipo: AuditProblemType;
+  descricao: string;
+  impacto: AuditSeverity;
+  acao_recomendada: string;
+}
+
+export interface AuditReport {
+  aprovado: boolean;
+  problemas: AuditProblem[];
+  geradoEm: number;
+}
+
+export interface FixAttempt {
+  problema: AuditProblem;
+  fixerAgent: AgentId;
+  resolved: boolean;
+  durationMs: number;
+  notes?: string;
+}
+
+export interface RunReport {
+  flow: AgentId[];
+  results: Record<string, AgentRunResult>;
+  attempts: number;
+  audits: AuditReport[];
+  fixes: FixAttempt[];
+  approved: boolean;
 }
 
 export interface AgentDefinition {
