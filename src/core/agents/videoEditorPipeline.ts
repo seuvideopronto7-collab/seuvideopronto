@@ -227,6 +227,7 @@ export async function runVideoEditorPipeline(payload: Record<string, unknown>): 
   const payloadHash = JSON.stringify(payload);
 
   console.group(`[VIDEO_EDITOR] job=${jobId} scenes=${scenes.length} ratio=${aspectRatio}`);
+  console.info("[VIDEO_PIPELINE]", { jobId, scenes: scenes.length, aspectRatio });
 
   let attempts = 0;
   let lastUrl: string | undefined;
