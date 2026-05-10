@@ -377,7 +377,7 @@ serve(async (req) => {
     for (let i = 0; i < 60; i++) {
       await delay(5000);
 
-      const pollRes = await fetch(`https://api.shotstack.io/edit/stage/render/${renderId}`, {
+      const pollRes = await fetch(`https://api.shotstack.io/edit/${shotstackEnv}/render/${renderId}`, {
         headers: { "x-api-key": SHOTSTACK_API_KEY },
       });
 
