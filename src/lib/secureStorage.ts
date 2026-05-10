@@ -8,6 +8,23 @@ export function ownerPath(userId: string, subpath: string): string {
 }
 
 /**
+ * Build a deterministic owner-scoped storage path:
+ * {userId}/{timestamp}-{slugified-filename}
+ *
+ * Use for ALL bucket uploads (media-uploads, images, videos, audio, avatars).
+ * Never upload to public/, temp/, tmp/, uploads/ or bucket root.
+ */
+export function buildUserStoragePath(userId: string, fileName: string): string {
+  if (!userId) throw new Error("AUTH_REQUIRED");
+  const safeName = (fileName || "file")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9._-]/g, "-")
+    .toLowerCase();
+  return `${userId}/${Date.now()}-${safeName}`;
+}
+
+/**
  * Get current user ID or throw
  */
 export async function requireUserId(): Promise<string> {
