@@ -12,7 +12,38 @@ serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  let body: { imageUrl?: string; prompt?: string; user_id?: string } | null = null;
+  // ─── MANDATORY AUTH ───────────────────────────────────────
+  const authHeader = req.headers.get("Authorization") ?? "";
+  if (!authHeader.startsWith("Bearer ")) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !serviceRoleKey || !anonKey) {
+    return new Response(JSON.stringify({ error: "Credenciais ausentes" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const userClient = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const { data: userData, error: userErr } = await userClient.auth.getUser();
+  if (userErr || !userData?.user) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+  // Always derive user_id from JWT — never trust request body
+  const user_id = userData.user.id;
+
+  let body: { imageUrl?: string; prompt?: string } | null = null;
 
   try {
     body = await req.json();
@@ -23,26 +54,16 @@ serve(async (req) => {
     });
   }
 
-  const { imageUrl, prompt, user_id } = body ?? {};
+  const { imageUrl, prompt } = body ?? {};
 
-  if (!imageUrl || !prompt || !user_id) {
+  if (!imageUrl || !prompt) {
     return new Response(
-      JSON.stringify({ error: "imageUrl, prompt e user_id são obrigatórios" }),
+      JSON.stringify({ error: "imageUrl e prompt são obrigatórios" }),
       {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
-  }
-
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-
-  if (!supabaseUrl || !serviceRoleKey) {
-    return new Response(JSON.stringify({ error: "Credenciais ausentes" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
   }
 
   const supabase = createClient(supabaseUrl, serviceRoleKey);

@@ -21,20 +21,34 @@ Deno.serve(async (req) => {
     const apiKey = Deno.env.get("SHOTSTACK_API_KEY");
     if (!apiKey) return json({ error: "SHOTSTACK_API_KEY missing" }, 500);
 
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
     const authHeader = req.headers.get("Authorization") ?? "";
-    const userClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } },
-    );
+    if (!authHeader.startsWith("Bearer ")) return json({ error: "unauthorized" }, 401);
+    const userClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
     const { data: userData } = await userClient.auth.getUser();
     if (!userData?.user) return json({ error: "unauthorized" }, 401);
+
+    // Plan must come from server-side subscription, never trust client body
+    const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+    const { data: sub } = await admin
+      .from("subscriptions")
+      .select("plan, status")
+      .eq("user_id", userData.user.id)
+      .maybeSingle();
+    const plan = (sub?.plan ?? "free").toLowerCase();
+    if (plan !== "pro" && plan !== "premium") {
+      return json({ error: "plan_required", message: "PRO or PREMIUM required" }, 403);
+    }
 
     const body = await req.json().catch(() => ({}));
     const script = String(body.script ?? "").trim();
     const audioUrl = String(body.audioUrl ?? "").trim();
     const trilha = String(body.trilha ?? "").trim();
-    const plan = String(body.plan ?? "pro");
 
     if (!script) return json({ error: "script obrigatório" }, 400);
 

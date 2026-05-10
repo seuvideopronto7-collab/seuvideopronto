@@ -21,10 +21,38 @@ serve(async (req) => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
+  const queueSecret = Deno.env.get("QUEUE_TRIGGER_SECRET") || "";
 
-  if (!supabaseUrl || !serviceRoleKey) {
+  if (!supabaseUrl || !serviceRoleKey || !anonKey) {
     return json({ error: "Supabase env not configured" }, 500);
   }
+
+  // ─── AUTH: shared queue secret OR admin JWT ─────────────────
+  const providedSecret = req.headers.get("x-queue-secret") || "";
+  let authorized = false;
+  if (queueSecret && providedSecret && providedSecret === queueSecret) {
+    authorized = true;
+  } else {
+    const authHeader = req.headers.get("Authorization") ?? "";
+    if (authHeader.startsWith("Bearer ")) {
+      const userClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data: u } = await userClient.auth.getUser();
+      if (u?.user) {
+        const adminCheck = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
+        const { data: roleRow } = await adminCheck
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", u.user.id)
+          .eq("role", "admin")
+          .maybeSingle();
+        if (roleRow) authorized = true;
+      }
+    }
+  }
+  if (!authorized) return json({ error: "Unauthorized" }, 401);
 
   const adminClient = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
 

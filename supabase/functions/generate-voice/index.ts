@@ -146,17 +146,22 @@ Deno.serve(async (req) => {
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    if (authHeader.startsWith("Bearer ")) {
-      const userClient = createClient(supabaseUrl, anonKey, {
-        global: { headers: { Authorization: authHeader } },
+    // ─── MANDATORY AUTH ─────────────────────────────────────
+    if (!authHeader.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
-      const { data, error } = await userClient.auth.getUser();
-      if (error || !data?.user) {
-        return new Response(JSON.stringify({ error: "unauthorized" }), {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+    }
+    const userClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: authData, error: authErr } = await userClient.auth.getUser();
+    if (authErr || !authData?.user) {
+      return new Response(JSON.stringify({ error: "unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const body = await req.json().catch(() => ({}));

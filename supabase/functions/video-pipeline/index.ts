@@ -255,11 +255,18 @@ serve(async (req) => {
       transition: { in: "fade", out: "fade" },
     }));
 
-    // Caption clips (TikTok style)
+    // Caption clips (TikTok style) — escape user-controlled text to prevent HTML injection
+    const escHtml = (s: string) =>
+      String(s ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
     const captionClips = sceneList.map((scene, i) => ({
       asset: {
         type: "html",
-        html: `<p style="font-family:Montserrat;font-size:42px;color:#fff;text-align:center;text-shadow:2px 2px 8px rgba(0,0,0,0.9);font-weight:800;line-height:1.3">${scene.texto.slice(0, 80)}</p>`,
+        html: `<p style="font-family:Montserrat;font-size:42px;color:#fff;text-align:center;text-shadow:2px 2px 8px rgba(0,0,0,0.9);font-weight:800;line-height:1.3">${escHtml(String(scene.texto ?? "").slice(0, 80))}</p>`,
         width: 720,
         height: 200,
       },

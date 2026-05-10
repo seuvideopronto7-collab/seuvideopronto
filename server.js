@@ -267,15 +267,43 @@ const processVideoJob = async (jobId) => {
   await updateJob(jobId, { status: "completed", progress: 100, video_url: videoUrl, error: null });
 };
 
+// Verify a Bearer JWT and return the authenticated user (or null)
+const getAuthedUser = async (req) => {
+  ensureSupabase();
+  const authHeader = req.headers["authorization"] || req.headers["Authorization"] || "";
+  if (!authHeader.startsWith("Bearer ")) return null;
+  const token = authHeader.slice(7).trim();
+  if (!token) return null;
+  try {
+    const { data, error } = await supabase.auth.getUser(token);
+    if (error || !data?.user) return null;
+    return data.user;
+  } catch {
+    return null;
+  }
+};
+
+const isAdminUser = async (userId) => {
+  ensureSupabase();
+  const { data } = await supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userId)
+    .eq("role", "admin")
+    .maybeSingle();
+  return !!data;
+};
+
 app.post("/api/video-jobs", async (req, res) => {
   try {
-    const { imageUrl, prompt, user_id, userId } = req.body || {};
-    const resolvedUserId = user_id || userId;
-    if (!resolvedUserId) {
-      res.status(400).json({ error: "user_id obrigatorio" });
+    const user = await getAuthedUser(req);
+    if (!user) {
+      res.status(401).json({ error: "Unauthorized" });
       return;
     }
-    const job = await createJob({ imageUrl, prompt, userId: resolvedUserId });
+    const { imageUrl, prompt } = req.body || {};
+    // Always derive user_id from the JWT — never trust request body
+    const job = await createJob({ imageUrl, prompt, userId: user.id });
 
     queueMicrotask(() => {
       processVideoJob(job.id).catch(async (err) => {
@@ -298,10 +326,22 @@ app.get("/api/webhook/health", async (_req, res) => {
 
 app.get("/api/video-jobs/:id", async (req, res) => {
   try {
+    const user = await getAuthedUser(req);
+    if (!user) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
     const job = await getJob(req.params.id);
     if (!job) {
       res.status(404).json({ error: "Job nao encontrado" });
       return;
+    }
+    if (job.user_id !== user.id) {
+      const admin = await isAdminUser(user.id);
+      if (!admin) {
+        res.status(403).json({ error: "Forbidden" });
+        return;
+      }
     }
     res.json(job);
   } catch (error) {
