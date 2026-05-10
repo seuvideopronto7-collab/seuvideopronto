@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { getNextResetAt, getPlanLimits, isResetDue, type PlanId, type PlanLimits } from "@/lib/plans";
+import { getPlanLimits, type PlanId, type PlanLimits } from "@/lib/plans";
+import { handleSecurityError } from "@/lib/secureErrors";
 
 interface PlanRecord {
   id: string;
@@ -18,12 +19,18 @@ interface LimitCheckResult {
   reason?: string;
 }
 
+/**
+ * READ-ONLY hook for the user's subscription/plan.
+ * All writes (create plan, change plan, change limits, reset usage) are
+ * performed server-side via secure edge functions / SECURITY DEFINER RPCs.
+ * The client NEVER inserts/updates `subscriptions` or `usuarios_planos`.
+ */
 export const usePlan = () => {
   const { user, isFounder } = useAuth();
   const [record, setRecord] = useState<PlanRecord | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const ensureRecord = useCallback(async () => {
+  const fetchRecord = useCallback(async () => {
     try {
       if (!user) {
         setRecord(null);
@@ -38,27 +45,23 @@ export const usePlan = () => {
         .maybeSingle() as any);
 
       if (error) {
-        console.error("PDG PLAN ERROR: fetch", error);
+        handleSecurityError(error, "consulta de plano");
       }
 
+      // If row missing, ask backend to bootstrap. Never insert from the client.
       if (!data) {
-        const { data: created, error: createError } = await (supabase
-          .from("subscriptions" as any)
-          .insert({
-            user_id: user.id,
-            plan: "free",
-            videos_limit: 2,
-            videos_used: 0,
-            reset_date: getNextResetAt(),
-            status: "active",
-          } as any)
-          .select("*")
-          .single() as any);
-
-        if (createError) {
-          console.error("PDG PLAN ERROR: create", createError);
+        try {
+          await supabase.functions.invoke("auth-bootstrap", { body: {} });
+          const { data: retry } = await (supabase
+            .from("subscriptions" as any)
+            .select("*")
+            .eq("user_id", user.id)
+            .maybeSingle() as any);
+          setRecord((retry as PlanRecord) || null);
+        } catch (e) {
+          handleSecurityError(e, "inicialização de plano");
+          setRecord(null);
         }
-        setRecord((created as PlanRecord) || null);
         setLoading(false);
         return;
       }
@@ -66,44 +69,14 @@ export const usePlan = () => {
       setRecord(data as PlanRecord);
       setLoading(false);
     } catch (error) {
-      console.error("PDG PLAN ERROR: ensureRecord", error);
+      handleSecurityError(error, "consulta de plano");
       setLoading(false);
     }
   }, [user]);
 
-  const maybeResetUsage = useCallback(
-    async (current: PlanRecord | null) => {
-      try {
-        if (!current || !user) return current;
-        if (!isResetDue(current.reset_date)) return current;
-        const nextReset = getNextResetAt();
-        const { data, error } = await (supabase
-          .from("subscriptions" as any)
-          .update({ videos_used: 0, reset_date: nextReset } as any)
-          .eq("user_id", user.id)
-          .select("*")
-          .single() as any);
-        if (error) console.error("PDG PLAN ERROR: reset", error);
-        return (data as PlanRecord) || current;
-      } catch (error) {
-        console.error("PDG PLAN ERROR: maybeResetUsage", error);
-        return current;
-      }
-    },
-    [user],
-  );
-
   useEffect(() => {
-    void ensureRecord();
-  }, [ensureRecord]);
-
-  useEffect(() => {
-    if (!record) return;
-    void (async () => {
-      const updated = await maybeResetUsage(record);
-      if (updated && updated !== record) setRecord(updated);
-    })();
-  }, [record, maybeResetUsage]);
+    void fetchRecord();
+  }, [fetchRecord]);
 
   const limits = useMemo(() => {
     const baseLimits = isFounder
@@ -150,6 +123,10 @@ export const usePlan = () => {
     [limits, usage, isFounder],
   );
 
+  /**
+   * Increment video usage via SECURITY DEFINER RPC.
+   * The client cannot directly UPDATE subscriptions.videos_used.
+   */
   const consume = useCallback(
     async (key: string, amount = 1): Promise<LimitCheckResult> => {
       try {
@@ -160,55 +137,44 @@ export const usePlan = () => {
         const check = checkLimit(key, amount);
         if (!check.allowed) return check;
 
-        const nextUsage = Math.max(0, (record.videos_used || 0) + amount);
-        const { data, error } = await (supabase
-          .from("subscriptions" as any)
-          .update({ videos_used: nextUsage } as any)
-          .eq("user_id", user.id)
-          .select("*")
-          .single() as any);
-
-        if (error) {
-          console.error("PDG PLAN ERROR: consume", error);
-          return { allowed: false, reason: "Falha ao registrar uso." };
+        if (key === "videos_dia") {
+          for (let i = 0; i < amount; i++) {
+            const { error } = await (supabase as any).rpc("increment_videos_used", {
+              _user_id: user.id,
+            });
+            if (error) {
+              handleSecurityError(error, "registro de uso");
+              return { allowed: false, reason: "Falha ao registrar uso." };
+            }
+          }
+          // Refresh local record (read-only)
+          await fetchRecord();
         }
 
-        setRecord(data as PlanRecord);
         return { allowed: true };
       } catch (error) {
-        console.error("PDG PLAN ERROR: consume", error);
+        handleSecurityError(error, "registro de uso");
         return { allowed: false, reason: "Erro inesperado ao registrar uso." };
       }
     },
-    [user, record, checkLimit, isFounder],
+    [user, record, checkLimit, isFounder, fetchRecord],
   );
 
+  /**
+   * Plan changes are handled exclusively by the billing backend
+   * (Stripe/Hotmart/Eduzz webhooks + check-subscription edge function).
+   * Client cannot mutate `subscriptions.plan` or `videos_limit` directly.
+   */
   const updatePlan = useCallback(
-    async (plan: PlanId) => {
+    async (_plan: PlanId) => {
       try {
-        if (!user) return;
-        const limitMap: Record<PlanId, number | null> = {
-          free: 2,
-          start: 10,
-          pro: 50,
-          premium: null,
-        };
-        const { data, error } = await (supabase
-          .from("subscriptions" as any)
-          .update({ plan, videos_limit: limitMap[plan] } as any)
-          .eq("user_id", user.id)
-          .select("*")
-          .single() as any);
-        if (error) {
-          console.error("PDG PLAN ERROR: updatePlan", error);
-          return;
-        }
-        setRecord(data as PlanRecord);
+        await supabase.functions.invoke("check-subscription", { body: {} });
+        await fetchRecord();
       } catch (error) {
-        console.error("PDG PLAN ERROR: updatePlan", error);
+        handleSecurityError(error, "atualização de plano");
       }
     },
-    [user],
+    [fetchRecord],
   );
 
   return {
@@ -217,7 +183,7 @@ export const usePlan = () => {
     limits,
     usage,
     loading,
-    refresh: ensureRecord,
+    refresh: fetchRecord,
     checkLimit,
     consume,
     updatePlan,
