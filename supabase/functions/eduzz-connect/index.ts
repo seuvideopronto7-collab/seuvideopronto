@@ -66,7 +66,12 @@ serve(async (req) => {
       client_secret: clientSecret,
     };
 
-    console.log("Eduzz request:", tokenRequestBody);
+    // Never log the secret — log only that it's present
+    console.log("Eduzz request:", {
+      grant_type: "client_credentials",
+      has_client_id: !!clientId,
+      has_client_secret: !!clientSecret,
+    });
 
     const tokenResponse = await fetch("https://api.eduzz.com/oauth/token", {
       method: "POST",
@@ -74,11 +79,9 @@ serve(async (req) => {
       body: JSON.stringify(tokenRequestBody),
     });
 
-    console.log("Eduzz response:", tokenResponse);
-
     const tokenResponseClone = tokenResponse.clone();
     const tokenRaw = await tokenResponseClone.text().catch(() => "");
-    console.log("Eduzz response:", { status: tokenResponse.status, body: tokenRaw });
+    console.log("Eduzz response status:", tokenResponse.status);
 
     if (!tokenResponse.ok) {
       return new Response(
