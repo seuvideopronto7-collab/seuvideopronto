@@ -1,8 +1,28 @@
+User-agent: *
+Allow: /
+
+Disallow: /admin
+Disallow: /admin/
+Disallow: /dashboard
+Disallow: /perfil
+Disallow: /private
+Disallow: /api
+Disallow: /auth
+Disallow: /login
+
+# Search-engine specific (explicit allow on public)
 User-agent: Googlebot
 Allow: /
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /perfil
+Disallow: /auth
+Disallow: /login
 
 User-agent: Bingbot
 Allow: /
+Disallow: /admin
+Disallow: /dashboard
 
 User-agent: Twitterbot
 Allow: /
@@ -10,5 +30,4 @@ Allow: /
 User-agent: facebookexternalhit
 Allow: /
 
-User-agent: *
-Allow: /
+Sitemap: https://seuvideopronto.lovable.app/sitemap.xml
