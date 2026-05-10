@@ -74,10 +74,17 @@ serve(async (req) => {
 
     const payload = (await getPayload(req)) as KiwifyPayload;
     const secret = Deno.env.get("KIWIFY_WEBHOOK_SECRET") || "";
-    if (secret && getWebhookToken(req) !== secret) {
+    if (!secret) {
+      console.error("[kiwify-webhook] missing KIWIFY_WEBHOOK_SECRET");
+      return new Response(JSON.stringify({ success: false, ok: false, error: "server_misconfigured" }), {
+        status: 500,
+        headers,
+      });
+    }
+    if (getWebhookToken(req) !== secret) {
       console.warn("Kiwify webhook token mismatch");
       return new Response(JSON.stringify({ success: false, ok: false, error: "unauthorized" }), {
-        status: 200,
+        status: 401,
         headers,
       });
     }
