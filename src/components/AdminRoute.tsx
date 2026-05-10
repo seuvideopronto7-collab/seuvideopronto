@@ -21,7 +21,12 @@ const AdminRoute = ({ children }: AdminRouteProps) => {
 
   if (!user || !isAdmin) return <Navigate to="/login" replace />;
 
-  return <>{children}</>;
+  return (
+    <>
+      <SEO noindex title="Admin — Seu Vídeo Pronto" />
+      {children}
+    </>
+  );
 };
 
 export default AdminRoute;
