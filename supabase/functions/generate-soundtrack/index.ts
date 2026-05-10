@@ -104,13 +104,23 @@ serve(async (req) => {
     if (!elRes.ok) {
       const errText = await elRes.text();
       console.error("[generate-soundtrack] ElevenLabs error:", elRes.status, errText);
-      const isAuthError = elRes.status === 401;
+
+      // Static CDN fallback (Pixabay) for 402/429/5xx — keeps pipeline alive
+      const FALLBACK_CDN: Record<string, string> = {
+        vendas: "https://cdn.pixabay.com/download/audio/2022/03/15/audio_115b9b6c4c.mp3",
+        vendas_agressiva: "https://cdn.pixabay.com/download/audio/2022/03/15/audio_115b9b6c4c.mp3",
+        autoridade: "https://cdn.pixabay.com/download/audio/2022/10/25/audio_946f5e7c6e.mp3",
+        viral: "https://cdn.pixabay.com/download/audio/2023/03/20/audio_5f1b64fcb7.mp3",
+      };
+      const key = (objective || "vendas").toLowerCase().replace(/\s+/g, "_");
+      const fallbackUrl = FALLBACK_CDN[key] || FALLBACK_CDN.vendas;
+
       return new Response(JSON.stringify({
-        ok: false,
-        error: isAuthError
-          ? "Chave da API de áudio inválida ou sem permissão para geração de música. Verifique as configurações."
-          : `Erro na geração de trilha sonora (${elRes.status})`,
-        detail: errText,
+        audioUrl: fallbackUrl,
+        fallback: true,
+        reason: `elevenlabs_${elRes.status}`,
+        objective,
+        duration: durationSec,
       }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

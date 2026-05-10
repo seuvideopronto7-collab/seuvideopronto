@@ -560,7 +560,11 @@ const VideoGeneratorUI = () => {
       if (data?.audioUrl) {
         if (musicUrl?.startsWith("blob:")) URL.revokeObjectURL(musicUrl);
         setMusicUrl(data.audioUrl);
-        toast.success(`🎧 Trilha "${soundtrackObjective}" gerada com sucesso!`);
+        if (data?.fallback) {
+          toast.success(`🎧 Trilha "${soundtrackObjective}" carregada (fallback)`);
+        } else {
+          toast.success(`🎧 Trilha "${soundtrackObjective}" gerada com sucesso!`);
+        }
       } else {
         throw new Error("Nenhum áudio retornado");
       }
