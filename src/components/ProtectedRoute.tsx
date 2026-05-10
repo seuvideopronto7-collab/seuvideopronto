@@ -3,6 +3,7 @@ import { Navigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { useDeviceGuard } from "@/hooks/useDeviceGuard";
 import DeviceBlockedDialog from "@/components/DeviceBlockedDialog";
+import SEO from "@/components/SEO";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -50,7 +51,12 @@ const ProtectedRoute = ({ children, requireAdmin }: ProtectedRouteProps) => {
     );
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      <SEO noindex title="Painel — Seu Vídeo Pronto" />
+      {children}
+    </>
+  );
 };
 
 export default ProtectedRoute;
