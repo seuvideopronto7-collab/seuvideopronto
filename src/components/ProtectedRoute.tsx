@@ -51,7 +51,12 @@ const ProtectedRoute = ({ children, requireAdmin }: ProtectedRouteProps) => {
     );
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      <SEO noindex title="Painel — Seu Vídeo Pronto" />
+      {children}
+    </>
+  );
 };
 
 export default ProtectedRoute;
