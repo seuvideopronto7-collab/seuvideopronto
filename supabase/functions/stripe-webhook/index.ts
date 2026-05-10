@@ -8,27 +8,45 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+
+  const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
+  const stripeSecret = Deno.env.get("STRIPE_SECRET_KEY");
+
+  // Hard requirement: never process without the verification secret configured
+  if (!webhookSecret || !stripeSecret) {
+    console.error("[stripe-webhook] missing secret(s); refusing to process");
+    return json({ error: "server_misconfigured" }, 500);
+  }
+
+  const sig = req.headers.get("stripe-signature");
+  if (!sig) {
+    return json({ error: "missing_signature" }, 401);
+  }
+
+  const body = await req.text();
+  const stripe = new Stripe(stripeSecret, {
+    apiVersion: "2025-08-27.basil",
+    httpClient: Stripe.createFetchHttpClient(),
+  });
+
+  let event: Stripe.Event;
+  try {
+    event = await stripe.webhooks.constructEventAsync(body, sig, webhookSecret);
+  } catch (err) {
+    console.error("[stripe-webhook] signature verification failed");
+    return json({ error: "invalid_signature" }, 400);
+  }
 
   try {
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, {
-      apiVersion: "2025-08-27.basil",
-      httpClient: Stripe.createFetchHttpClient(),
-    });
-
-    const sig = req.headers.get("stripe-signature");
-    const body = await req.text();
-    const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
-
-    let event: Stripe.Event;
-    if (sig && webhookSecret) {
-      event = await stripe.webhooks.constructEventAsync(body, sig, webhookSecret);
-    } else {
-      // Sem secret → tenta parsear (modo dev)
-      event = JSON.parse(body) as Stripe.Event;
-    }
-
     if (event.type === "checkout.session.completed") {
       const session = event.data.object as Stripe.Checkout.Session;
       const userId = session.metadata?.user_id;
@@ -60,15 +78,9 @@ Deno.serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify({ received: true }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return json({ received: true }, 200);
   } catch (e) {
-    console.error("[stripe-webhook]", e);
-    return new Response(JSON.stringify({ error: (e as Error).message }), {
-      status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    console.error("[stripe-webhook] handler error");
+    return json({ error: "handler_error" }, 500);
   }
 });
