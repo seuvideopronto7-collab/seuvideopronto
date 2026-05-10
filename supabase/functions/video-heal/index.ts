@@ -27,8 +27,36 @@ serve(async (req) => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
+  const healSecret = Deno.env.get("HEAL_JOB_SECRET") || "";
 
   if (!supabaseUrl || !serviceRoleKey) return json({ error: "Config missing" }, 500);
+
+  // ─── AUTH: shared secret OR admin JWT ─────────────────────
+  const providedSecret = req.headers.get("x-heal-secret") || "";
+  let authorized = false;
+  if (healSecret && providedSecret && providedSecret === healSecret) {
+    authorized = true;
+  } else if (anonKey) {
+    const authHeader = req.headers.get("Authorization") ?? "";
+    if (authHeader.startsWith("Bearer ")) {
+      const userClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data: u } = await userClient.auth.getUser();
+      if (u?.user) {
+        const adminCheck = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
+        const { data: roleRow } = await adminCheck
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", u.user.id)
+          .eq("role", "admin")
+          .maybeSingle();
+        if (roleRow) authorized = true;
+      }
+    }
+  }
+  if (!authorized) return json({ error: "Unauthorized" }, 401);
 
   const admin = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
 
