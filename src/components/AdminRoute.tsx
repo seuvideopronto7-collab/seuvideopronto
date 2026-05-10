@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Loader2 } from "lucide-react";
+import SEO from "@/components/SEO";
 
 interface AdminRouteProps {
   children: ReactNode;
