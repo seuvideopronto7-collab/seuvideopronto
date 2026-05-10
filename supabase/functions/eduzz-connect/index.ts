@@ -116,10 +116,7 @@ serve(async (req) => {
 
     if (!validateResponse.ok) {
       const validateRaw = await validateResponse.text().catch(() => "");
-      console.log("Eduzz response:", {
-        status: validateResponse.status,
-        body: validateRaw,
-      });
+      console.log("Eduzz validate failed status:", validateResponse.status);
       return new Response(
         JSON.stringify({
           success: false,
