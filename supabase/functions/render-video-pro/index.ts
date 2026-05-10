@@ -79,18 +79,28 @@ Deno.serve(async (req) => {
       });
     }
 
-    const renderRes = await fetch("https://api.shotstack.io/edit/stage/render", {
-      method: "POST",
-      headers: { "x-api-key": apiKey, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        timeline: { background: "#0B0F14", tracks },
-        output: { format: "mp4", resolution, aspectRatio: "9:16" },
-      }),
-    });
-
-    const renderData = await renderRes.json();
-    if (!renderRes.ok) {
-      return json({ error: "shotstack failed", detail: renderData }, 500);
+    const preferredEnv = (Deno.env.get("SHOTSTACK_ENV") || "stage").toLowerCase() === "v1" ? "v1" : "stage";
+    const envOrder = preferredEnv === "v1" ? ["v1", "stage"] : ["stage", "v1"];
+    let renderRes: Response | null = null;
+    let renderData: any = null;
+    let lastStatus = 0;
+    for (const env of envOrder) {
+      const r = await fetch(`https://api.shotstack.io/edit/${env}/render`, {
+        method: "POST",
+        headers: { "x-api-key": apiKey, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          timeline: { background: "#0B0F14", tracks },
+          output: { format: "mp4", resolution, aspectRatio: "9:16" },
+        }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (r.ok) { renderRes = r; renderData = data; break; }
+      lastStatus = r.status;
+      renderData = data;
+      if (r.status !== 401 && r.status !== 403) break;
+    }
+    if (!renderRes) {
+      return json({ error: "shotstack failed", status: lastStatus, detail: renderData }, 500);
     }
 
     return json({
