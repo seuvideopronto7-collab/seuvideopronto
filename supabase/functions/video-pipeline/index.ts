@@ -321,25 +321,45 @@ serve(async (req) => {
       },
     };
 
-    const renderRes = await fetch("https://api.shotstack.io/edit/stage/render", {
-      method: "POST",
-      headers: {
-        "x-api-key": SHOTSTACK_API_KEY,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(shotstackPayload),
-    });
+    // Detecta ambiente Shotstack (stage vs v1) — tenta o configurado e cai no outro em 401/403
+    const preferredEnv = (Deno.env.get("SHOTSTACK_ENV") || "stage").toLowerCase() === "v1" ? "v1" : "stage";
+    const envOrder = preferredEnv === "v1" ? ["v1", "stage"] : ["stage", "v1"];
+    let shotstackEnv = preferredEnv;
+    let renderRes: Response | null = null;
+    let lastErrText = "";
+    let lastStatus = 0;
+    for (const env of envOrder) {
+      const r = await fetch(`https://api.shotstack.io/edit/${env}/render`, {
+        method: "POST",
+        headers: {
+          "x-api-key": SHOTSTACK_API_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(shotstackPayload),
+      });
+      if (r.ok) {
+        renderRes = r;
+        shotstackEnv = env;
+        break;
+      }
+      lastStatus = r.status;
+      lastErrText = await r.text();
+      console.error(`Shotstack render error [${env}]:`, r.status, lastErrText);
+      // Só tenta outro env quando for problema de credenciais
+      if (r.status !== 401 && r.status !== 403) break;
+    }
 
-    if (!renderRes.ok) {
-      const errText = await renderRes.text();
-      console.error("Shotstack render error:", renderRes.status, errText);
+    if (!renderRes) {
+      const hint = (lastStatus === 401 || lastStatus === 403)
+        ? "Chave Shotstack inválida para os endpoints stage e v1. Verifique a SHOTSTACK_API_KEY (precisa ser do mesmo ambiente)."
+        : `Shotstack render failed: ${lastStatus}`;
       await updateJob(jobId, {
         status: "error",
         progress: 100,
         video_url: null,
-        error: `Shotstack render failed: ${renderRes.status}`,
+        error: hint,
       });
-      return json({ jobId, status: "error", images: imageUrls, audioUrl });
+      return json({ jobId, status: "error", images: imageUrls, audioUrl, detail: lastErrText }, 200);
     }
 
     const renderData = await renderRes.json();
@@ -357,7 +377,7 @@ serve(async (req) => {
     for (let i = 0; i < 60; i++) {
       await delay(5000);
 
-      const pollRes = await fetch(`https://api.shotstack.io/edit/stage/render/${renderId}`, {
+      const pollRes = await fetch(`https://api.shotstack.io/edit/${shotstackEnv}/render/${renderId}`, {
         headers: { "x-api-key": SHOTSTACK_API_KEY },
       });
 
