@@ -126,6 +126,13 @@ const VideoSection = () => {
       if (data) {
         setJobs(data as VideoJob[]);
         resolveUrls(data as VideoJob[]);
+        // Auto-heal (gap #7): re-enfileira jobs terminais sem video_url
+        (data as VideoJob[]).forEach((j) => {
+          autoHealJob({
+            id: j.id, status: j.status,
+            video_url: j.video_url, image_url: j.image_url, prompt: j.prompt,
+          }).catch(() => {});
+        });
       }
     };
     load();
