@@ -1,52 +1,35 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
+declare const EdgeRuntime: { waitUntil: (promise: Promise<unknown>) => void };
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
+const pipelineSecret = Deno.env.get("PIPELINE_SECRET") || supabaseServiceRoleKey;
 
-const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
-  auth: { persistSession: false },
-});
-
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-const updateJob = async (jobId: string, updates: Record<string, unknown>) => {
-  const { error } = await adminClient.from("video_jobs").update(updates).eq("id", jobId);
-  if (error) throw error;
-};
+const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey, { auth: { persistSession: false } });
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-
-  if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Metodo nao permitido" }), {
-      status: 405,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
+  if (req.method !== "POST") return json({ error: "Metodo nao permitido" }, 405);
 
   try {
     if (!supabaseUrl || !supabaseServiceRoleKey || !supabaseAnonKey) {
-      return new Response(JSON.stringify({ error: "Supabase env not configured." }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return json({ error: "Supabase env not configured." }, 500);
     }
 
     const authHeader = req.headers.get("Authorization") || "";
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    if (!authHeader) return json({ error: "Unauthorized" }, 401);
 
     const userClient = createClient(supabaseUrl, supabaseAnonKey, {
       auth: { persistSession: false },
@@ -54,121 +37,54 @@ serve(async (req) => {
     });
 
     const { data: authData, error: authError } = await userClient.auth.getUser();
-    if (authError || !authData?.user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    if (authError || !authData?.user) return json({ error: "Unauthorized" }, 401);
 
-    const { jobId, imageUrl, productType, style, useDarkflow, useViral, prompt, textoNaTela, narracao, modePro } =
-      await req.json();
-
-    if (!jobId || !imageUrl) {
-      return new Response(JSON.stringify({ error: "jobId e imageUrl sao obrigatorios" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    const { jobId, imageUrl, prompt } = await req.json();
+    if (!jobId) return json({ error: "jobId obrigatorio" }, 400);
 
     const { data: job, error: jobError } = await adminClient
       .from("video_jobs")
-      .select("id, user_id")
+      .select("id,user_id,metadata")
       .eq("id", jobId)
       .maybeSingle();
 
-    if (jobError || !job?.id) {
-      return new Response(JSON.stringify({ error: "Job nao encontrado" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    if (jobError || !job?.id) return json({ error: "Job nao encontrado" }, 404);
 
     if (job.user_id !== authData.user.id) {
-      const { data: adminRole } = await adminClient
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", authData.user.id)
-        .eq("role", "admin")
-        .maybeSingle();
-
-      if (!adminRole) {
-        return new Response(JSON.stringify({ error: "Forbidden" }), {
-          status: 403,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+      const { data: isAdmin } = await adminClient.rpc("has_role", { _user_id: authData.user.id, _role: "admin" });
+      if (!isAdmin) return json({ error: "Forbidden" }, 403);
     }
 
-    await updateJob(jobId, {
-      status: "processing",
-      progress: 5,
-      image_url: imageUrl,
-      prompt: prompt ?? null,
+    await adminClient.from("video_jobs").update({
+      status: "pending",
+      progress: 0,
+      image_url: imageUrl || undefined,
+      prompt: prompt ?? undefined,
+      video_url: null,
       error: null,
-    });
-    await delay(400);
-    await updateJob(jobId, { status: "generating_prompt", progress: 15 });
-    await delay(400);
+      provider: "native",
+      render_mode: "native_pipeline",
+      metadata: {
+        ...((job.metadata as Record<string, unknown>) || {}),
+        pipeline_lock: false,
+        requested_by: "process-video-job",
+        requested_at: new Date().toISOString(),
+      },
+    }).eq("id", jobId);
 
-    const response = await fetch(`${supabaseUrl}/functions/v1/generate-video`, {
+    EdgeRuntime.waitUntil(fetch(`${supabaseUrl}/functions/v1/pipeline-step`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${supabaseServiceRoleKey}`,
+        "x-pipeline-secret": pipelineSecret,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        imageUrl,
-        estilo: useDarkflow ? "darkflow" : "cinematografico",
-        movimento: useViral ? "cortes dinamicos" : "zoom cinematografico",
-        duracao: 6,
-        conteudoRelacionado: true,
-        produto: productType,
-        nicho: style,
-        prompt,
-        textoNaTela,
-        narracao,
-        modePro: Boolean(modePro),
-      }),
-    });
+      body: JSON.stringify({ jobId, source: "process-video-job" }),
+    }));
 
-    if (!response.ok) {
-      const text = await response.text();
-      console.error("generate-video error:", response.status, text);
-      await updateJob(jobId, {
-        status: "error",
-        progress: 100,
-        video_url: null,
-        error: text || "Falha ao gerar video — aguardando reprocessamento",
-      });
-      return new Response(
-        JSON.stringify({ id: jobId, status: "error", prompt, textoNaTela, narracao, modePro }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    const data = await response.json();
-    const videoUrl = data?.videoUrl || data?.video_url || null;
-
-    if (!videoUrl) {
-      await updateJob(jobId, { status: "error", progress: 100, video_url: null, error: "Video vazio" });
-      return new Response(JSON.stringify({ id: jobId, status: "error", prompt, textoNaTela, narracao, modePro }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    await updateJob(jobId, { status: "completed", progress: 100, video_url: videoUrl, error: null });
-
-    return new Response(JSON.stringify({ id: jobId, status: "completed", video_url: videoUrl, prompt, textoNaTela, narracao, modePro }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return json({ ok: true, accepted: true, id: jobId, status: "pending" }, 202);
   } catch (e) {
     console.error("Error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
   }
 });
