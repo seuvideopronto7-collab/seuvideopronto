@@ -267,8 +267,10 @@ const VideoSection = () => {
                     <p className="text-[10px] text-muted-foreground/60">
                       {new Date(job.created_at).toLocaleDateString("pt-BR")}
                     </p>
-                    {isFailed && job.error && (
-                      <p className="text-[10px] text-red-400/80 line-clamp-2">{job.error}</p>
+                    {isFailed && (
+                      <p className="text-[10px] text-red-400/80 line-clamp-2">
+                        Tivemos um problema ao renderizar este vídeo. Toque em <strong>Tentar</strong> para reprocessar.
+                      </p>
                     )}
                   </div>
 
