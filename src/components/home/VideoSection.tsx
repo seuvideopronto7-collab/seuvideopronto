@@ -143,8 +143,8 @@ const VideoSection = () => {
         jobsRef.current = list;
         setJobs(list);
         resolveUrls(list);
-        // Consumer/watchdog frontend: apenas chuta o backend 1x por ciclo e evita loops.
-        (data as VideoJob[]).forEach((j) => {
+        // Consumer/watchdog frontend: usa jobsRef.current (sem stale closure) e chuta o backend 1x por ciclo.
+        jobsRef.current.forEach((j) => {
           const meta = j.metadata || {};
           const lockedAt = meta.pipeline_locked_at ? Date.parse(meta.pipeline_locked_at) : 0;
           const lockFresh = Boolean(meta.pipeline_lock) && Date.now() - lockedAt < 5 * 60 * 1000;
