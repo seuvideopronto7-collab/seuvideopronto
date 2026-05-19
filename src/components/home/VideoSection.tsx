@@ -139,8 +139,10 @@ const VideoSection = () => {
         .order("created_at", { ascending: false })
         .limit(6);
       if (data) {
-        setJobs(data as VideoJob[]);
-        resolveUrls(data as VideoJob[]);
+        const list = data as VideoJob[];
+        jobsRef.current = list;
+        setJobs(list);
+        resolveUrls(list);
         // Consumer/watchdog frontend: apenas chuta o backend 1x por ciclo e evita loops.
         (data as VideoJob[]).forEach((j) => {
           const meta = j.metadata || {};
