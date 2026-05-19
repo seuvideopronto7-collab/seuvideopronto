@@ -53,7 +53,10 @@ const PROCESSING_STATUSES = new Set([
 const WATCHED_STATUSES = new Set([
   "pending", "queued", "processing", "generating_prompt", "generating_script",
   "script_ready", "generating_audio", "generating_voice", "rendering", "uploading",
+  "generating_images", "generating_video", "fallback_processing",
 ]);
+
+const STUCK_JOB_MS = 5 * 60 * 1000;
 
 async function toSignedUrl(url: string | null): Promise<string | null> {
   if (!url) return null;
@@ -149,6 +152,25 @@ const VideoSection = () => {
           const meta = j.metadata || {};
           const lockedAt = meta.pipeline_locked_at ? Date.parse(meta.pipeline_locked_at) : 0;
           const lockFresh = Boolean(meta.pipeline_lock) && Date.now() - lockedAt < 5 * 60 * 1000;
+          const updatedAt = j.metadata?.browser_render_started_at
+            ? Date.parse(String(j.metadata.browser_render_started_at))
+            : Date.parse(j.created_at);
+
+          if (WATCHED_STATUSES.has(j.status) && Number.isFinite(updatedAt) && Date.now() - updatedAt > STUCK_JOB_MS) {
+            logVideoEvent("PIPELINE_TIMEOUT", { jobId: j.id, status: j.status, timeoutMs: STUCK_JOB_MS });
+            supabase
+              .from("video_jobs")
+              .update({
+                status: "failed",
+                progress: 100,
+                video_url: null,
+                error: "pipeline_timeout",
+                metadata: { ...meta, pipeline_lock: false, needs_browser_render: false, timed_out_at: new Date().toISOString() },
+              } as never)
+              .eq("id", j.id)
+              .then(() => {}, () => {});
+            return;
+          }
 
           if (WATCHED_STATUSES.has(j.status) && !lockFresh) {
             const attempts = pipelineAttempts.current[j.id] || 0;
