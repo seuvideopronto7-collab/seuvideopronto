@@ -182,7 +182,7 @@ export const renderNativeVideo = async (
 
     const data = await ffmpeg.readFile(finalName);
     await safeDelete(ffmpeg, finalName);
-    const blob = new Blob([(data as Uint8Array).buffer], { type: "video/mp4" });
+    const blob = new Blob([(data as Uint8Array).buffer as ArrayBuffer], { type: "video/mp4" });
 
     // 100 — upload (ou blob URL)
     let videoUrl = URL.createObjectURL(blob);
