@@ -222,7 +222,8 @@ const VideoSection = () => {
               const Icon = cfg.icon;
               const urls = signedUrls[job.id] || {};
               const isTerminalReady = ["completed", "done", "fallback_completed"].includes(job.status);
-              const isReady = isTerminalReady && !!urls.video;
+              const videoValid = !!urls.video && validateVideoUrl(urls.video, { allowedImageUrl: job.image_url }).ok;
+              const isReady = isTerminalReady && videoValid;
               const isFailed = ["failed", "error"].includes(job.status);
               const canRetry = isFailed && !PROCESSING_STATUSES.has(job.status);
 
