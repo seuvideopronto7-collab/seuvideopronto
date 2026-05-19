@@ -26,7 +26,17 @@ async function updateJob(jobId: string, patch: Record<string, unknown>) {
   await supabase.from("video_jobs").update(patch as never).eq("id", jobId);
 }
 
+const BLOCKED_MIME = /^(image\/|text\/html|application\/json)/i;
+
+function assertVideoBlob(blob: Blob) {
+  const t = (blob.type || "").toLowerCase();
+  if (t && BLOCKED_MIME.test(t)) throw new Error("invalid_video_content_type");
+  if (t && !t.startsWith("video/")) throw new Error("invalid_video_content_type");
+  if (blob.size < 1000) throw new Error("empty_video_output");
+}
+
 async function uploadBlob(jobId: string, blob: Blob, extension: "mp4" | "webm") {
+  assertVideoBlob(blob);
   const { data: userData } = await supabase.auth.getUser();
   const uid = userData.user?.id;
   if (!uid) throw new Error("unauthorized");
@@ -45,7 +55,7 @@ async function persistRenderedUrl(jobId: string, url: string, preferredExt: "mp4
   const res = await fetch(url);
   if (!res.ok) throw new Error("empty_video_output");
   const blob = await res.blob();
-  if (blob.size < 1000) throw new Error("empty_video_output");
+  assertVideoBlob(blob);
   return uploadBlob(jobId, blob, preferredExt);
 }
 
