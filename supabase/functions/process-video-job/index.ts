@@ -60,8 +60,18 @@ function cleanMeta(meta: Record<string, any> | null | undefined) {
 }
 
 async function updateJob(jobId: string, patch: Record<string, unknown>) {
-  const { error } = await admin.from("video_jobs").update(patch).eq("id", jobId);
+  // Heartbeat automático em toda atualização — watchdog do DB depende disso
+  const withHeartbeat = { ...patch, last_heartbeat: new Date().toISOString() };
+  const { error } = await admin.from("video_jobs").update(withHeartbeat).eq("id", jobId);
   if (error) throw error;
+}
+
+async function heartbeat(jobId: string) {
+  try {
+    await admin.from("video_jobs").update({ last_heartbeat: new Date().toISOString() }).eq("id", jobId);
+  } catch {
+    // best-effort
+  }
 }
 
 async function logEvent(jobId: string, event: string, payload: Record<string, unknown> = {}) {
