@@ -271,7 +271,11 @@ async function processJob(jobId: string) {
     await logEvent(jobId, "VIDEO_RENDER_STARTED", { provider: shotstackKey ? "shotstack" : "browser_required" });
 
     const renderedUrl = await renderWithShotstack(job, script, audioUrl);
-    if (!renderedUrl) {
+    const renderedCheck = isValidVideoUrl(renderedUrl, job.image_url);
+    if (!renderedUrl || !renderedCheck.ok) {
+      if (renderedUrl && !renderedCheck.ok) {
+        await logEvent(jobId, "PIPELINE_FAKE_VIDEO_BLOCKED", { url: renderedUrl, reason: renderedCheck.reason });
+      }
       await logEvent(jobId, "VIDEO_RENDER_EMPTY", { fallback: "browser_renderer_required" });
       await updateJob(jobId, {
         status: "fallback_processing",
@@ -294,9 +298,10 @@ async function processJob(jobId: string) {
     const storedUrl = await uploadVideo(job, renderedUrl);
     await logEvent(jobId, "VIDEO_UPLOAD_SUCCESS", { url: storedUrl });
 
-    if (!storedUrl || storedUrl.trim().length === 0) {
-      await logEvent(jobId, "VIDEO_RENDER_EMPTY", { reason: "stored_url_empty" });
-      await releaseLock(jobId, meta, { status: "error", progress: 100, video_url: null, error: "empty_video_output" });
+    const storedCheck = isValidVideoUrl(storedUrl, job.image_url);
+    if (!storedCheck.ok) {
+      await logEvent(jobId, "PIPELINE_INVALID_VIDEO_URL", { url: storedUrl, reason: storedCheck.reason });
+      await releaseLock(jobId, meta, { status: "failed", progress: 100, video_url: null, error: storedCheck.reason || "empty_video_output" });
       return;
     }
 
