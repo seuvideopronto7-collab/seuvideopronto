@@ -43,10 +43,58 @@ type Caller = { service: boolean; userId?: string };
 const log = (event: string, payload: Record<string, unknown> = {}) =>
   console.log(`[PIPELINE] ${event}`, JSON.stringify(payload));
 
-async function updateJob(id: string, patch: Record<string, unknown>) {
-  const { error } = await admin.from("video_jobs").update(patch).eq("id", id);
-  if (error) log("DB_UPDATE_FAILED", { id, error: error.message });
+const FALLBACK_COLUMNS = [
+  "user_id",
+  "status",
+  "progress",
+  "image_url",
+  "prompt",
+  "video_url",
+  "audio_url",
+  "error",
+  "metadata",
+  "provider",
+  "render_mode",
+  "scenes",
+  "images",
+  "updated_at",
+];
+let cachedColumns: string[] | null = null;
+
+async function getJobColumns(): Promise<string[]> {
+  if (cachedColumns) return cachedColumns;
+  try {
+    const { data, error } = await admin.from("video_jobs").select("*").limit(1);
+    if (error) throw error;
+    if (data && data.length > 0) {
+      cachedColumns = Object.keys(data[0]);
+      return cachedColumns;
+    }
+    console.warn("PIPELINE_SCHEMA_EMPTY_TABLE_FALLBACK");
+    cachedColumns = FALLBACK_COLUMNS;
+    return cachedColumns;
+  } catch (e) {
+    log("PIPELINE_SCHEMA_FALLBACK", { error: String(e) });
+    cachedColumns = FALLBACK_COLUMNS;
+    return cachedColumns;
+  }
 }
+
+function filterPatch(patch: Record<string, unknown>, cols: string[]): Record<string, unknown> {
+  const allowed = new Set(cols);
+  const out: Record<string, unknown> = {};
+  for (const k of Object.keys(patch)) if (allowed.has(k)) out[k] = patch[k];
+  return out;
+}
+
+async function updateJob(id: string, patch: Record<string, unknown>) {
+  const cols = await getJobColumns();
+  const safe = filterPatch(patch, cols);
+  if (Object.keys(safe).length === 0) return;
+  const { error } = await admin.from("video_jobs").update(safe).eq("id", id);
+  if (error) log("DB_UPDATE_FAILED", { id, error: error.message, keys: Object.keys(safe) });
+}
+
 
 async function logRenderEvent(jobId: string, event: string, payload: Record<string, unknown> = {}) {
   log(event, { jobId, ...payload });
