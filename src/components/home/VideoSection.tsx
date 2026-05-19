@@ -35,6 +35,7 @@ const statusConfig: Record<string, { label: string; icon: any; color: string }> 
   generating_images: { label: "Gerando imagens", icon: Clock, color: "text-purple-400" },
   generating_video: { label: "Gerando vídeo", icon: Clock, color: "text-purple-400" },
   generating_prompt: { label: "Preparando", icon: Clock, color: "text-blue-400" },
+  fallback_processing: { label: "Render nativo", icon: Clock, color: "text-purple-400" },
   fallback_completed: { label: "Pronto (fallback)", icon: CheckCircle2, color: "text-green-400" },
   done: { label: "Pronto", icon: CheckCircle2, color: "text-green-400" },
   completed: { label: "Pronto", icon: CheckCircle2, color: "text-green-400" },
@@ -167,6 +168,7 @@ const VideoSection = () => {
       }
     };
     load();
+    const polling = window.setInterval(load, 5000);
 
     // Realtime filtrado por user_id (gap #1)
     const channel = supabase
@@ -183,7 +185,10 @@ const VideoSection = () => {
       )
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      window.clearInterval(polling);
+      supabase.removeChannel(channel);
+    };
   }, [user, resolveUrls]);
 
   if (jobs.length === 0) return null;
