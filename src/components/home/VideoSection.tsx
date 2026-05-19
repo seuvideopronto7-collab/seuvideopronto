@@ -1,9 +1,10 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Film, Clock, CheckCircle2, AlertCircle, Trash2, X, Download, RefreshCw } from "lucide-react";
+import { Film, Clock, CheckCircle2, AlertCircle, Trash2, X, Download, RefreshCw, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import VideoCardMedia from "./VideoCardMedia";
+import { retryVideoJob, isRetryLocked, autoHealJob } from "@/services/video/retryVideoJob";
 
 type VideoJob = {
   id: string;
