@@ -329,6 +329,24 @@ async function processJob(jobId: string) {
   }
 }
 
+async function safeProcessJob(jobId: string) {
+  try {
+    await processJob(jobId);
+  } catch (fatal) {
+    const message = fatal instanceof Error ? fatal.message : "fatal_crash";
+    try { await logEvent(jobId, "VIDEO_JOB_FAILED", { error: message, fatal: true }); } catch { /* noop */ }
+    try {
+      await admin.from("video_jobs").update({
+        status: "error",
+        progress: 100,
+        video_url: null,
+        error: message,
+        metadata: { pipeline_lock: false, fatal_crash_at: new Date().toISOString() },
+      } as never).eq("id", jobId);
+    } catch { /* last resort */ }
+  }
+}
+
 async function recoverStalled() {
   const cutoff = new Date(Date.now() - LOCK_TTL_MS).toISOString();
   const { data: jobs } = await admin
