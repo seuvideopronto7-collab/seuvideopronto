@@ -232,9 +232,12 @@ function isValidVideoUrl(url: string | null | undefined, imageUrl?: string | nul
 async function uploadVideo(job: JobRow, url: string) {
   const res = await fetch(url);
   if (!res.ok) throw new Error("empty_video_output");
-  const ctype = res.headers.get("content-type") || "";
-  if (ctype && !ctype.startsWith("video/")) {
-    throw new Error(`invalid_content_type:${ctype}`);
+  const ctype = (res.headers.get("content-type") || "").toLowerCase();
+  if (ctype) {
+    if (/^image\//.test(ctype) || /^text\/html/.test(ctype) || /^application\/json/.test(ctype)) {
+      throw new Error("invalid_video_content_type");
+    }
+    if (!ctype.startsWith("video/")) throw new Error("invalid_video_content_type");
   }
   const buffer = await res.arrayBuffer();
   if (!buffer || buffer.byteLength === 0 || buffer.byteLength < 1000) throw new Error("empty_video_output");
