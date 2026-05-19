@@ -1,10 +1,12 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Film, Clock, CheckCircle2, AlertCircle, Trash2, X, Download, RefreshCw, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import VideoCardMedia from "./VideoCardMedia";
 import { retryVideoJob, isRetryLocked, autoHealJob } from "@/services/video/retryVideoJob";
+import { runPipelineStep, triggerPipelineRecovery } from "@/services/video/runPipelineStep";
+import { renderBrowserFallbackForJob } from "@/services/video/browserVideoRender";
 
 type VideoJob = {
   id: string;
@@ -16,6 +18,10 @@ type VideoJob = {
   progress: number;
   created_at: string;
   error?: string | null;
+  audio_url?: string | null;
+  metadata?: Record<string, any> | null;
+  images?: unknown;
+  scenes?: unknown;
 };
 
 const statusConfig: Record<string, { label: string; icon: any; color: string }> = {
@@ -37,9 +43,14 @@ const statusConfig: Record<string, { label: string; icon: any; color: string }> 
 };
 
 const PROCESSING_STATUSES = new Set([
-  "pending", "queued", "processing", "rendering",
+  "pending", "queued", "processing", "rendering", "uploading",
   "generating_script", "generating_voice", "generating_images",
-  "generating_video", "generating_prompt", "script_ready",
+  "generating_video", "generating_prompt", "script_ready", "generating_audio",
+]);
+
+const WATCHED_STATUSES = new Set([
+  "pending", "queued", "processing", "generating_prompt", "generating_script",
+  "script_ready", "generating_audio", "generating_voice", "rendering", "uploading",
 ]);
 
 async function toSignedUrl(url: string | null): Promise<string | null> {
@@ -66,6 +77,8 @@ const VideoSection = () => {
   const [retrying, setRetrying] = useState<string | null>(null);
   const [activeVideo, setActiveVideo] = useState<string | null>(null);
   const [signedUrls, setSignedUrls] = useState<Record<string, { video?: string; image?: string }>>({});
+  const pipelineAttempts = useRef<Record<string, number>>({});
+  const browserRenderAttempts = useRef<Record<string, number>>({});
 
   const handleDelete = async (jobId: string) => {
     if (!confirm("Tem certeza que deseja excluir este vídeo?")) return;
@@ -126,13 +139,31 @@ const VideoSection = () => {
       if (data) {
         setJobs(data as VideoJob[]);
         resolveUrls(data as VideoJob[]);
-        // Auto-heal (gap #7): re-enfileira jobs terminais sem video_url
+        // Consumer/watchdog frontend: apenas chuta o backend 1x por ciclo e evita loops.
         (data as VideoJob[]).forEach((j) => {
+          const meta = j.metadata || {};
+          const lockedAt = meta.pipeline_locked_at ? Date.parse(meta.pipeline_locked_at) : 0;
+          const lockFresh = Boolean(meta.pipeline_lock) && Date.now() - lockedAt < 5 * 60 * 1000;
+
+          if (WATCHED_STATUSES.has(j.status) && !lockFresh) {
+            const attempts = pipelineAttempts.current[j.id] || 0;
+            if (attempts < 1) {
+              pipelineAttempts.current[j.id] = attempts + 1;
+              runPipelineStep(j.id).catch(() => {});
+            }
+          }
+
+          if (j.status === "fallback_processing" && meta.needs_browser_render && !browserRenderAttempts.current[j.id]) {
+            browserRenderAttempts.current[j.id] = 1;
+            renderBrowserFallbackForJob(j).catch(() => {});
+          }
+
           autoHealJob({
             id: j.id, status: j.status,
             video_url: j.video_url, image_url: j.image_url, prompt: j.prompt,
           }).catch(() => {});
         });
+        triggerPipelineRecovery().catch(() => {});
       }
     };
     load();
