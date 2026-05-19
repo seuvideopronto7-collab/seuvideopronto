@@ -365,7 +365,7 @@ async function recoverStalled() {
       error: null,
       metadata: { ...meta, pipeline_lock: false, recovered_at: new Date().toISOString() },
     });
-    EdgeRuntime.waitUntil(processJob(job.id));
+    EdgeRuntime.waitUntil(safeProcessJob(job.id));
   }
 
   const { data: browserStale } = await admin
@@ -417,6 +417,6 @@ serve(async (req) => {
   if (!job) return json({ error: "Job nao encontrado" }, 404);
   if (!(await canAccess(job, authHeader, secret))) return json({ error: "Unauthorized" }, 401);
 
-  EdgeRuntime.waitUntil(processJob(jobId));
+  EdgeRuntime.waitUntil(safeProcessJob(jobId));
   return json({ ok: true, accepted: true, id: jobId, status: "processing" }, 202);
 });
