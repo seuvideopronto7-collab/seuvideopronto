@@ -59,7 +59,7 @@ export async function renderVideoNative(input: RenderVideoNativeInput): Promise<
     imageUrl: url,
     durationSec: sceneDur,
     text: i === 0 && input.captionText ? input.captionText : undefined,
-    animation: i % 2 === 0 ? "ken_burns_in" : "ken_burns_out",
+    animation: "kenburns",
   }));
 
   return await renderNativeCore({
