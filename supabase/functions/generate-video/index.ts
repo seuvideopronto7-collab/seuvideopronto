@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
+declare const EdgeRuntime: { waitUntil: (promise: Promise<unknown>) => void };
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -343,16 +345,33 @@ serve(async (req) => {
         .from("video_jobs")
         .insert({
           user_id: callerUserId,
-          status: "started",
+          status: "pending",
           prompt: prompt || null,
           image_url: resolvedImageUrl,
-          progress: 5,
+          video_url: null,
+          error: null,
+          provider: "native",
+          render_mode: "native_pipeline",
+          progress: 0,
+          metadata: { pipeline_lock: false, requested_by: "generate-video", requested_at: new Date().toISOString() },
         })
         .select("id")
         .single();
 
       if (jobError) throw jobError;
       jobId = job.id;
+
+      EdgeRuntime.waitUntil(fetch(`${supabaseUrl}/functions/v1/process-video-job`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${serviceRoleKey}`,
+          "x-pipeline-secret": Deno.env.get("PIPELINE_SECRET") || serviceRoleKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ jobId, imageUrl: resolvedImageUrl, prompt, source: "generate-video" }),
+      }));
+
+      return json({ jobId, status: "pending", accepted: true }, 202);
     }
 
     // Ensure adminClient exists for storage operations
