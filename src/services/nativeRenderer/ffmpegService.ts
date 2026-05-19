@@ -1,29 +1,34 @@
 /**
- * 🎬 ffmpegService — Singleton FFmpeg.wasm loader (browser).
- * Carrega ffmpeg-core via CDN, expõe exec/writeFile/readFile/deleteFile.
- * Reaproveita a instância entre renders.
+ * 🎬 ffmpegService — Singleton FFmpeg.wasm loader (browser-only).
+ * Carrega ffmpeg-core a partir de assets LOCAIS em /public/ffmpeg/.
+ * Sem CDN externa, sem CORS, sem 404.
  */
 
 import type { FFmpeg } from "@ffmpeg/ffmpeg";
 
 let ffmpegPromise: Promise<FFmpeg> | null = null;
 
+const BASE_URL = "/ffmpeg";
+
 export const getFFmpeg = async (): Promise<FFmpeg> => {
+  if (typeof window === "undefined") throw new Error("ffmpeg_browser_only");
   if (!ffmpegPromise) {
     ffmpegPromise = (async () => {
-      const [{ FFmpeg }, { toBlobURL }] = await Promise.all([
-        import("@ffmpeg/ffmpeg"),
-        import("@ffmpeg/util"),
-      ]);
-      const ffmpeg = new FFmpeg();
-      const baseUrl = "https://unpkg.com/@ffmpeg/core@0.12.6/dist";
-      const [coreURL, wasmURL, workerURL] = await Promise.all([
-        toBlobURL(`${baseUrl}/ffmpeg-core.js`, "text/javascript"),
-        toBlobURL(`${baseUrl}/ffmpeg-core.wasm`, "application/wasm"),
-        toBlobURL(`${baseUrl}/ffmpeg-core.worker.js`, "text/javascript"),
-      ]);
-      await ffmpeg.load({ coreURL, wasmURL, workerURL });
-      return ffmpeg;
+      try {
+        const { FFmpeg } = await import("@ffmpeg/ffmpeg");
+        const ffmpeg = new FFmpeg();
+        await ffmpeg.load({
+          coreURL: `${BASE_URL}/ffmpeg-core.js`,
+          wasmURL: `${BASE_URL}/ffmpeg-core.wasm`,
+        });
+        console.log("[FFMPEG] loaded from local /ffmpeg/");
+        return ffmpeg;
+      } catch (err) {
+        // Reset singleton para permitir nova tentativa (ou fallback Canvas)
+        ffmpegPromise = null;
+        console.warn("[FFMPEG] load failed, caller should fallback to Canvas", err);
+        throw err;
+      }
     })();
   }
   return ffmpegPromise;
