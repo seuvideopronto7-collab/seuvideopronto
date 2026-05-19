@@ -667,6 +667,10 @@ export type Database = {
         Args: { _fingerprint: string; _user_id: string }
         Returns: Json
       }
+      claim_video_job: {
+        Args: { _job_id: string; _lock_ttl_seconds?: number }
+        Returns: Json
+      }
       fn_resolver_video_provider: { Args: never; Returns: Json }
       has_role: {
         Args: {

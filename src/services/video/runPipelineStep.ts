@@ -7,7 +7,7 @@ import { logVideoEvent } from "./videoLogger";
  */
 export async function runPipelineStep(jobId: string): Promise<{ ok: boolean; error?: string }> {
   try {
-    const { data, error } = await supabase.functions.invoke("pipeline-step", {
+    const { data, error } = await supabase.functions.invoke("process-video-job", {
       body: { jobId },
     });
     if (error) {
@@ -22,5 +22,5 @@ export async function runPipelineStep(jobId: string): Promise<{ ok: boolean; err
 
 /** Aciona o ciclo de recovery manualmente (mesma rota usada pelo cron). */
 export async function triggerPipelineRecovery() {
-  return supabase.functions.invoke("pipeline-step", { body: { action: "recover" } });
+  return supabase.functions.invoke("process-video-job", { body: { action: "recover" } });
 }

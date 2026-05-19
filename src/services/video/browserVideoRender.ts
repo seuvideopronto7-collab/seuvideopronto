@@ -179,6 +179,7 @@ export async function renderBrowserFallbackForJob(job: BrowserRenderJob): Promis
         logVideoEvent("VIDEO_FALLBACK_TRIGGERED", { jobId: job.id, fallback: "canvas_capture", error: ffmpegError?.message });
         const url = await canvasCaptureFallback(job);
         if (!url) throw new Error("empty_video_output");
+        const persistedUrl = url;
         await updateJob(job.id, {
           video_url: persistedUrl,
           progress: 100,

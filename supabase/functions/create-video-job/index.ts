@@ -157,14 +157,14 @@ serve(async (req) => {
 
     if (error) throw error;
 
-    EdgeRuntime.waitUntil(fetch(`${supabaseUrl}/functions/v1/pipeline-step`, {
+    EdgeRuntime.waitUntil(fetch(`${supabaseUrl}/functions/v1/process-video-job`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${supabaseServiceRoleKey}`,
         "x-pipeline-secret": pipelineSecret,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ jobId: data.id, source: "create-video-job" }),
+      body: JSON.stringify({ jobId: data.id, imageUrl, prompt, source: "create-video-job" }),
     }));
 
     return new Response(JSON.stringify({ id: data.id, status: "pending", accepted: true }), {
