@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
+declare const EdgeRuntime: { waitUntil: (promise: Promise<unknown>) => void };
+
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-pipeline-secret",
@@ -292,7 +294,6 @@ async function processOne(jobId: string, caller: Caller) {
     await updateJob(jobId, {
       status: nextStatus,
       progress: isCompleting ? 100 : Math.min(95, Math.round(((Object.keys(NEXT).indexOf(j.status) + 1) / Object.keys(NEXT).length) * 100)),
-      error: isCompleting ? null : undefined,
       metadata: { ...(latest?.metadata || meta), pipeline_lock: false, current_step: nextStatus, last_step_ms: Date.now() - startedAt },
     });
     await logRenderEvent(jobId, "PIPELINE_STEP_COMPLETED", { from: j.status, to: nextStatus, ms: Date.now() - startedAt });
@@ -371,6 +372,6 @@ serve(async (req) => {
   if (!serviceCaller && !caller.userId) return json({ error: "unauthorized" }, 401);
   if (!body?.jobId) return json({ error: "jobId_required" }, 400);
   await logRenderEvent(body.jobId, "VIDEO_PIPELINE_STARTED", { status: "accepted" });
-  const r = await processOne(body.jobId, caller);
-  return json(r);
+  EdgeRuntime.waitUntil(processOne(body.jobId, caller));
+  return json({ ok: true, accepted: true, jobId: body.jobId }, 202);
 });
