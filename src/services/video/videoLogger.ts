@@ -12,7 +12,14 @@ export type VideoLogEvent =
   | "VIDEO_NATIVE_RENDER_STARTED"
   | "VIDEO_NATIVE_RENDER_COMPLETED"
   | "VIDEO_PLAYER_ERROR"
-  | "AUTO_HEAL_VIDEO_JOB";
+  | "AUTO_HEAL_VIDEO_JOB"
+  | "VIDEO_PIPELINE_STARTED"
+  | "VIDEO_RENDER_STARTED"
+  | "VIDEO_RENDER_COMPLETED"
+  | "VIDEO_UPLOAD_COMPLETED"
+  | "VIDEO_EMPTY_OUTPUT"
+  | "VIDEO_PIPELINE_FAILED"
+  | "VIDEO_PIPELINE_RECOVERED";
 
 export function logVideoEvent(event: VideoLogEvent, payload?: Record<string, unknown>) {
   const key = `${event}:${payload?.jobId ?? "global"}`;
