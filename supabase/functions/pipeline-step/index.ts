@@ -381,6 +381,9 @@ async function safeProcessOne(jobId: string, caller: Caller) {
       } as never).eq("id", jobId);
     } catch { /* last resort */ }
   }
+}
+
+
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
