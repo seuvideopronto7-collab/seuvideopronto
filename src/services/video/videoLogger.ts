@@ -19,7 +19,10 @@ export type VideoLogEvent =
   | "VIDEO_UPLOAD_COMPLETED"
   | "VIDEO_EMPTY_OUTPUT"
   | "VIDEO_PIPELINE_FAILED"
-  | "VIDEO_PIPELINE_RECOVERED";
+  | "VIDEO_PIPELINE_RECOVERED"
+  | "PIPELINE_INVALID_VIDEO_URL"
+  | "PIPELINE_FAKE_VIDEO_BLOCKED"
+  | "PIPELINE_SCHEMA_FALLBACK";
 
 export function logVideoEvent(event: VideoLogEvent, payload?: Record<string, unknown>) {
   const key = `${event}:${payload?.jobId ?? "global"}`;

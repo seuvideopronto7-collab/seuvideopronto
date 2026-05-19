@@ -7,6 +7,7 @@ import VideoCardMedia from "./VideoCardMedia";
 import { retryVideoJob, isRetryLocked, autoHealJob } from "@/services/video/retryVideoJob";
 import { runPipelineStep, triggerPipelineRecovery } from "@/services/video/runPipelineStep";
 import { renderBrowserFallbackForJob } from "@/services/video/browserVideoRender";
+import { validateVideoUrl } from "@/services/video/validateVideoUrl";
 
 type VideoJob = {
   id: string;
@@ -74,6 +75,7 @@ async function toSignedUrl(url: string | null): Promise<string | null> {
 const VideoSection = () => {
   const { user } = useAuth();
   const [jobs, setJobs] = useState<VideoJob[]>([]);
+  const jobsRef = useRef<VideoJob[]>([]);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [retrying, setRetrying] = useState<string | null>(null);
   const [activeVideo, setActiveVideo] = useState<string | null>(null);
@@ -138,10 +140,12 @@ const VideoSection = () => {
         .order("created_at", { ascending: false })
         .limit(6);
       if (data) {
-        setJobs(data as VideoJob[]);
-        resolveUrls(data as VideoJob[]);
-        // Consumer/watchdog frontend: apenas chuta o backend 1x por ciclo e evita loops.
-        (data as VideoJob[]).forEach((j) => {
+        const list = data as VideoJob[];
+        jobsRef.current = list;
+        setJobs(list);
+        resolveUrls(list);
+        // Consumer/watchdog frontend: usa jobsRef.current (sem stale closure) e chuta o backend 1x por ciclo.
+        jobsRef.current.forEach((j) => {
           const meta = j.metadata || {};
           const lockedAt = meta.pipeline_locked_at ? Date.parse(meta.pipeline_locked_at) : 0;
           const lockFresh = Boolean(meta.pipeline_lock) && Date.now() - lockedAt < 5 * 60 * 1000;
@@ -219,7 +223,8 @@ const VideoSection = () => {
               const Icon = cfg.icon;
               const urls = signedUrls[job.id] || {};
               const isTerminalReady = ["completed", "done", "fallback_completed"].includes(job.status);
-              const isReady = isTerminalReady && !!urls.video;
+              const videoValid = !!urls.video && validateVideoUrl(urls.video, { allowedImageUrl: job.image_url }).ok;
+              const isReady = isTerminalReady && videoValid;
               const isFailed = ["failed", "error"].includes(job.status);
               const canRetry = isFailed && !PROCESSING_STATUSES.has(job.status);
 

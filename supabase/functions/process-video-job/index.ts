@@ -216,9 +216,26 @@ async function renderWithShotstack(job: JobRow, script: string, audioUrl: string
   return null;
 }
 
+function isValidVideoUrl(url: string | null | undefined, imageUrl?: string | null): { ok: boolean; reason?: string } {
+  if (!url || typeof url !== "string") return { ok: false, reason: "empty_url" };
+  const t = url.trim();
+  if (t.length === 0) return { ok: false, reason: "empty_url" };
+  if (imageUrl && t === imageUrl) return { ok: false, reason: "image_url_used_as_video" };
+  if (/\.(png|jpe?g|webp|gif|bmp|svg|avif)(\?|#|$)/i.test(t)) return { ok: false, reason: "image_extension_blocked" };
+  if (t.startsWith("blob:") || t.startsWith("data:image")) return { ok: false, reason: "invalid_blob" };
+  let path = t;
+  try { path = new URL(t).pathname; } catch { /* noop */ }
+  if (!/\.(mp4|webm|mov|m4v)$/i.test(path)) return { ok: false, reason: "not_video_extension" };
+  return { ok: true };
+}
+
 async function uploadVideo(job: JobRow, url: string) {
   const res = await fetch(url);
   if (!res.ok) throw new Error("empty_video_output");
+  const ctype = res.headers.get("content-type") || "";
+  if (ctype && !ctype.startsWith("video/")) {
+    throw new Error(`invalid_content_type:${ctype}`);
+  }
   const buffer = await res.arrayBuffer();
   if (!buffer || buffer.byteLength === 0 || buffer.byteLength < 1000) throw new Error("empty_video_output");
   const owner = job.user_id || "system";
@@ -254,7 +271,11 @@ async function processJob(jobId: string) {
     await logEvent(jobId, "VIDEO_RENDER_STARTED", { provider: shotstackKey ? "shotstack" : "browser_required" });
 
     const renderedUrl = await renderWithShotstack(job, script, audioUrl);
-    if (!renderedUrl) {
+    const renderedCheck = isValidVideoUrl(renderedUrl, job.image_url);
+    if (!renderedUrl || !renderedCheck.ok) {
+      if (renderedUrl && !renderedCheck.ok) {
+        await logEvent(jobId, "PIPELINE_FAKE_VIDEO_BLOCKED", { url: renderedUrl, reason: renderedCheck.reason });
+      }
       await logEvent(jobId, "VIDEO_RENDER_EMPTY", { fallback: "browser_renderer_required" });
       await updateJob(jobId, {
         status: "fallback_processing",
@@ -277,9 +298,10 @@ async function processJob(jobId: string) {
     const storedUrl = await uploadVideo(job, renderedUrl);
     await logEvent(jobId, "VIDEO_UPLOAD_SUCCESS", { url: storedUrl });
 
-    if (!storedUrl || storedUrl.trim().length === 0) {
-      await logEvent(jobId, "VIDEO_RENDER_EMPTY", { reason: "stored_url_empty" });
-      await releaseLock(jobId, meta, { status: "error", progress: 100, video_url: null, error: "empty_video_output" });
+    const storedCheck = isValidVideoUrl(storedUrl, job.image_url);
+    if (!storedCheck.ok) {
+      await logEvent(jobId, "PIPELINE_INVALID_VIDEO_URL", { url: storedUrl, reason: storedCheck.reason });
+      await releaseLock(jobId, meta, { status: "failed", progress: 100, video_url: null, error: storedCheck.reason || "empty_video_output" });
       return;
     }
 
