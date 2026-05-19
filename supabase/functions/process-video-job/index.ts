@@ -21,6 +21,19 @@ const shotstackEnv = (Deno.env.get("SHOTSTACK_ENV") || "stage").toLowerCase() ==
 
 const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
 const LOCK_TTL_MS = 5 * 60 * 1000;
+const HTTP_TIMEOUT_MS = 10_000;
+const MAX_VIDEO_MB = 250;
+const MAX_VIDEO_BYTES = MAX_VIDEO_MB * 1024 * 1024;
+
+async function fetchWithTimeout(url: string, init: RequestInit = {}, timeoutMs = HTTP_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 type JobRow = {
   id: string;
