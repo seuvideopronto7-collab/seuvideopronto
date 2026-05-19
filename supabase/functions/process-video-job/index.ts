@@ -196,14 +196,14 @@ async function renderWithShotstack(job: JobRow, script: string, audioUrl: string
     tracks.push({ clips: [{ asset: { type: "audio", src: audioUrl, volume: 1 }, start: 0, length: totalDuration }] });
   }
 
-  const create = await fetch(`https://api.shotstack.io/edit/${shotstackEnv}/render`, {
+  const create = await fetchWithTimeout(`https://api.shotstack.io/edit/${shotstackEnv}/render`, {
     method: "POST",
     headers: { "x-api-key": shotstackKey, "Content-Type": "application/json" },
     body: JSON.stringify({
       timeline: { background: "#000000", tracks },
       output: { format: "mp4", aspectRatio: "9:16", size: { width: 1080, height: 1920 }, fps: 30 },
     }),
-  });
+  }, HTTP_TIMEOUT_MS);
 
   if (!create.ok) {
     await logEvent(job.id, "VIDEO_JOB_FAILED", { stage: "render_create", status: create.status, error: await create.text() });
@@ -216,9 +216,9 @@ async function renderWithShotstack(job: JobRow, script: string, audioUrl: string
 
   for (let i = 0; i < 36; i++) {
     await delay(5000);
-    const poll = await fetch(`https://api.shotstack.io/edit/${shotstackEnv}/render/${renderId}`, {
+    const poll = await fetchWithTimeout(`https://api.shotstack.io/edit/${shotstackEnv}/render/${renderId}`, {
       headers: { "x-api-key": shotstackKey },
-    });
+    }, HTTP_TIMEOUT_MS);
     if (!poll.ok) continue;
     const data = await poll.json();
     const status = data?.response?.status;
