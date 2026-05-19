@@ -294,16 +294,19 @@ async function processOne(jobId: string, caller: Caller) {
     const nextStatus = NEXT[j.status] || "completed";
     const isCompleting = nextStatus === "completed";
     const { data: latest } = await admin.from("video_jobs").select("video_url,metadata,status").eq("id", jobId).maybeSingle();
-    if (isCompleting && (!latest?.video_url || String(latest.video_url).trim().length === 0)) {
-      await logRenderEvent(jobId, "VIDEO_EMPTY_OUTPUT", { step: j.status });
-      await updateJob(jobId, {
-        status: "error",
-        progress: 100,
-        video_url: null,
-        error: "empty_video_output",
-        metadata: { ...(latest?.metadata || meta), pipeline_lock: false, last_error_step: j.status },
-      });
-      return { ok: false, reason: "empty_video_output" };
+    if (isCompleting) {
+      const check = isValidVideoUrl(latest?.video_url || null, j.image_url);
+      if (!check.ok) {
+        await logRenderEvent(jobId, "PIPELINE_INVALID_VIDEO_URL", { step: j.status, videoUrl: latest?.video_url, reason: check.reason });
+        await updateJob(jobId, {
+          status: "failed",
+          progress: 100,
+          video_url: null,
+          error: check.reason === "image_url_used_as_video" ? "fake_video_blocked" : (check.reason || "empty_video_output"),
+          metadata: { ...(latest?.metadata || meta), pipeline_lock: false, last_error_step: j.status },
+        });
+        return { ok: false, reason: check.reason || "empty_video_output" };
+      }
     }
 
     if (latest?.status === "fallback_processing") {
