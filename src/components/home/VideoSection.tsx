@@ -186,6 +186,7 @@ const VideoSection = () => {
                   className="group relative rounded-xl overflow-hidden border border-border/30 bg-card/50 backdrop-blur-sm hover:border-primary/40 transition-all hover:shadow-[0_0_20px_-5px_hsl(var(--primary)/0.3)]"
                 >
                   <VideoCardMedia
+                    jobId={job.id}
                     videoUrl={urls.video}
                     imageUrl={urls.image}
                     status={job.status}
