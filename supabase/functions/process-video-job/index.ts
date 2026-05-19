@@ -21,6 +21,19 @@ const shotstackEnv = (Deno.env.get("SHOTSTACK_ENV") || "stage").toLowerCase() ==
 
 const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
 const LOCK_TTL_MS = 5 * 60 * 1000;
+const HTTP_TIMEOUT_MS = 10_000;
+const MAX_VIDEO_MB = 250;
+const MAX_VIDEO_BYTES = MAX_VIDEO_MB * 1024 * 1024;
+
+async function fetchWithTimeout(url: string, init: RequestInit = {}, timeoutMs = HTTP_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 type JobRow = {
   id: string;
@@ -131,11 +144,11 @@ async function generateAudio(jobId: string, script: string) {
   const apiKey = Deno.env.get("ELEVENLABS_API_KEY") || "";
   if (!apiKey) return null;
   try {
-    const res = await fetch("https://api.elevenlabs.io/v1/text-to-speech/onwK4e9ZLuTAKqWW03F9?output_format=mp3_44100_128", {
+    const res = await fetchWithTimeout("https://api.elevenlabs.io/v1/text-to-speech/onwK4e9ZLuTAKqWW03F9?output_format=mp3_44100_128", {
       method: "POST",
       headers: { "xi-api-key": apiKey, "Content-Type": "application/json" },
       body: JSON.stringify({ text: script, model_id: "eleven_multilingual_v2" }),
-    });
+    }, 15_000);
     if (!res.ok) return null;
     const buffer = await res.arrayBuffer();
     if (buffer.byteLength < 1024) return null;
@@ -183,14 +196,14 @@ async function renderWithShotstack(job: JobRow, script: string, audioUrl: string
     tracks.push({ clips: [{ asset: { type: "audio", src: audioUrl, volume: 1 }, start: 0, length: totalDuration }] });
   }
 
-  const create = await fetch(`https://api.shotstack.io/edit/${shotstackEnv}/render`, {
+  const create = await fetchWithTimeout(`https://api.shotstack.io/edit/${shotstackEnv}/render`, {
     method: "POST",
     headers: { "x-api-key": shotstackKey, "Content-Type": "application/json" },
     body: JSON.stringify({
       timeline: { background: "#000000", tracks },
       output: { format: "mp4", aspectRatio: "9:16", size: { width: 1080, height: 1920 }, fps: 30 },
     }),
-  });
+  }, HTTP_TIMEOUT_MS);
 
   if (!create.ok) {
     await logEvent(job.id, "VIDEO_JOB_FAILED", { stage: "render_create", status: create.status, error: await create.text() });
@@ -203,9 +216,9 @@ async function renderWithShotstack(job: JobRow, script: string, audioUrl: string
 
   for (let i = 0; i < 36; i++) {
     await delay(5000);
-    const poll = await fetch(`https://api.shotstack.io/edit/${shotstackEnv}/render/${renderId}`, {
+    const poll = await fetchWithTimeout(`https://api.shotstack.io/edit/${shotstackEnv}/render/${renderId}`, {
       headers: { "x-api-key": shotstackKey },
-    });
+    }, HTTP_TIMEOUT_MS);
     if (!poll.ok) continue;
     const data = await poll.json();
     const status = data?.response?.status;
@@ -230,7 +243,7 @@ function isValidVideoUrl(url: string | null | undefined, imageUrl?: string | nul
 }
 
 async function uploadVideo(job: JobRow, url: string) {
-  const res = await fetch(url);
+  const res = await fetchWithTimeout(url, {}, HTTP_TIMEOUT_MS);
   if (!res.ok) throw new Error("empty_video_output");
   const ctype = (res.headers.get("content-type") || "").toLowerCase();
   if (ctype) {
@@ -239,8 +252,17 @@ async function uploadVideo(job: JobRow, url: string) {
     }
     if (!ctype.startsWith("video/")) throw new Error("invalid_video_content_type");
   }
+  const clen = Number(res.headers.get("content-length") || "0");
+  if (clen && clen > MAX_VIDEO_BYTES) {
+    await logEvent(job.id, "PIPELINE_VIDEO_TOO_LARGE", { contentLength: clen, maxBytes: MAX_VIDEO_BYTES });
+    throw new Error("video_too_large");
+  }
   const buffer = await res.arrayBuffer();
   if (!buffer || buffer.byteLength === 0 || buffer.byteLength < 1000) throw new Error("empty_video_output");
+  if (buffer.byteLength > MAX_VIDEO_BYTES) {
+    await logEvent(job.id, "PIPELINE_VIDEO_TOO_LARGE", { byteLength: buffer.byteLength, maxBytes: MAX_VIDEO_BYTES });
+    throw new Error("video_too_large");
+  }
   const owner = job.user_id || "system";
   const path = `${owner}/${job.id}.mp4`;
   const { error } = await admin.storage.from("generated-videos").upload(path, buffer, { contentType: "video/mp4", upsert: true });
