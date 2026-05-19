@@ -59,6 +59,42 @@ async function persistRenderedUrl(jobId: string, url: string, preferredExt: "mp4
   return uploadBlob(jobId, blob, preferredExt);
 }
 
+async function refreshSignedUrl(url: string): Promise<string> {
+  try {
+    if (!url.includes("supabase.co/storage")) return url;
+    const m = url.match(/\/storage\/v1\/object\/(?:public|sign)\/([^/]+)\/([^?#]+)/);
+    if (!m) return url;
+    const [, bucket, path] = m;
+    const { data } = await supabase.storage.from(bucket).createSignedUrl(decodeURIComponent(path), 3600);
+    return data?.signedUrl || url;
+  } catch {
+    return url;
+  }
+}
+
+async function loadImage(url: string): Promise<HTMLImageElement> {
+  const fresh = await refreshSignedUrl(url);
+  const tryLoad = (src: string, withCors: boolean) =>
+    new Promise<HTMLImageElement>((resolve, reject) => {
+      const img = new Image();
+      if (withCors) img.crossOrigin = "anonymous";
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("image_load_failed"));
+      img.src = src;
+    });
+  try { return await tryLoad(fresh, true); }
+  catch {
+    try {
+      const res = await fetch(fresh, { mode: "cors" });
+      if (!res.ok) throw new Error("fetch_failed");
+      const blob = await res.blob();
+      return await tryLoad(URL.createObjectURL(blob), false);
+    } catch {
+      return await tryLoad(fresh, false);
+    }
+  }
+}
+
 async function canvasCaptureFallback(job: BrowserRenderJob): Promise<string> {
   const imageUrl = resolveImages(job)[0];
   if (!imageUrl) throw new Error("image_url_required");
@@ -69,16 +105,11 @@ async function canvasCaptureFallback(job: BrowserRenderJob): Promise<string> {
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("canvas_unavailable");
 
-  const img = new Image();
-  img.crossOrigin = "anonymous";
-  await new Promise<void>((resolve, reject) => {
-    img.onload = () => resolve();
-    img.onerror = () => reject(new Error("image_load_failed"));
-    img.src = imageUrl;
-  });
+  const img = await loadImage(imageUrl);
 
   const stream = canvas.captureStream(30);
-  const mime = MediaRecorder.isTypeSupported("video/mp4") ? "video/mp4" : "video/webm";
+  const candidates = ["video/mp4;codecs=h264", "video/mp4", "video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
+  const mime = candidates.find((c) => MediaRecorder.isTypeSupported(c)) || "video/webm";
   const chunks: BlobPart[] = [];
   const recorder = new MediaRecorder(stream, { mimeType: mime });
   recorder.ondataavailable = (event) => event.data.size > 0 && chunks.push(event.data);
@@ -87,7 +118,7 @@ async function canvasCaptureFallback(job: BrowserRenderJob): Promise<string> {
     recorder.onstop = () => resolve(new Blob(chunks, { type: mime }));
   });
 
-  recorder.start();
+  recorder.start(100);
   const start = performance.now();
   const durationMs = 6000;
 
@@ -97,23 +128,33 @@ async function canvasCaptureFallback(job: BrowserRenderJob): Promise<string> {
       const t = Math.min(1, elapsed / durationMs);
       ctx.fillStyle = "#000";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      const scale = 1.08 + t * 0.08;
+      const scale = 1.08 + t * 0.12;
       const imgRatio = img.width / img.height;
       const canvasRatio = canvas.width / canvas.height;
       let drawW = canvas.width * scale;
       let drawH = drawW / imgRatio;
-      if (drawH < canvas.height * scale || imgRatio > canvasRatio) {
+      if (imgRatio > canvasRatio) {
         drawH = canvas.height * scale;
         drawW = drawH * imgRatio;
       }
       ctx.drawImage(img, (canvas.width - drawW) / 2, (canvas.height - drawH) / 2, drawW, drawH);
-      ctx.fillStyle = "rgba(0,0,0,0.35)";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "rgba(0,0,0,0.45)";
+      ctx.fillRect(0, canvas.height - 320, canvas.width, 320);
       ctx.fillStyle = "#fff";
       ctx.font = "700 42px sans-serif";
       ctx.textAlign = "center";
-      const caption = (job.prompt || "Seu vídeo pronto").slice(0, 60);
-      ctx.fillText(caption, canvas.width / 2, canvas.height - 180, canvas.width - 80);
+      const caption = (job.prompt || "Seu vídeo pronto").slice(0, 80);
+      const words = caption.split(/\s+/);
+      const lines: string[] = [];
+      let line = "";
+      for (const w of words) {
+        if ((line + " " + w).trim().length > 24) { lines.push(line.trim()); line = w; }
+        else line = (line + " " + w).trim();
+      }
+      if (line) lines.push(line);
+      lines.slice(0, 3).forEach((ln, i) => {
+        ctx.fillText(ln, canvas.width / 2, canvas.height - 200 + i * 52, canvas.width - 80);
+      });
       if (elapsed < durationMs) requestAnimationFrame(draw);
       else resolve();
     };
@@ -123,7 +164,8 @@ async function canvasCaptureFallback(job: BrowserRenderJob): Promise<string> {
   recorder.stop();
   const blob = await done;
   if (blob.size < 1000) throw new Error("empty_video_output");
-  return uploadBlob(job.id, blob, mime === "video/mp4" ? "mp4" : "webm");
+  const ext = mime.startsWith("video/mp4") ? "mp4" : "webm";
+  return uploadBlob(job.id, blob, ext);
 }
 
 export async function renderBrowserFallbackForJob(job: BrowserRenderJob): Promise<{ ok: boolean; videoUrl?: string; error?: string }> {
