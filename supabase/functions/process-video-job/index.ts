@@ -236,17 +236,18 @@ async function renderWithShotstack(job: JobRow, script: string, audioUrl: string
   return null;
 }
 
-async function uploadVideo(jobId: string, url: string) {
+async function uploadVideo(job: JobRow, url: string) {
   const res = await fetch(url);
   if (!res.ok) throw new Error("empty_video_output");
   const buffer = await res.arrayBuffer();
   if (!buffer || buffer.byteLength === 0 || buffer.byteLength < 1000) throw new Error("empty_video_output");
-  const path = `generated/${jobId}.mp4`;
-  const { error } = await admin.storage.from("videos").upload(path, buffer, { contentType: "video/mp4", upsert: true });
+  const owner = job.user_id || "system";
+  const path = `${owner}/${job.id}.mp4`;
+  const { error } = await admin.storage.from("generated-videos").upload(path, buffer, { contentType: "video/mp4", upsert: true });
   if (error) throw error;
-  const { data } = admin.storage.from("videos").getPublicUrl(path);
-  if (!data?.publicUrl) throw new Error("empty_video_output");
-  return data.publicUrl;
+  const { data } = await admin.storage.from("generated-videos").createSignedUrl(path, 60 * 60 * 24 * 7);
+  if (!data?.signedUrl) throw new Error("empty_video_output");
+  return data.signedUrl;
 }
 
 async function processJob(jobId: string) {
@@ -293,7 +294,7 @@ async function processJob(jobId: string) {
 
     await logEvent(jobId, "VIDEO_RENDER_SUCCESS", { url: renderedUrl });
     await updateJob(jobId, { progress: 90, status: "processing", metadata: { ...meta, current_step: "upload", pipeline_lock: true } });
-    const storedUrl = await uploadVideo(jobId, renderedUrl);
+    const storedUrl = await uploadVideo(job, renderedUrl);
     await logEvent(jobId, "VIDEO_UPLOAD_SUCCESS", { url: storedUrl });
 
     if (!storedUrl || storedUrl.trim().length === 0) {
