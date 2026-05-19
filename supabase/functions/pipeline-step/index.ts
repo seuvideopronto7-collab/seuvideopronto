@@ -144,6 +144,19 @@ async function stepGenerateAudio(job: JobRow) {
   }
 }
 
+function isValidVideoUrl(url: string | null | undefined, imageUrl?: string | null): { ok: boolean; reason?: string } {
+  if (!url || typeof url !== "string") return { ok: false, reason: "empty_url" };
+  const t = url.trim();
+  if (t.length === 0) return { ok: false, reason: "empty_url" };
+  if (imageUrl && t === imageUrl) return { ok: false, reason: "image_url_used_as_video" };
+  if (/\.(png|jpe?g|webp|gif|bmp|svg|avif)(\?|#|$)/i.test(t)) return { ok: false, reason: "image_extension_blocked" };
+  if (t.startsWith("blob:") || t.startsWith("data:image")) return { ok: false, reason: "invalid_blob" };
+  let path = t;
+  try { path = new URL(t).pathname; } catch { /* noop */ }
+  if (!/\.(mp4|webm|mov|m4v)$/i.test(path)) return { ok: false, reason: "not_video_extension" };
+  return { ok: true };
+}
+
 async function stepRenderVideo(job: JobRow) {
   await logRenderEvent(job.id, "VIDEO_RENDER_STARTED", { render_mode: "native_pipeline" });
   const imageList = normalizeImages(job);
@@ -158,13 +171,19 @@ async function stepRenderVideo(job: JobRow) {
   });
   const video = r.data?.videoUrl || r.data?.video_url || null;
   if (r.ok && video && String(video).trim().length > 0) {
-    await updateJob(job.id, { video_url: video, provider: "shotstack", render_mode: "native_pipeline" });
-    await logRenderEvent(job.id, "VIDEO_RENDER_COMPLETED", { provider: "video-pipeline", videoUrl: video });
-    return;
+    const check = isValidVideoUrl(String(video), job.image_url);
+    if (!check.ok) {
+      await logRenderEvent(job.id, "PIPELINE_FAKE_VIDEO_BLOCKED", { videoUrl: video, reason: check.reason, stage: "shotstack_response" });
+      // segue para fallback browser
+    } else {
+      await updateJob(job.id, { video_url: video, provider: "shotstack", render_mode: "native_pipeline" });
+      await logRenderEvent(job.id, "VIDEO_RENDER_COMPLETED", { provider: "video-pipeline", videoUrl: video });
+      return;
+    }
   }
 
   await logRenderEvent(job.id, "VIDEO_PIPELINE_RECOVERED", {
-    reason: r.ok ? "empty_video_output" : `video_pipeline_${r.status}`,
+    reason: r.ok ? "empty_or_invalid_video_output" : `video_pipeline_${r.status}`,
     fallback_chain: ["browser_renderer", "ffmpeg.wasm", "canvas_capture"],
   });
   const meta = job.metadata || {};
