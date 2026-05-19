@@ -119,7 +119,6 @@ async function acquireLock(job: JobRow) {
       metadata: nextMeta,
     })
     .eq("id", job.id)
-    .or("metadata->>pipeline_lock.is.null,metadata->>pipeline_lock.eq.false,updated_at.lt." + new Date(Date.now() - LOCK_TTL_MS).toISOString())
     .select("id")
     .maybeSingle();
 
