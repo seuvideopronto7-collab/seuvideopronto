@@ -109,6 +109,19 @@ async function canAccess(job: JobRow, authHeader: string, secret: string) {
   return Boolean(isAdmin);
 }
 
+async function signStorageUrlForJob(job: JobRow, rawUrl: string) {
+  const m = String(rawUrl || "").match(/\/storage\/v1\/object\/(?:public|sign)\/([^/]+)\/([^?#]+)/);
+  if (!m) throw new Error("invalid_storage_url");
+  const [, bucket, path] = m;
+  const decodedPath = decodeURIComponent(path);
+  if (bucket === "media-uploads" && job.user_id && !decodedPath.startsWith(`${job.user_id}/`)) {
+    throw new Error("asset_owner_mismatch");
+  }
+  const { data, error } = await admin.storage.from(bucket).createSignedUrl(decodedPath, 3600);
+  if (error || !data?.signedUrl) throw new Error(error?.message || "asset_sign_failed");
+  return data.signedUrl;
+}
+
 async function acquireLock(job: JobRow): Promise<JobRow | null> {
   const { data, error } = await admin.rpc("claim_video_job", {
     _job_id: job.id,
@@ -438,6 +451,17 @@ serve(async (req) => {
   const job = await fetchJob(jobId);
   if (!job) return json({ error: "Job nao encontrado" }, 404);
   if (!(await canAccess(job, authHeader, secret))) return json({ error: "Unauthorized" }, 401);
+
+  if (body?.action === "sign-storage-url") {
+    try {
+      const signedUrl = await signStorageUrlForJob(job, body?.url || "");
+      return json({ ok: true, signedUrl });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "asset_sign_failed";
+      await logEvent(jobId, "VIDEO_JOB_FAILED", { stage: "asset_sign", error: message });
+      return json({ error: message }, 400);
+    }
+  }
 
   EdgeRuntime.waitUntil(safeProcessJob(jobId));
   return json({ ok: true, accepted: true, id: jobId, status: "processing" }, 202);
