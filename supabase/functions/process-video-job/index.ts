@@ -232,9 +232,12 @@ function isValidVideoUrl(url: string | null | undefined, imageUrl?: string | nul
 async function uploadVideo(job: JobRow, url: string) {
   const res = await fetch(url);
   if (!res.ok) throw new Error("empty_video_output");
-  const ctype = res.headers.get("content-type") || "";
-  if (ctype && !ctype.startsWith("video/")) {
-    throw new Error(`invalid_content_type:${ctype}`);
+  const ctype = (res.headers.get("content-type") || "").toLowerCase();
+  if (ctype) {
+    if (/^image\//.test(ctype) || /^text\/html/.test(ctype) || /^application\/json/.test(ctype)) {
+      throw new Error("invalid_video_content_type");
+    }
+    if (!ctype.startsWith("video/")) throw new Error("invalid_video_content_type");
   }
   const buffer = await res.arrayBuffer();
   if (!buffer || buffer.byteLength === 0 || buffer.byteLength < 1000) throw new Error("empty_video_output");
@@ -326,6 +329,24 @@ async function processJob(jobId: string) {
   }
 }
 
+async function safeProcessJob(jobId: string) {
+  try {
+    await processJob(jobId);
+  } catch (fatal) {
+    const message = fatal instanceof Error ? fatal.message : "fatal_crash";
+    try { await logEvent(jobId, "VIDEO_JOB_FAILED", { error: message, fatal: true }); } catch { /* noop */ }
+    try {
+      await admin.from("video_jobs").update({
+        status: "error",
+        progress: 100,
+        video_url: null,
+        error: message,
+        metadata: { pipeline_lock: false, fatal_crash_at: new Date().toISOString() },
+      } as never).eq("id", jobId);
+    } catch { /* last resort */ }
+  }
+}
+
 async function recoverStalled() {
   const cutoff = new Date(Date.now() - LOCK_TTL_MS).toISOString();
   const { data: jobs } = await admin
@@ -344,7 +365,7 @@ async function recoverStalled() {
       error: null,
       metadata: { ...meta, pipeline_lock: false, recovered_at: new Date().toISOString() },
     });
-    EdgeRuntime.waitUntil(processJob(job.id));
+    EdgeRuntime.waitUntil(safeProcessJob(job.id));
   }
 
   const { data: browserStale } = await admin
@@ -396,6 +417,6 @@ serve(async (req) => {
   if (!job) return json({ error: "Job nao encontrado" }, 404);
   if (!(await canAccess(job, authHeader, secret))) return json({ error: "Unauthorized" }, 401);
 
-  EdgeRuntime.waitUntil(processJob(jobId));
+  EdgeRuntime.waitUntil(safeProcessJob(jobId));
   return json({ ok: true, accepted: true, id: jobId, status: "processing" }, 202);
 });
