@@ -411,6 +411,6 @@ serve(async (req) => {
   if (!serviceCaller && !caller.userId) return json({ error: "unauthorized" }, 401);
   if (!body?.jobId) return json({ error: "jobId_required" }, 400);
   await logRenderEvent(body.jobId, "VIDEO_PIPELINE_STARTED", { status: "accepted" });
-  EdgeRuntime.waitUntil(processOne(body.jobId, caller));
+  EdgeRuntime.waitUntil(safeProcessOne(body.jobId, caller));
   return json({ ok: true, accepted: true, jobId: body.jobId }, 202);
 });
