@@ -236,7 +236,7 @@ export async function generateVideoWithFallback(
       fallbackUsed: true,
       status: "fallback_completed",
       errors,
-      metadata: { duration, format, provider: "ffmpeg-local", generatedAt },
+      metadata: { duration, format, provider: "native_pipeline", generatedAt, render_mode: "native_pipeline" } as any,
     };
   } catch (err: any) {
     const msg = `Local: ${err?.message || err}`;
