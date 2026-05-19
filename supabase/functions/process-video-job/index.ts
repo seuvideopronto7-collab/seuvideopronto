@@ -144,11 +144,11 @@ async function generateAudio(jobId: string, script: string) {
   const apiKey = Deno.env.get("ELEVENLABS_API_KEY") || "";
   if (!apiKey) return null;
   try {
-    const res = await fetch("https://api.elevenlabs.io/v1/text-to-speech/onwK4e9ZLuTAKqWW03F9?output_format=mp3_44100_128", {
+    const res = await fetchWithTimeout("https://api.elevenlabs.io/v1/text-to-speech/onwK4e9ZLuTAKqWW03F9?output_format=mp3_44100_128", {
       method: "POST",
       headers: { "xi-api-key": apiKey, "Content-Type": "application/json" },
       body: JSON.stringify({ text: script, model_id: "eleven_multilingual_v2" }),
-    });
+    }, 15_000);
     if (!res.ok) return null;
     const buffer = await res.arrayBuffer();
     if (buffer.byteLength < 1024) return null;
