@@ -7,6 +7,7 @@ import VideoCardMedia from "./VideoCardMedia";
 import { retryVideoJob, isRetryLocked, autoHealJob } from "@/services/video/retryVideoJob";
 import { runPipelineStep, triggerPipelineRecovery } from "@/services/video/runPipelineStep";
 import { renderBrowserFallbackForJob } from "@/services/video/browserVideoRender";
+import { validateVideoUrl } from "@/services/video/validateVideoUrl";
 
 type VideoJob = {
   id: string;
