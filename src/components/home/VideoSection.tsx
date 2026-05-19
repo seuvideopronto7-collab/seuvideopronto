@@ -137,6 +137,13 @@ const VideoSection = () => {
   useEffect(() => {
     if (!user) return;
     const load = async () => {
+      // Watchdog server-side: marca como failed qualquer job sem heartbeat há >5min
+      try {
+        await supabase.rpc("video_jobs_watchdog", { _stale_minutes: 5 });
+      } catch {
+        // best-effort
+      }
+
       // Isolamento por usuário (gap #1)
       const { data } = await supabase
         .from("video_jobs")
@@ -154,25 +161,6 @@ const VideoSection = () => {
           const meta = j.metadata || {};
           const lockedAt = meta.pipeline_locked_at ? Date.parse(meta.pipeline_locked_at) : 0;
           const lockFresh = Boolean(meta.pipeline_lock) && Date.now() - lockedAt < 5 * 60 * 1000;
-          const updatedAt = j.metadata?.browser_render_started_at
-            ? Date.parse(String(j.metadata.browser_render_started_at))
-            : Date.parse(j.updated_at || j.created_at);
-
-          if (WATCHED_STATUSES.has(j.status) && Number.isFinite(updatedAt) && Date.now() - updatedAt > STUCK_JOB_MS) {
-            logVideoEvent("PIPELINE_TIMEOUT", { jobId: j.id, status: j.status, timeoutMs: STUCK_JOB_MS });
-            supabase
-              .from("video_jobs")
-              .update({
-                status: "failed",
-                progress: 100,
-                video_url: null,
-                error: "pipeline_timeout",
-                metadata: { ...meta, pipeline_lock: false, needs_browser_render: false, timed_out_at: new Date().toISOString() },
-              } as never)
-              .eq("id", j.id)
-              .then(() => {}, () => {});
-            return;
-          }
 
           if (WATCHED_STATUSES.has(j.status) && !lockFresh) {
             const attempts = pipelineAttempts.current[j.id] || 0;
@@ -197,6 +185,7 @@ const VideoSection = () => {
     };
     load();
     const polling = window.setInterval(load, 5000);
+
 
     // Realtime filtrado por user_id (gap #1)
     const channel = supabase
@@ -278,8 +267,10 @@ const VideoSection = () => {
                     <p className="text-[10px] text-muted-foreground/60">
                       {new Date(job.created_at).toLocaleDateString("pt-BR")}
                     </p>
-                    {isFailed && job.error && (
-                      <p className="text-[10px] text-red-400/80 line-clamp-2">{job.error}</p>
+                    {isFailed && (
+                      <p className="text-[10px] text-red-400/80 line-clamp-2">
+                        Tivemos um problema ao renderizar este vídeo. Toque em <strong>Tentar</strong> para reprocessar.
+                      </p>
                     )}
                   </div>
 

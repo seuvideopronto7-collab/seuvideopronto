@@ -518,9 +518,11 @@ export type Database = {
           caption_text: string | null
           created_at: string
           error: string | null
+          error_code: string | null
           id: string
           image_url: string | null
           images: Json
+          last_heartbeat: string
           metadata: Json | null
           progress: number
           prompt: string | null
@@ -538,9 +540,11 @@ export type Database = {
           caption_text?: string | null
           created_at?: string
           error?: string | null
+          error_code?: string | null
           id?: string
           image_url?: string | null
           images?: Json
+          last_heartbeat?: string
           metadata?: Json | null
           progress?: number
           prompt?: string | null
@@ -558,9 +562,11 @@ export type Database = {
           caption_text?: string | null
           created_at?: string
           error?: string | null
+          error_code?: string | null
           id?: string
           image_url?: string | null
           images?: Json
+          last_heartbeat?: string
           metadata?: Json | null
           progress?: number
           prompt?: string | null
@@ -681,6 +687,14 @@ export type Database = {
       }
       increment_videos_used: { Args: { _user_id: string }; Returns: undefined }
       is_user_active: { Args: { _user_id: string }; Returns: boolean }
+      update_video_job_heartbeat: {
+        Args: { _job_id: string }
+        Returns: undefined
+      }
+      video_jobs_watchdog: {
+        Args: { _stale_minutes?: number }
+        Returns: number
+      }
     }
     Enums: {
       app_role: "admin" | "user"
