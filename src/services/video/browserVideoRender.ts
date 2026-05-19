@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import renderVideoNative from "@/lib/video/renderNativeVideo";
 import { renderVideoFromImage } from "@/lib/videoRender";
 import { logVideoEvent } from "./videoLogger";
+import { validateVideoUrl } from "./validateVideoUrl";
 
 type BrowserRenderJob = {
   id: string;
