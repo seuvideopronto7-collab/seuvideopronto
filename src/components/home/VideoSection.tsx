@@ -66,8 +66,6 @@ const VideoSection = () => {
   const [retrying, setRetrying] = useState<string | null>(null);
   const [activeVideo, setActiveVideo] = useState<string | null>(null);
   const [signedUrls, setSignedUrls] = useState<Record<string, { video?: string; image?: string }>>({});
-  // Guard anti-duplo processamento (gap #3)
-  const retryLockRef = useRef<Set<string>>(new Set());
 
   const handleDelete = async (jobId: string) => {
     if (!confirm("Tem certeza que deseja excluir este vídeo?")) return;
@@ -82,47 +80,23 @@ const VideoSection = () => {
     setDeleting(null);
   };
 
-  // Retry unificado (gap #2 + #3) — muda status E dispara process-video-job
+  // Retry unificado via helper (gap #2, #3, #4)
   const handleRetry = async (job: VideoJob) => {
-    // Lock anti-duplo processamento
-    if (retryLockRef.current.has(job.id)) {
-      toast.warning("Retry já em andamento");
-      return;
-    }
-    if (PROCESSING_STATUSES.has(job.status)) {
-      toast.warning("Vídeo já está sendo processado");
-      return;
-    }
-    retryLockRef.current.add(job.id);
     setRetrying(job.id);
-    try {
-      await supabase
-        .from("video_jobs")
-        .update({
-          status: "pending",
-          progress: 0,
-          error: null,
-        })
-        .eq("id", job.id);
-
-      if (job.image_url) {
-        const { error: invokeErr } = await supabase.functions.invoke("process-video-job", {
-          body: {
-            jobId: job.id,
-            imageUrl: job.image_url,
-            prompt: job.prompt,
-          },
-        });
-        if (invokeErr) throw invokeErr;
-      }
-      toast.success("Reprocessamento iniciado");
-    } catch (e: any) {
-      toast.error(e?.message || "Falha ao reprocessar");
-    } finally {
-      setRetrying(null);
-      // Libera o lock após 5s para evitar spam
-      setTimeout(() => retryLockRef.current.delete(job.id), 5000);
+    const res = await retryVideoJob({
+      id: job.id,
+      status: job.status,
+      image_url: job.image_url,
+      prompt: job.prompt,
+    });
+    setRetrying(null);
+    if (!res.ok) {
+      if (res.reason === "LOCKED") toast.warning("Retry já em andamento");
+      else if (res.reason === "ALREADY_PROCESSING") toast.warning("Já está processando");
+      else toast.error(res.reason || "Falha ao reprocessar");
+      return;
     }
+    toast.success("Reprocessamento iniciado");
   };
 
   const resolveUrls = useCallback(async (jobList: VideoJob[]) => {
