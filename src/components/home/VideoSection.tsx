@@ -74,6 +74,7 @@ async function toSignedUrl(url: string | null): Promise<string | null> {
 const VideoSection = () => {
   const { user } = useAuth();
   const [jobs, setJobs] = useState<VideoJob[]>([]);
+  const jobsRef = useRef<VideoJob[]>([]);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [retrying, setRetrying] = useState<string | null>(null);
   const [activeVideo, setActiveVideo] = useState<string | null>(null);
