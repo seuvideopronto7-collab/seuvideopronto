@@ -5,8 +5,12 @@ const IMAGE_EXT = /\.(png|jpe?g|webp|gif|bmp|svg|avif|heic|heif)(\?|#|$)/i;
 const VIDEO_EXT = /\.(mp4|webm|mov|m4v)(\?|#|$)/i;
 
 export type ValidationResult =
-  | { ok: true; url: string; ext: "mp4" | "webm" | "mov" | "m4v" }
-  | { ok: false; reason: string };
+export type ValidationResult = {
+  ok: boolean;
+  url?: string;
+  ext?: "mp4" | "webm" | "mov" | "m4v";
+  reason?: string;
+};
 
 export function validateVideoUrl(url: string | null | undefined, opts?: { allowedImageUrl?: string | null }): ValidationResult {
   if (!url || typeof url !== "string") return { ok: false, reason: "empty_url" };
