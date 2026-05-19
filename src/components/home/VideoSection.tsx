@@ -215,7 +215,7 @@ const VideoSection = () => {
                     {canRetry && (
                       <button
                         onClick={(e) => { e.stopPropagation(); handleRetry(job); }}
-                        disabled={retrying === job.id || retryLockRef.current.has(job.id)}
+                        disabled={retrying === job.id || isRetryLocked(job.id)}
                         className="bg-primary/80 hover:bg-primary text-primary-foreground text-[10px] px-2 py-1 rounded-md flex items-center gap-1 disabled:opacity-50"
                       >
                         <RefreshCw className={`w-3 h-3 ${retrying === job.id ? "animate-spin" : ""}`} />
