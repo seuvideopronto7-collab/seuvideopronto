@@ -33,9 +33,9 @@ export const detectFocus = async (imageUrl: string): Promise<AnimationFocus> => 
   const fallback: AnimationFocus = { x: 0.5, y: 0.5, source: "fallback" };
   if (typeof window === "undefined") return fallback;
   try {
-    const vision = await import(
-      /* @vite-ignore */ "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/+esm"
-    ).catch(() => null);
+    const url = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/+esm";
+    // dynamic import via variable evita type-check do specifier remoto
+    const vision: any = await import(/* @vite-ignore */ url).catch(() => null);
     if (!vision) return fallback;
 
     const { FilesetResolver, FaceDetector } = vision as any;
