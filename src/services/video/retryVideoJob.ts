@@ -59,7 +59,7 @@ export async function autoHealJob(job: {
   image_url?: string | null;
   prompt?: string | null;
 }): Promise<boolean> {
-  const terminal = ["completed", "done", "failed", "error", "fallback_completed"].includes(job.status);
+  const terminal = ["completed", "done", "fallback_completed"].includes(job.status);
   if (!terminal) return false;
   if (job.video_url) return false;
   if (!job.image_url) return false;
