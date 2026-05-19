@@ -8,6 +8,7 @@ import { retryVideoJob, isRetryLocked, autoHealJob } from "@/services/video/retr
 import { runPipelineStep, triggerPipelineRecovery } from "@/services/video/runPipelineStep";
 import { renderBrowserFallbackForJob } from "@/services/video/browserVideoRender";
 import { validateVideoUrl } from "@/services/video/validateVideoUrl";
+import { logVideoEvent } from "@/services/video/videoLogger";
 
 type VideoJob = {
   id: string;
@@ -18,6 +19,7 @@ type VideoJob = {
   image_url: string | null;
   progress: number;
   created_at: string;
+  updated_at?: string | null;
   error?: string | null;
   audio_url?: string | null;
   metadata?: Record<string, any> | null;
@@ -154,7 +156,7 @@ const VideoSection = () => {
           const lockFresh = Boolean(meta.pipeline_lock) && Date.now() - lockedAt < 5 * 60 * 1000;
           const updatedAt = j.metadata?.browser_render_started_at
             ? Date.parse(String(j.metadata.browser_render_started_at))
-            : Date.parse(j.created_at);
+            : Date.parse(j.updated_at || j.created_at);
 
           if (WATCHED_STATUSES.has(j.status) && Number.isFinite(updatedAt) && Date.now() - updatedAt > STUCK_JOB_MS) {
             logVideoEvent("PIPELINE_TIMEOUT", { jobId: j.id, status: j.status, timeoutMs: STUCK_JOB_MS });
