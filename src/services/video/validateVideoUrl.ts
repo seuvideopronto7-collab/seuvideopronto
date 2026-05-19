@@ -4,7 +4,6 @@
 const IMAGE_EXT = /\.(png|jpe?g|webp|gif|bmp|svg|avif|heic|heif)(\?|#|$)/i;
 const VIDEO_EXT = /\.(mp4|webm|mov|m4v)(\?|#|$)/i;
 
-export type ValidationResult =
 export type ValidationResult = {
   ok: boolean;
   url?: string;
