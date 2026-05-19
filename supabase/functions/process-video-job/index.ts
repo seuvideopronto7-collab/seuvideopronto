@@ -380,7 +380,8 @@ serve(async (req) => {
   const apiKey = req.headers.get("apikey") || "";
 
   if (body?.action === "recover") {
-    const allowed = secret === pipelineSecret || authHeader.replace(/^Bearer\s+/i, "") === serviceKey || apiKey === anonKey;
+    const caller = await userFromAuth(authHeader);
+    const allowed = secret === pipelineSecret || authHeader.replace(/^Bearer\s+/i, "") === serviceKey || apiKey === anonKey || Boolean(caller);
     if (!allowed) return json({ error: "Unauthorized" }, 401);
     const result = await recoverStalled();
     return json({ ok: true, ...result });
