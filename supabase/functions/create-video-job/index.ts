@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
+declare const EdgeRuntime: { waitUntil: (promise: Promise<unknown>) => void };
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -10,6 +12,7 @@ const corsHeaders = {
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
+const pipelineSecret = Deno.env.get("PIPELINE_SECRET") || supabaseServiceRoleKey;
 
 const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
   auth: { persistSession: false },
@@ -134,20 +137,38 @@ serve(async (req) => {
       .from("video_jobs")
       .insert({
         user_id: authData.user.id,
-        status: "queued",
+        status: "pending",
         progress: 0,
         image_url: imageUrl,
         prompt: prompt ?? null,
         video_url: null,
+        audio_url: null,
         error: null,
-        priority: resolvePlanConfig(subscription?.plan || "free").priority,
+        provider: "native",
+        render_mode: "native_pipeline",
+        metadata: {
+          pipeline_lock: false,
+          priority: resolvePlanConfig(subscription?.plan || "free").priority,
+          requested_at: new Date().toISOString(),
+        },
       })
       .select("id")
       .single();
 
     if (error) throw error;
 
-    return new Response(JSON.stringify({ id: data.id }), {
+    EdgeRuntime.waitUntil(fetch(`${supabaseUrl}/functions/v1/pipeline-step`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${supabaseServiceRoleKey}`,
+        "x-pipeline-secret": pipelineSecret,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ jobId: data.id, source: "create-video-job" }),
+    }));
+
+    return new Response(JSON.stringify({ id: data.id, status: "pending", accepted: true }), {
+      status: 202,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
