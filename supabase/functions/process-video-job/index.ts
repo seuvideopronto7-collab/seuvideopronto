@@ -243,7 +243,7 @@ function isValidVideoUrl(url: string | null | undefined, imageUrl?: string | nul
 }
 
 async function uploadVideo(job: JobRow, url: string) {
-  const res = await fetch(url);
+  const res = await fetchWithTimeout(url, {}, HTTP_TIMEOUT_MS);
   if (!res.ok) throw new Error("empty_video_output");
   const ctype = (res.headers.get("content-type") || "").toLowerCase();
   if (ctype) {
@@ -252,8 +252,17 @@ async function uploadVideo(job: JobRow, url: string) {
     }
     if (!ctype.startsWith("video/")) throw new Error("invalid_video_content_type");
   }
+  const clen = Number(res.headers.get("content-length") || "0");
+  if (clen && clen > MAX_VIDEO_BYTES) {
+    await logEvent(job.id, "PIPELINE_VIDEO_TOO_LARGE", { contentLength: clen, maxBytes: MAX_VIDEO_BYTES });
+    throw new Error("video_too_large");
+  }
   const buffer = await res.arrayBuffer();
   if (!buffer || buffer.byteLength === 0 || buffer.byteLength < 1000) throw new Error("empty_video_output");
+  if (buffer.byteLength > MAX_VIDEO_BYTES) {
+    await logEvent(job.id, "PIPELINE_VIDEO_TOO_LARGE", { byteLength: buffer.byteLength, maxBytes: MAX_VIDEO_BYTES });
+    throw new Error("video_too_large");
+  }
   const owner = job.user_id || "system";
   const path = `${owner}/${job.id}.mp4`;
   const { error } = await admin.storage.from("generated-videos").upload(path, buffer, { contentType: "video/mp4", upsert: true });
