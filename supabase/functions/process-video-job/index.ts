@@ -216,9 +216,26 @@ async function renderWithShotstack(job: JobRow, script: string, audioUrl: string
   return null;
 }
 
+function isValidVideoUrl(url: string | null | undefined, imageUrl?: string | null): { ok: boolean; reason?: string } {
+  if (!url || typeof url !== "string") return { ok: false, reason: "empty_url" };
+  const t = url.trim();
+  if (t.length === 0) return { ok: false, reason: "empty_url" };
+  if (imageUrl && t === imageUrl) return { ok: false, reason: "image_url_used_as_video" };
+  if (/\.(png|jpe?g|webp|gif|bmp|svg|avif)(\?|#|$)/i.test(t)) return { ok: false, reason: "image_extension_blocked" };
+  if (t.startsWith("blob:") || t.startsWith("data:image")) return { ok: false, reason: "invalid_blob" };
+  let path = t;
+  try { path = new URL(t).pathname; } catch { /* noop */ }
+  if (!/\.(mp4|webm|mov|m4v)$/i.test(path)) return { ok: false, reason: "not_video_extension" };
+  return { ok: true };
+}
+
 async function uploadVideo(job: JobRow, url: string) {
   const res = await fetch(url);
   if (!res.ok) throw new Error("empty_video_output");
+  const ctype = res.headers.get("content-type") || "";
+  if (ctype && !ctype.startsWith("video/")) {
+    throw new Error(`invalid_content_type:${ctype}`);
+  }
   const buffer = await res.arrayBuffer();
   if (!buffer || buffer.byteLength === 0 || buffer.byteLength < 1000) throw new Error("empty_video_output");
   const owner = job.user_id || "system";
