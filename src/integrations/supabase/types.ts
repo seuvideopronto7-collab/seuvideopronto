@@ -437,6 +437,33 @@ export type Database = {
         }
         Relationships: []
       }
+      system_settings: {
+        Row: {
+          ativo: boolean | null
+          chave: string
+          created_at: string | null
+          id: string
+          updated_at: string | null
+          valor: Json
+        }
+        Insert: {
+          ativo?: boolean | null
+          chave: string
+          created_at?: string | null
+          id?: string
+          updated_at?: string | null
+          valor?: Json
+        }
+        Update: {
+          ativo?: boolean | null
+          chave?: string
+          created_at?: string | null
+          id?: string
+          updated_at?: string | null
+          valor?: Json
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
@@ -569,15 +596,69 @@ export type Database = {
         }
         Relationships: []
       }
+      video_render_logs: {
+        Row: {
+          created_at: string | null
+          erro: string | null
+          id: string
+          job_id: string | null
+          metadata: Json | null
+          provider: string | null
+          status: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          erro?: string | null
+          id?: string
+          job_id?: string | null
+          metadata?: Json | null
+          provider?: string | null
+          status?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          erro?: string | null
+          id?: string
+          job_id?: string | null
+          metadata?: Json | null
+          provider?: string | null
+          status?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
-      [_ in never]: never
+      vw_video_render_status: {
+        Row: {
+          chave: string | null
+          motivo: string | null
+          provider: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          chave?: string | null
+          motivo?: never
+          provider?: never
+          status?: never
+          updated_at?: string | null
+        }
+        Update: {
+          chave?: string | null
+          motivo?: never
+          provider?: never
+          status?: never
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       check_device_limit: {
         Args: { _fingerprint: string; _user_id: string }
         Returns: Json
       }
+      fn_resolver_video_provider: { Args: never; Returns: Json }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
