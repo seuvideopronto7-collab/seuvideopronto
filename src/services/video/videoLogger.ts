@@ -1,0 +1,25 @@
+/**
+ * Throttled video pipeline logger.
+ * Same event key won't log more than once per 60s.
+ */
+const lastEmit = new Map<string, number>();
+const THROTTLE_MS = 60_000;
+
+export type VideoLogEvent =
+  | "SHOTSTACK_INVALID_KEY"
+  | "SHOTSTACK_403"
+  | "VIDEO_FALLBACK_TRIGGERED"
+  | "VIDEO_NATIVE_RENDER_STARTED"
+  | "VIDEO_NATIVE_RENDER_COMPLETED"
+  | "VIDEO_PLAYER_ERROR"
+  | "AUTO_HEAL_VIDEO_JOB";
+
+export function logVideoEvent(event: VideoLogEvent, payload?: Record<string, unknown>) {
+  const key = `${event}:${payload?.jobId ?? "global"}`;
+  const now = Date.now();
+  const last = lastEmit.get(key) || 0;
+  if (now - last < THROTTLE_MS) return;
+  lastEmit.set(key, now);
+  // eslint-disable-next-line no-console
+  console.log(`[VIDEO_PIPELINE] ${event}`, payload || {});
+}

@@ -1,9 +1,10 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Film, Clock, CheckCircle2, AlertCircle, Trash2, X, Download, RefreshCw } from "lucide-react";
+import { Film, Clock, CheckCircle2, AlertCircle, Trash2, X, Download, RefreshCw, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import VideoCardMedia from "./VideoCardMedia";
+import { retryVideoJob, isRetryLocked, autoHealJob } from "@/services/video/retryVideoJob";
 
 type VideoJob = {
   id: string;
@@ -65,8 +66,6 @@ const VideoSection = () => {
   const [retrying, setRetrying] = useState<string | null>(null);
   const [activeVideo, setActiveVideo] = useState<string | null>(null);
   const [signedUrls, setSignedUrls] = useState<Record<string, { video?: string; image?: string }>>({});
-  // Guard anti-duplo processamento (gap #3)
-  const retryLockRef = useRef<Set<string>>(new Set());
 
   const handleDelete = async (jobId: string) => {
     if (!confirm("Tem certeza que deseja excluir este vídeo?")) return;
@@ -81,47 +80,23 @@ const VideoSection = () => {
     setDeleting(null);
   };
 
-  // Retry unificado (gap #2 + #3) — muda status E dispara process-video-job
+  // Retry unificado via helper (gap #2, #3, #4)
   const handleRetry = async (job: VideoJob) => {
-    // Lock anti-duplo processamento
-    if (retryLockRef.current.has(job.id)) {
-      toast.warning("Retry já em andamento");
-      return;
-    }
-    if (PROCESSING_STATUSES.has(job.status)) {
-      toast.warning("Vídeo já está sendo processado");
-      return;
-    }
-    retryLockRef.current.add(job.id);
     setRetrying(job.id);
-    try {
-      await supabase
-        .from("video_jobs")
-        .update({
-          status: "pending",
-          progress: 0,
-          error: null,
-        })
-        .eq("id", job.id);
-
-      if (job.image_url) {
-        const { error: invokeErr } = await supabase.functions.invoke("process-video-job", {
-          body: {
-            jobId: job.id,
-            imageUrl: job.image_url,
-            prompt: job.prompt,
-          },
-        });
-        if (invokeErr) throw invokeErr;
-      }
-      toast.success("Reprocessamento iniciado");
-    } catch (e: any) {
-      toast.error(e?.message || "Falha ao reprocessar");
-    } finally {
-      setRetrying(null);
-      // Libera o lock após 5s para evitar spam
-      setTimeout(() => retryLockRef.current.delete(job.id), 5000);
+    const res = await retryVideoJob({
+      id: job.id,
+      status: job.status,
+      image_url: job.image_url,
+      prompt: job.prompt,
+    });
+    setRetrying(null);
+    if (!res.ok) {
+      if (res.reason === "LOCKED") toast.warning("Retry já em andamento");
+      else if (res.reason === "ALREADY_PROCESSING") toast.warning("Já está processando");
+      else toast.error(res.reason || "Falha ao reprocessar");
+      return;
     }
+    toast.success("Reprocessamento iniciado");
   };
 
   const resolveUrls = useCallback(async (jobList: VideoJob[]) => {
@@ -151,6 +126,13 @@ const VideoSection = () => {
       if (data) {
         setJobs(data as VideoJob[]);
         resolveUrls(data as VideoJob[]);
+        // Auto-heal (gap #7): re-enfileira jobs terminais sem video_url
+        (data as VideoJob[]).forEach((j) => {
+          autoHealJob({
+            id: j.id, status: j.status,
+            video_url: j.video_url, image_url: j.image_url, prompt: j.prompt,
+          }).catch(() => {});
+        });
       }
     };
     load();
@@ -211,6 +193,7 @@ const VideoSection = () => {
                   className="group relative rounded-xl overflow-hidden border border-border/30 bg-card/50 backdrop-blur-sm hover:border-primary/40 transition-all hover:shadow-[0_0_20px_-5px_hsl(var(--primary)/0.3)]"
                 >
                   <VideoCardMedia
+                    jobId={job.id}
                     videoUrl={urls.video}
                     imageUrl={urls.image}
                     status={job.status}
@@ -239,7 +222,7 @@ const VideoSection = () => {
                     {canRetry && (
                       <button
                         onClick={(e) => { e.stopPropagation(); handleRetry(job); }}
-                        disabled={retrying === job.id || retryLockRef.current.has(job.id)}
+                        disabled={retrying === job.id || isRetryLocked(job.id)}
                         className="bg-primary/80 hover:bg-primary text-primary-foreground text-[10px] px-2 py-1 rounded-md flex items-center gap-1 disabled:opacity-50"
                       >
                         <RefreshCw className={`w-3 h-3 ${retrying === job.id ? "animate-spin" : ""}`} />
