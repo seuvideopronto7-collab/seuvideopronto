@@ -521,8 +521,11 @@ export type Database = {
           id: string
           image_url: string | null
           images: Json
+          metadata: Json | null
           progress: number
           prompt: string | null
+          provider: string | null
+          render_mode: string | null
           scenes: Json
           status: string
           updated_at: string | null
@@ -538,8 +541,11 @@ export type Database = {
           id?: string
           image_url?: string | null
           images?: Json
+          metadata?: Json | null
           progress?: number
           prompt?: string | null
+          provider?: string | null
+          render_mode?: string | null
           scenes?: Json
           status?: string
           updated_at?: string | null
@@ -555,8 +561,11 @@ export type Database = {
           id?: string
           image_url?: string | null
           images?: Json
+          metadata?: Json | null
           progress?: number
           prompt?: string | null
+          provider?: string | null
+          render_mode?: string | null
           scenes?: Json
           status?: string
           updated_at?: string | null
