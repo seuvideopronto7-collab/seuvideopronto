@@ -92,7 +92,7 @@ const logStage = async (jobId: string | undefined, stage: NativeStage, extra: Re
     if (stage !== "VIDEO_RENDER_FAILED") {
       await supabase
         .from("video_jobs")
-        .update({ progress, status: stage === "VIDEO_UPLOAD_COMPLETE" ? "concluido" : "processando" } as never)
+        .update({ progress, status: stage === "VIDEO_UPLOAD_COMPLETE" ? "completed" : "fallback_processing" } as never)
         .eq("id", jobId);
     }
   } catch {
@@ -210,7 +210,7 @@ export const renderNativeVideo = async (
       try {
         await supabase
           .from("video_jobs")
-          .update({ video_url: videoUrl, status: "concluido", progress: 100 } as never)
+          .update({ video_url: videoUrl, status: "completed", progress: 100 } as never)
           .eq("id", jobId);
       } catch {
         /* tolerante */
@@ -237,7 +237,7 @@ export const renderNativeVideo = async (
       try {
         await supabase
           .from("video_jobs")
-          .update({ status: "erro", error: msg } as never)
+          .update({ status: "error", error: msg } as never)
           .eq("id", jobId);
       } catch {
         /* ignore */
