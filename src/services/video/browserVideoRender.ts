@@ -145,6 +145,11 @@ export async function renderBrowserFallbackForJob(job: BrowserRenderJob): Promis
     });
     if (!native.videoUrl || !native.blob || native.blob.size < 1000) throw new Error("empty_video_output");
     const persistedUrl = native.storagePath ? native.videoUrl : await uploadBlob(job.id, native.blob, "mp4");
+    const v1 = validateVideoUrl(persistedUrl, { allowedImageUrl: job.image_url });
+    if (!v1.ok) {
+      logVideoEvent("PIPELINE_INVALID_VIDEO_URL", { jobId: job.id, stage: "native_renderer", reason: v1.reason, url: persistedUrl });
+      throw new Error("fallback_render_required");
+    }
     await updateJob(job.id, {
       video_url: persistedUrl,
       progress: 100,
@@ -167,6 +172,11 @@ export async function renderBrowserFallbackForJob(job: BrowserRenderJob): Promis
       });
       if (!url) throw new Error("empty_video_output");
       const persistedUrl = await persistRenderedUrl(job.id, url, "mp4");
+      const v2 = validateVideoUrl(persistedUrl, { allowedImageUrl: job.image_url });
+      if (!v2.ok) {
+        logVideoEvent("PIPELINE_INVALID_VIDEO_URL", { jobId: job.id, stage: "ffmpeg_wasm", reason: v2.reason, url: persistedUrl });
+        throw new Error("fallback_render_required");
+      }
       await updateJob(job.id, {
         video_url: persistedUrl,
         progress: 100,
@@ -181,6 +191,11 @@ export async function renderBrowserFallbackForJob(job: BrowserRenderJob): Promis
         const url = await canvasCaptureFallback(job);
         if (!url) throw new Error("empty_video_output");
         const persistedUrl = url;
+        const v3 = validateVideoUrl(persistedUrl, { allowedImageUrl: job.image_url });
+        if (!v3.ok) {
+          logVideoEvent("PIPELINE_INVALID_VIDEO_URL", { jobId: job.id, stage: "canvas_capture", reason: v3.reason, url: persistedUrl });
+          throw new Error("fallback_render_required");
+        }
         await updateJob(job.id, {
           video_url: persistedUrl,
           progress: 100,
@@ -190,16 +205,18 @@ export async function renderBrowserFallbackForJob(job: BrowserRenderJob): Promis
         });
         return { ok: true, videoUrl: persistedUrl };
       } catch (canvasError: any) {
-        const msg = canvasError?.message || ffmpegError?.message || nativeError?.message || "empty_video_output";
+        const raw = canvasError?.message || ffmpegError?.message || nativeError?.message || "empty_video_output";
+        const msg = raw === "Video vazio" ? "empty_video_output" : raw;
+        const finalMsg = msg === "fallback_render_required" ? "fallback_render_required" : msg;
         await updateJob(job.id, {
-          status: "error",
+          status: "failed",
           progress: 100,
           video_url: null,
-          error: msg === "Video vazio" ? "empty_video_output" : msg,
+          error: finalMsg,
           metadata: { ...baseMeta, pipeline_lock: false, needs_browser_render: false, browser_render_failed_at: new Date().toISOString() },
         });
-        logVideoEvent("VIDEO_PIPELINE_FAILED", { jobId: job.id, error: msg });
-        return { ok: false, error: msg };
+        logVideoEvent("VIDEO_PIPELINE_FAILED", { jobId: job.id, error: finalMsg });
+        return { ok: false, error: finalMsg };
       }
     }
   }
