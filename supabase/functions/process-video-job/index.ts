@@ -96,34 +96,14 @@ async function canAccess(job: JobRow, authHeader: string, secret: string) {
   return Boolean(isAdmin);
 }
 
-async function acquireLock(job: JobRow) {
-  const meta = cleanMeta(job.metadata);
-  const lockedAt = meta.pipeline_locked_at ? Date.parse(meta.pipeline_locked_at) : 0;
-  if (meta.pipeline_lock && Date.now() - lockedAt < LOCK_TTL_MS) return false;
-
-  const nextMeta = {
-    ...meta,
-    pipeline_lock: true,
-    pipeline_locked_at: new Date().toISOString(),
-    current_step: "processing",
-  };
-
-  const { data, error } = await admin
-    .from("video_jobs")
-    .update({
-      status: "processing",
-      progress: 5,
-      error: null,
-      provider: "native",
-      render_mode: "native_pipeline",
-      metadata: nextMeta,
-    })
-    .eq("id", job.id)
-    .select("id")
-    .maybeSingle();
-
+async function acquireLock(job: JobRow): Promise<JobRow | null> {
+  const { data, error } = await admin.rpc("claim_video_job", {
+    _job_id: job.id,
+    _lock_ttl_seconds: Math.floor(LOCK_TTL_MS / 1000),
+  });
   if (error) throw error;
-  return Boolean(data?.id);
+  if (!data?.claimed || !data?.job) return null;
+  return data.job as JobRow;
 }
 
 async function releaseLock(jobId: string, meta: Record<string, any>, extra: Record<string, unknown> = {}) {
@@ -255,11 +235,11 @@ async function processJob(jobId: string) {
   if (!job) return;
   if (["completed", "done"].includes(job.status) && job.video_url) return;
 
-  const locked = await acquireLock(job);
-  if (!locked) return;
+  const claimedJob = await acquireLock(job);
+  if (!claimedJob) return;
   await logEvent(jobId, "VIDEO_JOB_CONSUMED", { status: job.status });
 
-  job = (await fetchJob(jobId)) || job;
+  job = claimedJob;
   const meta = cleanMeta(job.metadata);
 
   try {
