@@ -39,6 +39,15 @@ async function uploadBlob(jobId: string, blob: Blob, extension: "mp4" | "webm") 
   return data.signedUrl;
 }
 
+async function persistRenderedUrl(jobId: string, url: string, preferredExt: "mp4" | "webm" = "mp4") {
+  if (!url.startsWith("blob:")) return url;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("empty_video_output");
+  const blob = await res.blob();
+  if (blob.size < 1000) throw new Error("empty_video_output");
+  return uploadBlob(jobId, blob, preferredExt);
+}
+
 async function canvasCaptureFallback(job: BrowserRenderJob): Promise<string> {
   const imageUrl = resolveImages(job)[0];
   if (!imageUrl) throw new Error("image_url_required");
@@ -134,15 +143,16 @@ export async function renderBrowserFallbackForJob(job: BrowserRenderJob): Promis
       },
     });
     if (!native.videoUrl || !native.blob || native.blob.size < 1000) throw new Error("empty_video_output");
+    const persistedUrl = native.storagePath ? native.videoUrl : await uploadBlob(job.id, native.blob, "mp4");
     await updateJob(job.id, {
-      video_url: native.videoUrl,
+      video_url: persistedUrl,
       progress: 100,
       status: "completed",
       error: null,
       metadata: { ...baseMeta, pipeline_lock: false, needs_browser_render: false, browser_render_completed_at: new Date().toISOString() },
     });
     logVideoEvent("VIDEO_RENDER_COMPLETED", { jobId: job.id, provider: "browser_renderer" });
-    return { ok: true, videoUrl: native.videoUrl };
+    return { ok: true, videoUrl: persistedUrl };
   } catch (nativeError: any) {
     try {
       logVideoEvent("VIDEO_FALLBACK_TRIGGERED", { jobId: job.id, fallback: "ffmpeg.wasm", error: nativeError?.message });
@@ -155,27 +165,28 @@ export async function renderBrowserFallbackForJob(job: BrowserRenderJob): Promis
         narrationUrl: job.audio_url || undefined,
       });
       if (!url) throw new Error("empty_video_output");
+      const persistedUrl = await persistRenderedUrl(job.id, url, "mp4");
       await updateJob(job.id, {
-        video_url: url,
+        video_url: persistedUrl,
         progress: 100,
         status: "completed",
         error: null,
         metadata: { ...baseMeta, pipeline_lock: false, needs_browser_render: false, browser_render_completed_at: new Date().toISOString(), fallback_used: "ffmpeg.wasm" },
       });
-      return { ok: true, videoUrl: url };
+      return { ok: true, videoUrl: persistedUrl };
     } catch (ffmpegError: any) {
       try {
         logVideoEvent("VIDEO_FALLBACK_TRIGGERED", { jobId: job.id, fallback: "canvas_capture", error: ffmpegError?.message });
         const url = await canvasCaptureFallback(job);
         if (!url) throw new Error("empty_video_output");
         await updateJob(job.id, {
-          video_url: url,
+          video_url: persistedUrl,
           progress: 100,
           status: "completed",
           error: null,
           metadata: { ...baseMeta, pipeline_lock: false, needs_browser_render: false, browser_render_completed_at: new Date().toISOString(), fallback_used: "canvas_capture" },
         });
-        return { ok: true, videoUrl: url };
+        return { ok: true, videoUrl: persistedUrl };
       } catch (canvasError: any) {
         const msg = canvasError?.message || ffmpegError?.message || nativeError?.message || "empty_video_output";
         await updateJob(job.id, {
