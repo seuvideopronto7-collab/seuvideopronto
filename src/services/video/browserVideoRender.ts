@@ -170,106 +170,49 @@ async function canvasCaptureFallback(job: BrowserRenderJob): Promise<string> {
 
 export async function renderBrowserFallbackForJob(job: BrowserRenderJob): Promise<{ ok: boolean; videoUrl?: string; error?: string }> {
   const images = resolveImages(job);
-  if (images.length === 0) return { ok: false, error: "image_url_required" };
+  if (images.length === 0) {
+    await updateJob(job.id, {
+      status: "failed", progress: 100, video_url: null, error: "image_url_required",
+      metadata: { ...(job.metadata || {}), pipeline_lock: false, needs_browser_render: false },
+    });
+    return { ok: false, error: "image_url_required" };
+  }
 
   const baseMeta = job.metadata || {};
   await updateJob(job.id, {
     status: "fallback_processing",
-    progress: 72,
+    progress: 80,
     error: null,
     provider: "browser",
-    render_mode: "native_pipeline",
+    render_mode: "canvas_capture",
     metadata: { ...baseMeta, pipeline_lock: true, browser_render_started_at: new Date().toISOString() },
   });
 
   try {
-    logVideoEvent("VIDEO_RENDER_STARTED", { jobId: job.id, fallback: "browser_renderer" });
-    const native = await renderVideoNative({
-      jobId: job.id,
-      images,
-      audioUrl: job.audio_url,
-      captionText: job.prompt || undefined,
-      resolution: "720p",
-      uploadToStorage: true,
-      onStage: (_stage, progress) => {
-        updateJob(job.id, { progress: Math.max(72, Math.min(96, progress)), status: "fallback_processing" }).catch(() => {});
-      },
-    });
-    if (!native.videoUrl || !native.blob || native.blob.size < 1000) throw new Error("empty_video_output");
-    const persistedUrl = native.storagePath ? native.videoUrl : await uploadBlob(job.id, native.blob, "mp4");
-    const v1 = validateVideoUrl(persistedUrl, { allowedImageUrl: job.image_url });
-    if (!v1.ok) {
-      logVideoEvent("PIPELINE_INVALID_VIDEO_URL", { jobId: job.id, stage: "native_renderer", reason: v1.reason, url: persistedUrl });
-      throw new Error("fallback_render_required");
-    }
+    logVideoEvent("VIDEO_RENDER_STARTED", { jobId: job.id, fallback: "canvas_capture" });
+    const persistedUrl = await canvasCaptureFallback(job);
+    const v = validateVideoUrl(persistedUrl, { allowedImageUrl: job.image_url });
+    if (!v.ok) throw new Error(v.reason || "fallback_render_required");
     await updateJob(job.id, {
       video_url: persistedUrl,
       progress: 100,
       status: "completed",
       error: null,
-      metadata: { ...baseMeta, pipeline_lock: false, needs_browser_render: false, browser_render_completed_at: new Date().toISOString() },
+      metadata: { ...baseMeta, pipeline_lock: false, needs_browser_render: false, browser_render_completed_at: new Date().toISOString(), fallback_used: "canvas_capture" },
     });
-    logVideoEvent("VIDEO_RENDER_COMPLETED", { jobId: job.id, provider: "browser_renderer" });
+    logVideoEvent("VIDEO_RENDER_COMPLETED", { jobId: job.id, provider: "canvas_capture" });
     return { ok: true, videoUrl: persistedUrl };
-  } catch (nativeError: any) {
-    try {
-      logVideoEvent("VIDEO_FALLBACK_TRIGGERED", { jobId: job.id, fallback: "ffmpeg.wasm", error: nativeError?.message });
-      const url = await renderVideoFromImage(images[0], {
-        durationSec: 6,
-        fps: 30,
-        width: 720,
-        height: 1280,
-        animation: "kenburns",
-        narrationUrl: job.audio_url || undefined,
-      });
-      if (!url) throw new Error("empty_video_output");
-      const persistedUrl = await persistRenderedUrl(job.id, url, "mp4");
-      const v2 = validateVideoUrl(persistedUrl, { allowedImageUrl: job.image_url });
-      if (!v2.ok) {
-        logVideoEvent("PIPELINE_INVALID_VIDEO_URL", { jobId: job.id, stage: "ffmpeg_wasm", reason: v2.reason, url: persistedUrl });
-        throw new Error("fallback_render_required");
-      }
-      await updateJob(job.id, {
-        video_url: persistedUrl,
-        progress: 100,
-        status: "completed",
-        error: null,
-        metadata: { ...baseMeta, pipeline_lock: false, needs_browser_render: false, browser_render_completed_at: new Date().toISOString(), fallback_used: "ffmpeg.wasm" },
-      });
-      return { ok: true, videoUrl: persistedUrl };
-    } catch (ffmpegError: any) {
-      try {
-        logVideoEvent("VIDEO_FALLBACK_TRIGGERED", { jobId: job.id, fallback: "canvas_capture", error: ffmpegError?.message });
-        const url = await canvasCaptureFallback(job);
-        if (!url) throw new Error("empty_video_output");
-        const persistedUrl = url;
-        const v3 = validateVideoUrl(persistedUrl, { allowedImageUrl: job.image_url });
-        if (!v3.ok) {
-          logVideoEvent("PIPELINE_INVALID_VIDEO_URL", { jobId: job.id, stage: "canvas_capture", reason: v3.reason, url: persistedUrl });
-          throw new Error("fallback_render_required");
-        }
-        await updateJob(job.id, {
-          video_url: persistedUrl,
-          progress: 100,
-          status: "completed",
-          error: null,
-          metadata: { ...baseMeta, pipeline_lock: false, needs_browser_render: false, browser_render_completed_at: new Date().toISOString(), fallback_used: "canvas_capture" },
-        });
-        return { ok: true, videoUrl: persistedUrl };
-      } catch (canvasError: any) {
-        const raw = canvasError?.message || ffmpegError?.message || nativeError?.message || "empty_video_output";
-        const msg = raw === "Video vazio" ? "empty_video_output" : raw;
-        const finalMsg = msg === "fallback_render_required" ? "fallback_render_required" : msg;
-        await updateJob(job.id, {
-          status: "failed",
-          progress: 100,
-          video_url: null,
-          error: finalMsg,
-          metadata: { ...baseMeta, pipeline_lock: false, needs_browser_render: false, browser_render_failed_at: new Date().toISOString() },
-        });
-        logVideoEvent("VIDEO_PIPELINE_FAILED", { jobId: job.id, error: finalMsg });
-        return { ok: false, error: finalMsg };
-      }
-    }
+  } catch (err: any) {
+    const raw = err?.message || "empty_video_output";
+    const msg = raw === "Video vazio" ? "empty_video_output" : raw;
+    await updateJob(job.id, {
+      status: "failed",
+      progress: 100,
+      video_url: null,
+      error: msg,
+      metadata: { ...baseMeta, pipeline_lock: false, needs_browser_render: false, browser_render_failed_at: new Date().toISOString() },
+    });
+    logVideoEvent("VIDEO_PIPELINE_FAILED", { jobId: job.id, error: msg });
+    return { ok: false, error: msg };
   }
 }
