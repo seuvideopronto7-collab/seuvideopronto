@@ -365,6 +365,23 @@ async function runAutoRecovery(): Promise<{ recovered: number }> {
   return { recovered: stuck.length };
 }
 
+async function safeProcessOne(jobId: string, caller: Caller) {
+  try {
+    await processOne(jobId, caller);
+  } catch (fatal) {
+    const message = fatal instanceof Error ? fatal.message : "fatal_crash";
+    try { await logRenderEvent(jobId, "VIDEO_PIPELINE_FAILED", { error: message, fatal: true }); } catch { /* noop */ }
+    try {
+      await admin.from("video_jobs").update({
+        status: "error",
+        progress: 100,
+        video_url: null,
+        error: message,
+        metadata: { pipeline_lock: false, fatal_crash_at: new Date().toISOString() },
+      } as never).eq("id", jobId);
+    } catch { /* last resort */ }
+  }
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
