@@ -116,13 +116,12 @@ serve(async (req) => {
 
     if (!validateResponse.ok) {
       const validateRaw = await validateResponse.text().catch(() => "");
-      console.log("Eduzz validate failed status:", validateResponse.status);
+      console.error("[eduzz-connect] validate failed:", validateResponse.status, validateRaw);
       return new Response(
         JSON.stringify({
           success: false,
           error:
             "Falha na conexão com a Eduzz. Verifique credenciais, escopos e formato da requisição.",
-          details: validateRaw,
         }),
         {
           status: 200,
