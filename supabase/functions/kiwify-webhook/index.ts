@@ -119,7 +119,14 @@ serve(async (req) => {
       produto: product.name || "",
       valor,
       status,
-      raw_payload: payload,
+      raw_payload: {
+        external_id: externalId,
+        email: customer.email || "",
+        nome: customer.name || "",
+        produto: product.name || "",
+        valor,
+        status,
+      },
     };
 
     const insertQuery = externalId

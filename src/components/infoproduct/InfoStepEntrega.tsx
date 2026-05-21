@@ -266,8 +266,8 @@ const InfoStepEntrega = ({ estruturaData, conteudoData, vslData, kitData, onNewP
       return;
     }
     setLogs((prev) => [`${new Date().toLocaleTimeString()} • Produto preparado (Hotmart não permite envio direto)`, ...prev]);
-    if (hotmartToken) {
-      console.log("Token válido:", hotmartToken);
+    if (!hotmartToken) {
+      // token check without logging the value
     }
     toast.success("Produto preparado para envio manual.");
   };

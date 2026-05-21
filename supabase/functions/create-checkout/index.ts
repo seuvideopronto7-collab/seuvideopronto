@@ -38,7 +38,12 @@ serve(async (req) => {
       customerId = customers.data[0].id;
     }
 
-    const origin = req.headers.get("origin") || "https://seuvideopronto.lovable.app";
+    const ALLOWED_ORIGINS = [
+      "https://seuvideopronto.lovable.app",
+      "https://id-preview--89a5f473-46e8-426b-be16-eb5f8c80a30a.lovable.app",
+    ];
+    const rawOrigin = req.headers.get("origin") || "";
+    const origin = ALLOWED_ORIGINS.includes(rawOrigin) ? rawOrigin : ALLOWED_ORIGINS[0];
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
