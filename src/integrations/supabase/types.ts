@@ -519,6 +519,10 @@ export type Database = {
           created_at: string
           error: string | null
           error_code: string | null
+          error_message: string | null
+          error_phase: string | null
+          error_stack: string | null
+          failed_reason: string | null
           id: string
           image_url: string | null
           images: Json
@@ -541,6 +545,10 @@ export type Database = {
           created_at?: string
           error?: string | null
           error_code?: string | null
+          error_message?: string | null
+          error_phase?: string | null
+          error_stack?: string | null
+          failed_reason?: string | null
           id?: string
           image_url?: string | null
           images?: Json
@@ -563,6 +571,10 @@ export type Database = {
           created_at?: string
           error?: string | null
           error_code?: string | null
+          error_message?: string | null
+          error_phase?: string | null
+          error_stack?: string | null
+          failed_reason?: string | null
           id?: string
           image_url?: string | null
           images?: Json
