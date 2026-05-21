@@ -84,12 +84,12 @@ serve(async (req) => {
     console.log("Eduzz response status:", tokenResponse.status);
 
     if (!tokenResponse.ok) {
+      console.error("[eduzz-connect] token error:", tokenResponse.status, tokenRaw);
       return new Response(
         JSON.stringify({
           success: false,
           error:
             "Falha na conexão com a Eduzz. Verifique credenciais, escopos e formato da requisição.",
-          details: tokenRaw,
         }),
         {
           status: 200,
