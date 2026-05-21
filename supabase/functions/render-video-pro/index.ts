@@ -100,7 +100,8 @@ Deno.serve(async (req) => {
       if (r.status !== 401 && r.status !== 403) break;
     }
     if (!renderRes) {
-      return json({ error: "shotstack failed", status: lastStatus, detail: renderData }, 500);
+      console.error("[render-video-pro] shotstack failed:", lastStatus, renderData);
+      return json({ error: "Falha ao iniciar renderização. Tente novamente." }, 500);
     }
 
     return json({
