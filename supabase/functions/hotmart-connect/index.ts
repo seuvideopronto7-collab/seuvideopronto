@@ -82,9 +82,9 @@ serve(async (req) => {
 
     if (!tokenResponse.ok) {
       const errorText = await tokenResponse.text();
-      console.log("Hotmart token error:", { status: tokenResponse.status, body: errorText });
+      console.error("[hotmart-connect] token error:", { status: tokenResponse.status, body: errorText });
       return new Response(
-        JSON.stringify({ success: false, error: "Falha ao autenticar na Hotmart.", details: errorText }),
+        JSON.stringify({ success: false, error: "Falha ao autenticar na Hotmart. Verifique suas credenciais." }),
         {
           status: 200,
           headers: responseHeaders,
