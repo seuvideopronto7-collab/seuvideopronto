@@ -391,7 +391,9 @@ async function processOne(jobId: string, caller: Caller) {
   }
 }
 
-async function runAutoRecovery(): Promise<{ recovered: number }> {
+const MAX_RECOVERY_ATTEMPTS = 3;
+
+async function runAutoRecovery(): Promise<{ recovered: number; killed: number }> {
   const fiveMinAgo = new Date(Date.now() - STUCK_TIMEOUT_MS).toISOString();
   const { data: stuck } = await admin
     .from("video_jobs")
@@ -400,17 +402,44 @@ async function runAutoRecovery(): Promise<{ recovered: number }> {
     .lt("updated_at", fiveMinAgo)
     .limit(20);
 
-  if (!stuck || stuck.length === 0) return { recovered: 0 };
+  if (!stuck || stuck.length === 0) return { recovered: 0, killed: 0 };
 
+  let recovered = 0;
+  let killed = 0;
   for (const j of stuck) {
-    await logRenderEvent(j.id, "VIDEO_PIPELINE_RECOVERED", { status: j.status, reason: "watchdog_5min" });
+    const meta = (j.metadata || {}) as Record<string, any>;
+    const attempts = Number(meta.recovery_attempts || 0);
+
+    // Cap anti-loop: depois de N tentativas falhas, encerra como failed
+    if (attempts >= MAX_RECOVERY_ATTEMPTS) {
+      await logRenderEvent(j.id, "VIDEO_PIPELINE_FAILED", {
+        status: j.status, reason: "recovery_attempts_exhausted", attempts,
+      });
+      await updateJob(j.id, {
+        status: "failed",
+        progress: 100,
+        video_url: null,
+        error: "recovery_attempts_exhausted",
+        metadata: { ...meta, pipeline_lock: false, needs_browser_render: false, recovery_killed_at: new Date().toISOString() },
+      });
+      killed += 1;
+      continue;
+    }
+
+    await logRenderEvent(j.id, "VIDEO_PIPELINE_RECOVERED", { status: j.status, reason: "watchdog_5min", attempts: attempts + 1 });
     await updateJob(j.id, {
       status: j.status === "processing" ? "pending" : j.status,
-      metadata: { ...(j.metadata || {}), pipeline_lock: false, recovered_at: new Date().toISOString() },
+      metadata: {
+        ...meta,
+        pipeline_lock: false,
+        recovered_at: new Date().toISOString(),
+        recovery_attempts: attempts + 1,
+      },
     });
     chainNext(j.id);
+    recovered += 1;
   }
-  return { recovered: stuck.length };
+  return { recovered, killed };
 }
 
 async function safeProcessOne(jobId: string, caller: Caller) {
