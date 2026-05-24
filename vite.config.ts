@@ -15,12 +15,10 @@ export default defineConfig(({ mode }) => {
       hmr: {
         overlay: false,
       },
-      // Habilita SharedArrayBuffer para ffmpeg.wasm (multi-thread futuro).
-      // Single-thread já funciona sem isso, mas adicionar é defensivo e
-      // remove warnings de `crossOriginIsolated` no console.
+      // Habilita SharedArrayBuffer (crossOriginIsolated) para ffmpeg.wasm.
       headers: {
         "Cross-Origin-Opener-Policy": "same-origin",
-        "Cross-Origin-Embedder-Policy": "credentialless",
+        "Cross-Origin-Embedder-Policy": "require-corp",
       },
       proxy: supabaseUrl
         ? {
@@ -31,6 +29,12 @@ export default defineConfig(({ mode }) => {
             },
           }
         : undefined,
+    },
+    preview: {
+      headers: {
+        "Cross-Origin-Opener-Policy": "same-origin",
+        "Cross-Origin-Embedder-Policy": "require-corp",
+      },
     },
     plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
     resolve: {
