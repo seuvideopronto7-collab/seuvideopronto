@@ -229,9 +229,85 @@ export async function generateVideoWithFallback(
   try {
     options.onEngineChange?.("local", ENGINE_LABELS.local);
     const url = await tryLocalEngine(input, options);
+    console.log("[VIDEO_LOCAL_RENDER_SUCCESS]", { jobId: options.jobId, isBlob: url.startsWith("blob:") });
+
+    // Persistência: se for blob: URL, sobe para Storage e atualiza video_jobs.video_url
+    let finalUrl = url;
+    let persistError: string | null = null;
+    if (url.startsWith("blob:")) {
+      try {
+        console.log("[VIDEO_STORAGE_UPLOAD_STARTED]", { jobId: options.jobId });
+        const blob = await (await fetch(url)).blob();
+        if (!blob || blob.size < 1000) throw new Error("blob inválido (vazio)");
+
+        const { data: { user } } = await supabase.auth.getUser();
+        const ownerPrefix = user?.id ? `${user.id}/` : "anonymous/";
+        const fileName = `${ownerPrefix}fallback-${options.jobId || crypto.randomUUID()}-${Date.now()}.mp4`;
+
+        const { error: upErr } = await supabase.storage
+          .from("generated-videos")
+          .upload(fileName, blob, { contentType: "video/mp4", upsert: false });
+        if (upErr) throw upErr;
+
+        const { data: signed, error: signErr } = await supabase.storage
+          .from("generated-videos")
+          .createSignedUrl(fileName, 60 * 60 * 24 * 7);
+        if (signErr || !signed?.signedUrl) throw signErr || new Error("signed URL ausente");
+
+        finalUrl = signed.signedUrl;
+        try { URL.revokeObjectURL(url); } catch { /* noop */ }
+        console.log("[VIDEO_STORAGE_UPLOAD_SUCCESS]", { jobId: options.jobId, path: fileName });
+
+        if (options.jobId) {
+          await supabase
+            .from("video_jobs")
+            .update({
+              video_url: finalUrl,
+              status: "fallback_completed",
+              progress: 100,
+              error: null,
+            })
+            .eq("id", options.jobId);
+        }
+      } catch (upErr: any) {
+        persistError = upErr?.message || String(upErr);
+        console.error("[VIDEO_STORAGE_UPLOAD_FAILED]", { jobId: options.jobId, error: persistError });
+        if (options.jobId) {
+          await supabase
+            .from("video_jobs")
+            .update({
+              status: "failed",
+              progress: 100,
+              error: `local_persist_failed: ${persistError}`,
+              error_code: "local_persist_failed",
+              video_url: null,
+            })
+            .eq("id", options.jobId);
+        }
+        addSystemLog({ level: "error", etapa: "video", status: "failed", motivo: `Upload local falhou: ${persistError}` });
+        errors.push(`LocalPersist: ${persistError}`);
+        return {
+          videoUrl: null,
+          engine: null,
+          fallbackUsed: true,
+          status: "failed",
+          errors,
+          metadata: { duration, format, provider: "none", generatedAt },
+        };
+      }
+    } else if (options.jobId) {
+      // URL já persistida (ex.: signed URL)
+      await supabase
+        .from("video_jobs")
+        .update({ video_url: finalUrl, status: "fallback_completed", progress: 100, error: null })
+        .eq("id", options.jobId);
+    } else {
+      console.warn("[VIDEO_JOB_COMPLETED_WITHOUT_URL]", { reason: "no_jobId_to_persist" });
+    }
+
     addSystemLog({ level: "warning", etapa: "video", status: "local_completed", motivo: "Render local gratuito" });
     return {
-      videoUrl: url,
+      videoUrl: finalUrl,
       engine: "local",
       fallbackUsed: true,
       status: "fallback_completed",
@@ -253,6 +329,7 @@ export async function generateVideoWithFallback(
     };
   }
 }
+
 
 /**
  * Mensagem amigável de status.
