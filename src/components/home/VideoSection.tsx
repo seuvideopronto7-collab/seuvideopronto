@@ -105,11 +105,19 @@ const VideoSection = () => {
   // Retry unificado via helper (gap #2, #3, #4)
   const handleRetry = async (job: VideoJob) => {
     setRetrying(job.id);
+    // Reset contadores para permitir novos nudges após retry manual
+    pipelineAttempts.current[job.id] = 0;
+    pipelineLastStatus.current[job.id] = "";
+    resetAutoHealAttempts(job.id);
+    logVideoEvent("PIPELINE_RETRY_MANUAL", {
+      jobId: job.id, old_status: job.status, timestamp: Date.now(),
+    });
     const res = await retryVideoJob({
       id: job.id,
       status: job.status,
       image_url: job.image_url,
       prompt: job.prompt,
+      metadata: job.metadata,
     });
     setRetrying(null);
     if (!res.ok) {
