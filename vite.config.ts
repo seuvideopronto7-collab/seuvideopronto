@@ -15,10 +15,11 @@ export default defineConfig(({ mode }) => {
       hmr: {
         overlay: false,
       },
-      // Habilita SharedArrayBuffer (crossOriginIsolated) para ffmpeg.wasm.
+      // crossOriginIsolated p/ ffmpeg.wasm SEM bloquear recursos do Supabase (avatars, vídeos assinados).
+      // 'credentialless' não exige CORP nos responses cross-origin.
       headers: {
         "Cross-Origin-Opener-Policy": "same-origin",
-        "Cross-Origin-Embedder-Policy": "require-corp",
+        "Cross-Origin-Embedder-Policy": "credentialless",
       },
       proxy: supabaseUrl
         ? {
@@ -33,7 +34,7 @@ export default defineConfig(({ mode }) => {
     preview: {
       headers: {
         "Cross-Origin-Opener-Policy": "same-origin",
-        "Cross-Origin-Embedder-Policy": "require-corp",
+        "Cross-Origin-Embedder-Policy": "credentialless",
       },
     },
     plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
