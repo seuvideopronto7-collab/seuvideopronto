@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Film, Clock, CheckCircle2, AlertCircle, Trash2, X, Download, RefreshCw, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import VideoCardMedia from "./VideoCardMedia";
-import { retryVideoJob, isRetryLocked, autoHealJob } from "@/services/video/retryVideoJob";
+import { retryVideoJob, isRetryLocked, autoHealJob, resetAutoHealAttempts } from "@/services/video/retryVideoJob";
 import { runPipelineStep, triggerPipelineRecovery } from "@/services/video/runPipelineStep";
 import { renderBrowserFallbackForJob } from "@/services/video/browserVideoRender";
 import { validateVideoUrl } from "@/services/video/validateVideoUrl";
@@ -86,6 +86,7 @@ const VideoSection = () => {
   const [activeVideo, setActiveVideo] = useState<string | null>(null);
   const [signedUrls, setSignedUrls] = useState<Record<string, { video?: string; image?: string }>>({});
   const pipelineAttempts = useRef<Record<string, number>>({});
+  const pipelineLastStatus = useRef<Record<string, string>>({});
   const browserRenderAttempts = useRef<Record<string, number>>({});
 
   const handleDelete = async (jobId: string) => {
@@ -104,11 +105,19 @@ const VideoSection = () => {
   // Retry unificado via helper (gap #2, #3, #4)
   const handleRetry = async (job: VideoJob) => {
     setRetrying(job.id);
+    // Reset contadores para permitir novos nudges após retry manual
+    pipelineAttempts.current[job.id] = 0;
+    pipelineLastStatus.current[job.id] = "";
+    resetAutoHealAttempts(job.id);
+    logVideoEvent("PIPELINE_RETRY_MANUAL", {
+      jobId: job.id, old_status: job.status, timestamp: Date.now(),
+    });
     const res = await retryVideoJob({
       id: job.id,
       status: job.status,
       image_url: job.image_url,
       prompt: job.prompt,
+      metadata: job.metadata,
     });
     setRetrying(null);
     if (!res.ok) {
@@ -162,10 +171,23 @@ const VideoSection = () => {
           const lockedAt = meta.pipeline_locked_at ? Date.parse(meta.pipeline_locked_at) : 0;
           const lockFresh = Boolean(meta.pipeline_lock) && Date.now() - lockedAt < 5 * 60 * 1000;
 
+          // Reset attempts quando status muda (sobrevive ao polling)
+          const prev = pipelineLastStatus.current[j.id];
+          if (prev !== undefined && prev !== j.status) {
+            pipelineAttempts.current[j.id] = 0;
+            logVideoEvent("PIPELINE_STATUS_CHANGED", {
+              jobId: j.id, old_status: prev, new_status: j.status, timestamp: Date.now(),
+            });
+          }
+          pipelineLastStatus.current[j.id] = j.status;
+
           if (WATCHED_STATUSES.has(j.status) && !lockFresh) {
             const attempts = pipelineAttempts.current[j.id] || 0;
-            if (attempts < 1) {
+            if (attempts < 3) {
               pipelineAttempts.current[j.id] = attempts + 1;
+              logVideoEvent("PIPELINE_NUDGE", {
+                jobId: j.id, status: j.status, attempts: attempts + 1, timestamp: Date.now(),
+              });
               runPipelineStep(j.id).catch(() => {});
             }
           }
@@ -178,6 +200,7 @@ const VideoSection = () => {
           autoHealJob({
             id: j.id, status: j.status,
             video_url: j.video_url, image_url: j.image_url, prompt: j.prompt,
+            updated_at: j.updated_at, metadata: j.metadata,
           }).catch(() => {});
         });
         triggerPipelineRecovery().catch(() => {});
