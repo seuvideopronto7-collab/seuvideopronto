@@ -86,6 +86,7 @@ const VideoSection = () => {
   const [activeVideo, setActiveVideo] = useState<string | null>(null);
   const [signedUrls, setSignedUrls] = useState<Record<string, { video?: string; image?: string }>>({});
   const pipelineAttempts = useRef<Record<string, number>>({});
+  const pipelineLastStatus = useRef<Record<string, string>>({});
   const browserRenderAttempts = useRef<Record<string, number>>({});
 
   const handleDelete = async (jobId: string) => {
