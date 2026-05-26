@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Film, Clock, CheckCircle2, AlertCircle, Trash2, X, Download, RefreshCw, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import VideoCardMedia from "./VideoCardMedia";
-import { retryVideoJob, isRetryLocked, autoHealJob } from "@/services/video/retryVideoJob";
+import { retryVideoJob, isRetryLocked, autoHealJob, resetAutoHealAttempts } from "@/services/video/retryVideoJob";
 import { runPipelineStep, triggerPipelineRecovery } from "@/services/video/runPipelineStep";
 import { renderBrowserFallbackForJob } from "@/services/video/browserVideoRender";
 import { validateVideoUrl } from "@/services/video/validateVideoUrl";
