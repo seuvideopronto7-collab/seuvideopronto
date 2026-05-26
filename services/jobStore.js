@@ -1,10 +1,11 @@
 const jobs = new Map();
 let nextId = 1;
 
-const createJob = ({ imageUrl, productType, style, useDarkflow, useViral }) => {
+const createJob = ({ imageUrl, productType, style, useDarkflow, useViral, userId }) => {
   const id = String(nextId++);
   const job = {
     id,
+    user_id: userId || null,
     imageUrl: imageUrl || null,
     productType: productType || null,
     style: style || null,
@@ -12,6 +13,8 @@ const createJob = ({ imageUrl, productType, style, useDarkflow, useViral }) => {
     useViral: Boolean(useViral),
     status: "queued",
     progress: 0,
+    video_url: null,
+    error: null,
     error_message: null,
     created_at: new Date().toISOString()
   };
