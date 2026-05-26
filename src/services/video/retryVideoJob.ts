@@ -49,9 +49,14 @@ export function isRetryLocked(jobId: string) {
 }
 
 /**
- * Auto-heal: if a terminal job has no video_url but has image_url, re-enqueue via native pipeline.
- * Throttled by retryLock so it won't spam.
+ * Auto-heal:
+ *  - terminal "completed/done/fallback_completed" sem video_url → re-enfileira
+ *  - "failed/error" com image_url → re-tenta UMA vez por sessão (cap)
+ * Throttled por retryLock + autoHealAttempts.
  */
+const autoHealAttempts = new Map<string, number>();
+const AUTO_HEAL_MAX = 1;
+
 export async function autoHealJob(job: {
   id: string;
   status: string;
@@ -59,13 +64,18 @@ export async function autoHealJob(job: {
   image_url?: string | null;
   prompt?: string | null;
 }): Promise<boolean> {
-  const terminal = ["completed", "done", "fallback_completed"].includes(job.status);
-  if (!terminal) return false;
-  if (job.video_url) return false;
+  const isTerminalMissingUrl =
+    ["completed", "done", "fallback_completed"].includes(job.status) && !job.video_url;
+  const isFailed = ["failed", "error"].includes(job.status);
+  if (!isTerminalMissingUrl && !isFailed) return false;
   if (!job.image_url) return false;
   if (retryLock.has(job.id)) return false;
 
-  logVideoEvent("AUTO_HEAL_VIDEO_JOB", { jobId: job.id, fromStatus: job.status });
+  const attempts = autoHealAttempts.get(job.id) || 0;
+  if (attempts >= AUTO_HEAL_MAX) return false;
+  autoHealAttempts.set(job.id, attempts + 1);
+
+  logVideoEvent("AUTO_HEAL_VIDEO_JOB", { jobId: job.id, fromStatus: job.status, attempt: attempts + 1 });
   const res = await retryVideoJob({
     id: job.id,
     status: "failed",
