@@ -171,10 +171,23 @@ const VideoSection = () => {
           const lockedAt = meta.pipeline_locked_at ? Date.parse(meta.pipeline_locked_at) : 0;
           const lockFresh = Boolean(meta.pipeline_lock) && Date.now() - lockedAt < 5 * 60 * 1000;
 
+          // Reset attempts quando status muda (sobrevive ao polling)
+          const prev = pipelineLastStatus.current[j.id];
+          if (prev !== undefined && prev !== j.status) {
+            pipelineAttempts.current[j.id] = 0;
+            logVideoEvent("PIPELINE_STATUS_CHANGED", {
+              jobId: j.id, old_status: prev, new_status: j.status, timestamp: Date.now(),
+            });
+          }
+          pipelineLastStatus.current[j.id] = j.status;
+
           if (WATCHED_STATUSES.has(j.status) && !lockFresh) {
             const attempts = pipelineAttempts.current[j.id] || 0;
-            if (attempts < 1) {
+            if (attempts < 3) {
               pipelineAttempts.current[j.id] = attempts + 1;
+              logVideoEvent("PIPELINE_NUDGE", {
+                jobId: j.id, status: j.status, attempts: attempts + 1, timestamp: Date.now(),
+              });
               runPipelineStep(j.id).catch(() => {});
             }
           }
@@ -187,6 +200,7 @@ const VideoSection = () => {
           autoHealJob({
             id: j.id, status: j.status,
             video_url: j.video_url, image_url: j.image_url, prompt: j.prompt,
+            updated_at: j.updated_at, metadata: j.metadata,
           }).catch(() => {});
         });
         triggerPipelineRecovery().catch(() => {});
