@@ -77,17 +77,8 @@ const logStage = async (jobId: string | undefined, stage: NativeStage, extra: Re
   const progress = STAGE_PROGRESS[stage];
   console.log(`[nativeRenderer] ${stage} (${progress}%)`, extra);
   if (!jobId) return;
-  try {
-    await supabase.from("job_logs" as never).insert({
-      job_id: jobId,
-      stage: "render",
-      level: stage === "VIDEO_RENDER_FAILED" ? "error" : "info",
-      message: stage,
-      payload_json: { progress, render_mode: "native_pipeline", ...extra },
-    } as never);
-  } catch {
-    /* job_logs pode não existir / FK falhar — best-effort */
-  }
+  // NOTE: job_logs pertence a pipeline_jobs (FK + RLS). Inserir com video_jobs.id
+  // gera 400 no console. Logging fica apenas no console para nativeRenderer.
   try {
     if (stage !== "VIDEO_RENDER_FAILED") {
       await supabase
